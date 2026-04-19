@@ -1,0 +1,45 @@
+src/components/LoadingScreen.tsx
+  e01d65850bca41d3 1-7
+src/components/Sidebar.tsx
+  e01d65850bca41d3 1-2,6,9,71-76,89-95,127-133
+src/main/ProjectStore.ts
+  e01d65850bca41d3 1-96
+src/preload.ts
+  e01d65850bca41d3 2,6-13
+src/main/TaskStore.ts
+  e01d65850bca41d3 7-8,17,49-67,70-91,94,101
+src/components/WelcomeScreen.tsx
+  e01d65850bca41d3 1-49
+src/main.ts
+  e01d65850bca41d3 1,3-4,7-8,15-19,24-25,27,44-47,72-92,94-146,148,150,173
+src/components/TopBar.tsx
+  e01d65850bca41d3 1-2,4,9,11-14
+src/types.ts
+  e01d65850bca41d3 5-11,19
+src/App.tsx
+  e01d65850bca41d3 3,8-9,18-19,28-32,34-36,39-40,151-168,175-206,216-222,226-238
+src/components/AppShell.tsx
+  e01d65850bca41d3 2,7-8,13-19,22-27
+src/env.d.ts
+  e01d65850bca41d3 2,8-12,18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "e546c8c7418cd9c6694f3c0dcffee63251d47100",
+  "prompts": {
+    "e01d65850bca41d3": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7ae915b5-7acf-4242-9213-191ab578ea20",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 486,
+      "total_deletions": 87,
+      "accepted_lines": 474,
+      "overriden_lines": 0
+    }
+  }
+}
