@@ -1,0 +1,29 @@
+src/components/TaskDetailPanel.tsx
+  06b1b27bf4d6f07e 1,3,5,58-66,77-80,119-137,141-177,179-182,184-186,190-209,212-231
+src/components/Terminal.tsx
+  06b1b27bf4d6f07e 1-112
+src/hooks/useFakeSession.ts
+  06b1b27bf4d6f07e 1-35
+src/renderer.tsx
+  06b1b27bf4d6f07e 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "2bc4082d2cd497f31e9a7503302f9820c00b6f3d",
+  "prompts": {
+    "06b1b27bf4d6f07e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3c653fd1-9b01-4818-94ff-882338b70ab6",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 298,
+      "total_deletions": 102,
+      "accepted_lines": 268,
+      "overriden_lines": 0
+    }
+  }
+}
