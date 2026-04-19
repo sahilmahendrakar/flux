@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DropResult } from '@hello-pangea/dnd';
-import { Task, TaskStatus, Agent } from './types';
+import { Task, TaskStatus, Agent, Project } from './types';
 import Board from './components/Board';
 import TaskDetailPanel from './components/TaskDetailPanel';
 import { AppShell } from './components/AppShell';
 import { TopBar } from './components/TopBar';
+import { LoadingScreen } from './components/LoadingScreen';
+import { WelcomeScreen } from './components/WelcomeScreen';
 import type { WorkspaceNavView } from './components/Sidebar';
 
 type TaskPatch = Partial<Pick<Task, 'title' | 'status' | 'agent' | 'description'>>;
@@ -13,8 +15,9 @@ const UPDATE_DEBOUNCE_MS = 300;
 
 export default function App() {
   const isMac = window.electronAPI.platform === 'darwin';
+  const [project, setProject] = useState<Project | null>(null);
+  const [projectLoading, setProjectLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [workspaceView, setWorkspaceView] = useState<WorkspaceNavView>('board');
 
@@ -22,16 +25,19 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    window.electronAPI.tasks
-      .getAll()
-      .then((all) => {
+    Promise.all([
+      window.electronAPI.project.get(),
+      window.electronAPI.tasks.getAll(),
+    ])
+      .then(([proj, taskList]) => {
         if (cancelled) return;
-        setTasks(all);
-        setLoaded(true);
+        setProject(proj);
+        setTasks(taskList);
+        setProjectLoading(false);
       })
       .catch((err) => {
-        console.error('[tasks.getAll] failed', err);
-        if (!cancelled) setLoaded(true);
+        console.error('[initial load] failed', err);
+        if (!cancelled) setProjectLoading(false);
       });
     return () => {
       cancelled = true;
@@ -142,11 +148,61 @@ export default function App() {
     }
   }, []);
 
+  const handleProjectOpened = useCallback(async (p: Project) => {
+    setProject(p);
+    try {
+      const all = await window.electronAPI.tasks.getAll();
+      setTasks(all);
+    } catch (err) {
+      console.error('[tasks.getAll] after open failed', err);
+      setTasks([]);
+    }
+  }, []);
+
+  const handleClearProject = useCallback(async () => {
+    await window.electronAPI.project.clear();
+    setProject(null);
+    setTasks([]);
+    setSelectedTaskId(null);
+  }, []);
+
   const inProgressCount = tasks.filter((t) => t.status === 'in-progress').length;
   const needsInputCount = tasks.filter((t) => t.status === 'needs-input').length;
   const statusLine = `${inProgressCount} in progress · ${needsInputCount} needs input`;
 
   const topBarTitle = workspaceView === 'board' ? 'Board' : 'Plan';
+
+  if (projectLoading) {
+    return (
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-950 text-white">
+        {isMac ? (
+          <div
+            className="app-window-drag h-10 w-full shrink-0 bg-gray-950"
+            aria-hidden
+          />
+        ) : null}
+        <div className="app-window-no-drag flex min-h-0 flex-1 flex-col overflow-hidden">
+          <LoadingScreen />
+        </div>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-950 text-white">
+        {isMac ? (
+          <div
+            className="app-window-drag h-10 w-full shrink-0 bg-gray-950"
+            aria-hidden
+          />
+        ) : null}
+        <div className="app-window-no-drag flex min-h-0 flex-1 flex-col overflow-hidden">
+          <WelcomeScreen onProjectOpened={(p) => void handleProjectOpened(p)} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-gray-950 text-white">
@@ -157,28 +213,29 @@ export default function App() {
         />
       ) : null}
       <div className="app-window-no-drag flex min-h-0 flex-1 flex-col overflow-hidden">
-        <AppShell workspaceView={workspaceView} onWorkspaceViewChange={setWorkspaceView}>
-          <TopBar title={topBarTitle} statusLine={statusLine} />
+        <AppShell
+          project={project}
+          onClearProject={() => void handleClearProject()}
+          workspaceView={workspaceView}
+          onWorkspaceViewChange={setWorkspaceView}
+        >
+          <TopBar project={project} title={topBarTitle} statusLine={statusLine} />
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {workspaceView === 'board' ? (
               <div className="relative min-h-0 flex-1 overflow-hidden">
-                {loaded ? (
-                  <>
-                    <Board
-                      tasks={tasks}
-                      onDragEnd={handleDragEnd}
-                      onCreateTask={handleCreateTask}
-                      onDeleteTask={handleDeleteTask}
-                      onCardClick={(id) => setSelectedTaskId(id)}
-                    />
-                    <TaskDetailPanel
-                      task={selectedTask}
-                      onClose={() => setSelectedTaskId(null)}
-                      onUpdate={handleUpdateTask}
-                      onDelete={handleDeleteTask}
-                    />
-                  </>
-                ) : null}
+                <Board
+                  tasks={tasks}
+                  onDragEnd={handleDragEnd}
+                  onCreateTask={handleCreateTask}
+                  onDeleteTask={handleDeleteTask}
+                  onCardClick={(id) => setSelectedTaskId(id)}
+                />
+                <TaskDetailPanel
+                  task={selectedTask}
+                  onClose={() => setSelectedTaskId(null)}
+                  onUpdate={handleUpdateTask}
+                  onDelete={handleDeleteTask}
+                />
               </div>
             ) : (
               <div className="flex flex-1 items-center justify-center px-6 text-sm text-gray-500">

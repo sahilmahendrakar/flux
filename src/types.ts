@@ -2,6 +2,13 @@ export type TaskStatus = 'backlog' | 'in-progress' | 'needs-input' | 'done';
 
 export type Agent = 'claude-code' | 'codex' | 'cursor';
 
+export interface Project {
+  id: string;
+  name: string;
+  rootPath: string;
+  addedAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -9,6 +16,7 @@ export interface Task {
   agent: Agent;
   description?: string;
   createdAt: string;
+  projectId: string;
 }
 
 export const COLUMNS: { id: TaskStatus; label: string }[] = [
