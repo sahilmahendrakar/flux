@@ -4,6 +4,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Agent, Task } from '../types';
 
+type TaskInput = { title: string; agent: Agent; projectId: string };
+
 export class TaskStore {
   private filePath: string;
   private tasks: Task[] = [];
@@ -12,7 +14,7 @@ export class TaskStore {
     this.filePath = path.join(app.getPath('userData'), 'tasks.json');
   }
 
-  async init(): Promise<void> {
+  async init(currentProjectId: string | null): Promise<void> {
     try {
       const raw = await fs.readFile(this.filePath, 'utf8');
       let parsed: unknown;
@@ -44,19 +46,59 @@ export class TaskStore {
       }
       throw err;
     }
+
+    if (currentProjectId) {
+      await this.migrateMissingProjectIds(currentProjectId);
+    }
   }
 
-  async getAll(): Promise<Task[]> {
-    return this.tasks;
+  /** Assign `projectId` to tasks missing it (e.g. legacy data), then persist if needed. */
+  async migrateMissingProjectIds(projectId: string): Promise<void> {
+    let changed = false;
+    this.tasks = this.tasks.map((t) => {
+      if (t.projectId == null || t.projectId === '') {
+        changed = true;
+        return { ...t, projectId: projectId };
+      }
+      return t;
+    });
+    if (changed) {
+      await this.save();
+    }
   }
 
-  async create(input: { title: string; agent: Agent }): Promise<Task> {
+  async remapProjectId(from: string, to: string): Promise<void> {
+    if (from === to) {
+      return;
+    }
+    let changed = false;
+    this.tasks = this.tasks.map((t) => {
+      if (t.projectId === from) {
+        changed = true;
+        return { ...t, projectId: to };
+      }
+      return t;
+    });
+    if (changed) {
+      await this.save();
+    }
+  }
+
+  getAll(projectId?: string): Task[] {
+    if (!projectId) {
+      return this.tasks;
+    }
+    return this.tasks.filter((t) => t.projectId === projectId);
+  }
+
+  async create(input: TaskInput): Promise<Task> {
     const task: Task = {
       id: randomUUID(),
       title: input.title,
       status: 'backlog',
       agent: input.agent,
       createdAt: new Date().toISOString(),
+      projectId: input.projectId,
     };
     this.tasks.push(task);
     await this.save();

@@ -1,19 +1,30 @@
-import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import started from 'electron-squirrel-startup';
 import { TaskStore } from './main/TaskStore';
+import { ProjectStore } from './main/ProjectStore';
+import type { Agent, Project } from './types';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
 
+/** Stable id per folder so tasks in tasks.json stay scoped after close/reopen. */
+function stableProjectIdForPath(rootPath: string): string {
+  return createHash('sha256').update(path.resolve(rootPath)).digest('hex');
+}
+
 // Matches renderer `bg-gray-950` (Tailwind default palette) so native chrome
 // and any pre-paint window surface are not a contrasting light color.
 const WINDOW_BACKGROUND = '#030712';
 
+let mainWindow: BrowserWindow | null = null;
+
 const createWindow = () => {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     title: 'Flux',
@@ -28,6 +39,10 @@ const createWindow = () => {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
 
   // and load the index.html of the app.
@@ -54,15 +69,85 @@ app.whenReady().then(async () => {
     nativeTheme.themeSource = 'dark';
   }
 
-  const store = new TaskStore();
-  await store.init();
+  const projectStore = new ProjectStore();
+  await projectStore.init();
 
-  ipcMain.handle('tasks:getAll', async () => store.getAll());
-  ipcMain.handle('tasks:create', async (_e, input) => store.create(input));
+  let previousProjectIdForRemap: string | null = null;
+  const openProject = projectStore.get();
+  if (openProject) {
+    const canonicalId = stableProjectIdForPath(openProject.rootPath);
+    if (openProject.id !== canonicalId) {
+      previousProjectIdForRemap = openProject.id;
+      await projectStore.set({ ...openProject, id: canonicalId });
+    }
+  }
+
+  const taskStore = new TaskStore();
+  await taskStore.init(projectStore.get()?.id ?? null);
+  const projectAfterInit = projectStore.get();
+  if (previousProjectIdForRemap && projectAfterInit) {
+    await taskStore.remapProjectId(previousProjectIdForRemap, projectAfterInit.id);
+  }
+
+  ipcMain.handle('project:get', () => projectStore.get());
+
+  ipcMain.handle('project:open', async () => {
+    const win = mainWindow ?? BrowserWindow.getFocusedWindow();
+    const dialogOpts = {
+      properties: ['openDirectory' as const],
+      title: 'Open project folder',
+      buttonLabel: 'Open project',
+    };
+    const result = win
+      ? await dialog.showOpenDialog(win, dialogOpts)
+      : await dialog.showOpenDialog(dialogOpts);
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    const rootPath = result.filePaths[0];
+    const gitDir = path.join(rootPath, '.git');
+    try {
+      await fs.access(gitDir);
+    } catch {
+      return { error: 'NOT_GIT_REPO' as const };
+    }
+
+    const name = path.basename(rootPath);
+    const project: Project = {
+      id: stableProjectIdForPath(rootPath),
+      name,
+      rootPath,
+      addedAt: new Date().toISOString(),
+    };
+    await projectStore.set(project);
+    await taskStore.migrateMissingProjectIds(project.id);
+    return project;
+  });
+
+  ipcMain.handle('project:clear', async () => {
+    await projectStore.clear();
+  });
+
+  ipcMain.handle('tasks:getAll', async () => {
+    const project = projectStore.get();
+    if (!project) {
+      return [];
+    }
+    return taskStore.getAll(project.id);
+  });
+
+  ipcMain.handle('tasks:create', async (_e, input: { title: string; agent: Agent }) => {
+    const project = projectStore.get();
+    if (!project) {
+      throw new Error('No project open');
+    }
+    return taskStore.create({ ...input, projectId: project.id });
+  });
   ipcMain.handle('tasks:update', async (_e, id, patch) =>
-    store.update(id, patch),
+    taskStore.update(id, patch),
   );
-  ipcMain.handle('tasks:delete', async (_e, id) => store.delete(id));
+  ipcMain.handle('tasks:delete', async (_e, id) => taskStore.delete(id));
 
   createWindow();
 });

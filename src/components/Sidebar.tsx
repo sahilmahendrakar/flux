@@ -1,8 +1,12 @@
+import type { Project } from '../types';
+
 export type WorkspaceNavView = 'board' | 'plan';
 
 interface SidebarProps {
+  project: Project;
   workspaceView: WorkspaceNavView;
   onWorkspaceViewChange: (view: WorkspaceNavView) => void;
+  onClearProject: () => void;
 }
 
 function BoardIcon({ className }: { className?: string }) {
@@ -64,7 +68,12 @@ function SettingsIcon({ className }: { className?: string }) {
   );
 }
 
-export function Sidebar({ workspaceView, onWorkspaceViewChange }: SidebarProps) {
+export function Sidebar({
+  project,
+  workspaceView,
+  onWorkspaceViewChange,
+  onClearProject,
+}: SidebarProps) {
   const navItemClass = (active: boolean) =>
     [
       'flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors',
@@ -77,7 +86,13 @@ export function Sidebar({ workspaceView, onWorkspaceViewChange }: SidebarProps) 
     <aside className="flex h-full w-56 shrink-0 flex-col bg-gray-900 text-gray-100">
       <div className="px-3 py-3">
         <div className="text-base font-medium text-gray-100">Flux</div>
-        <div className="text-sm text-gray-500">my-project</div>
+        <div className="mt-1 text-sm font-medium text-gray-200">{project.name}</div>
+        <div
+          className="mt-0.5 max-w-full truncate text-xs text-gray-500"
+          title={project.rootPath}
+        >
+          {project.rootPath}
+        </div>
       </div>
       <div className="border-t border-gray-800" />
       <div className="flex min-h-0 flex-1 flex-col px-3 py-3">
@@ -108,6 +123,13 @@ export function Sidebar({ workspaceView, onWorkspaceViewChange }: SidebarProps) 
           >
             <SettingsIcon className="shrink-0 text-current" />
             <span>Settings</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClearProject}
+            className="mt-1 w-full px-2 py-1.5 text-left text-xs text-gray-600 transition-colors hover:text-gray-400"
+          >
+            Close project
           </button>
         </div>
       </div>

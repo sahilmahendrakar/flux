@@ -1,8 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { Agent, Task } from './types';
+import type { Agent, Project, Task } from './types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
+  project: {
+    get: () => ipcRenderer.invoke('project:get') as Promise<Project | null>,
+    open: () =>
+      ipcRenderer.invoke('project:open') as Promise<
+        Project | { error: string } | null
+      >,
+    clear: () => ipcRenderer.invoke('project:clear') as Promise<void>,
+  },
   tasks: {
     getAll: () => ipcRenderer.invoke('tasks:getAll') as Promise<Task[]>,
     create: (input: { title: string; agent: Agent }) =>
