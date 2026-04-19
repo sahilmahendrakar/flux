@@ -1,0 +1,39 @@
+src/main/SessionManager.ts
+  82243dd5345f9566 1-163
+src/main.ts
+  82243dd5345f9566 8-10,94-96,129,158-192
+package.json
+  82243dd5345f9566 13-14,25-26,48,57
+src/preload.ts
+  82243dd5345f9566 2-6,29-49
+src/main/WorktreeService.ts
+  82243dd5345f9566 1-132
+src/types.ts
+  82243dd5345f9566 22-34
+forge.config.ts
+  82243dd5345f9566 13
+src/env.d.ts
+  82243dd5345f9566 2-6,26-34
+vite.main.config.ts
+  82243dd5345f9566 4-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "39c5c7180d06a9d8f4a530795b652247730fb732",
+  "prompts": {
+    "82243dd5345f9566": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "04107632-d20b-44d1-abe6-336be9ca0463",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 436,
+      "total_deletions": 36,
+      "accepted_lines": 406,
+      "overriden_lines": 0
+    }
+  }
+}
