@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Task, TaskStatus, COLUMNS, AGENTS, Agent } from '../types';
+import { useFakeSession } from '../hooks/useFakeSession';
 import AgentBadge from './AgentBadge';
+import Terminal, { type TerminalHandle } from './Terminal';
 
 interface TaskDetailPanelProps {
   task: Task | null;
@@ -53,6 +55,15 @@ export default function TaskDetailPanel({
 }: TaskDetailPanelProps) {
   const titleArea = useAutosizeTextArea(task?.title ?? '');
   const descriptionArea = useAutosizeTextArea(task?.description ?? '', 120);
+  const [isFakeSessionActive, setIsFakeSessionActive] = useState(false);
+  const terminalRef = useRef<TerminalHandle | null>(null);
+
+  const fakeSessionId = isFakeSessionActive ? 'fake-session' : null;
+  useFakeSession(terminalRef, fakeSessionId);
+
+  useEffect(() => {
+    setIsFakeSessionActive(false);
+  }, [task?.id]);
 
   useEffect(() => {
     if (!task) return;
@@ -62,6 +73,10 @@ export default function TaskDetailPanel({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [task, onClose]);
+
+  const handleStartSession = () => {
+    setIsFakeSessionActive(true);
+  };
 
   const handleDelete = () => {
     if (!task) return;
@@ -101,86 +116,119 @@ export default function TaskDetailPanel({
               </span>
               <p className="mt-1.5 text-xs text-gray-500">{formatCreatedLabel(task.createdAt)}</p>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="shrink-0 rounded p-1 text-gray-400 transition hover:bg-gray-800 hover:text-gray-200"
-              aria-label="Close"
-            >
-              <span className="text-lg leading-none" aria-hidden>
-                ×
-              </span>
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={handleStartSession}
+                className="rounded-md bg-green-900 px-3 py-1.5 text-xs text-green-300 transition-colors hover:bg-green-800"
+              >
+                Start session
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="shrink-0 rounded p-1 text-gray-400 transition hover:bg-gray-800 hover:text-gray-200"
+                aria-label="Close"
+              >
+                <span className="text-lg leading-none" aria-hidden>
+                  ×
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
-          <textarea
-            id="task-detail-title"
-            ref={titleArea.ref}
-            value={task.title}
-            rows={1}
-            onChange={(e) => {
-              onUpdate(task.id, { title: e.target.value });
-              titleArea.resize();
-            }}
-            className="w-full resize-none bg-transparent text-2xl font-semibold leading-snug text-white outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
-            placeholder="Title"
-          />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
+            <textarea
+              id="task-detail-title"
+              ref={titleArea.ref}
+              value={task.title}
+              rows={1}
+              onChange={(e) => {
+                onUpdate(task.id, { title: e.target.value });
+                titleArea.resize();
+              }}
+              className="w-full resize-none bg-transparent text-2xl font-semibold leading-snug text-white outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900"
+              placeholder="Title"
+            />
 
-          <div>
-            <dl className="grid grid-cols-[minmax(0,7rem)_1fr] gap-x-3 gap-y-2 text-sm">
-              <dt className="text-gray-500">Agent</dt>
-              <dd className="min-w-0">
-                <div className="relative inline-flex max-w-full">
+            <div>
+              <dl className="grid grid-cols-[minmax(0,7rem)_1fr] gap-x-3 gap-y-2 text-sm">
+                <dt className="text-gray-500">Agent</dt>
+                <dd className="min-w-0">
+                  <div className="relative inline-flex max-w-full">
+                    <select
+                      value={task.agent}
+                      onChange={(e) => onUpdate(task.id, { agent: e.target.value as Agent })}
+                      className="absolute inset-0 z-10 h-full min-h-[1.75rem] w-full max-w-full cursor-pointer opacity-0"
+                      aria-label="Change agent"
+                    >
+                      {AGENTS.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.label}
+                        </option>
+                      ))}
+                    </select>
+                    <AgentBadge agent={task.agent} />
+                  </div>
+                </dd>
+                <dt className="text-gray-500">Status</dt>
+                <dd>
                   <select
-                    value={task.agent}
-                    onChange={(e) => onUpdate(task.id, { agent: e.target.value as Agent })}
-                    className="absolute inset-0 z-10 h-full min-h-[1.75rem] w-full max-w-full cursor-pointer opacity-0"
-                    aria-label="Change agent"
+                    value={task.status}
+                    onChange={(e) => onUpdate(task.id, { status: e.target.value as TaskStatus })}
+                    className="w-full max-w-[220px] cursor-pointer rounded-md border border-gray-700 bg-gray-800 px-2 py-1.5 text-sm text-gray-200 outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
+                    aria-label="Change status"
                   >
-                    {AGENTS.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.label}
+                    {COLUMNS.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
                       </option>
                     ))}
                   </select>
-                  <AgentBadge agent={task.agent} />
-                </div>
-              </dd>
-              <dt className="text-gray-500">Status</dt>
-              <dd>
-                <select
-                  value={task.status}
-                  onChange={(e) => onUpdate(task.id, { status: e.target.value as TaskStatus })}
-                  className="w-full max-w-[220px] cursor-pointer rounded-md border border-gray-700 bg-gray-800 px-2 py-1.5 text-sm text-gray-200 outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50"
-                  aria-label="Change status"
-                >
-                  {COLUMNS.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </dd>
-            </dl>
+                </dd>
+              </dl>
+            </div>
+
+            <div className="flex flex-col">
+              <label htmlFor="task-detail-description" className="mb-1.5 text-xs text-gray-500">
+                Description
+              </label>
+              <textarea
+                id="task-detail-description"
+                ref={descriptionArea.ref}
+                value={task.description ?? ''}
+                onChange={(e) => {
+                  onUpdate(task.id, { description: e.target.value });
+                  descriptionArea.resize();
+                }}
+                placeholder="Add a description..."
+                className="min-h-[120px] w-full resize-none rounded-md border border-gray-700 bg-gray-800 p-3 text-sm leading-relaxed text-gray-100 outline-none placeholder:text-gray-600 focus-visible:ring-2 focus-visible:ring-purple-500/50"
+              />
+            </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col">
-            <label htmlFor="task-detail-description" className="mb-1.5 text-xs text-gray-500">
-              Description
-            </label>
-            <textarea
-              id="task-detail-description"
-              ref={descriptionArea.ref}
-              value={task.description ?? ''}
-              onChange={(e) => {
-                onUpdate(task.id, { description: e.target.value });
-                descriptionArea.resize();
-              }}
-              placeholder="Add a description..."
-              className="min-h-[120px] w-full resize-none rounded-md border border-gray-700 bg-gray-800 p-3 text-sm leading-relaxed text-gray-100 outline-none placeholder:text-gray-600 focus-visible:ring-2 focus-visible:ring-purple-500/50"
-            />
+          <div className="flex min-h-[200px] flex-1 flex-col border-t border-gray-800">
+            <div className="flex items-center justify-between px-4 py-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Session</span>
+              {isFakeSessionActive && (
+                <button
+                  type="button"
+                  onClick={() => setIsFakeSessionActive(false)}
+                  className="text-xs text-red-500 hover:text-red-400"
+                >
+                  Stop
+                </button>
+              )}
+            </div>
+            <div className="min-h-0 flex-1 px-2 pb-2">
+              <Terminal
+                ref={terminalRef}
+                sessionId={fakeSessionId}
+                onData={(data) => console.log('Terminal input:', data)}
+              />
+            </div>
           </div>
         </div>
 
