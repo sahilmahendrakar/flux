@@ -1,0 +1,23 @@
+src/main/WorktreeService.ts
+  180c0d4e42874920 2,17-22,40-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "7b8b791b3431d9ab93e3226240edd24bbc161a0b",
+  "prompts": {
+    "180c0d4e42874920": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "095df593-e2c0-4de8-a908-bede0e7b6b62",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 1,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
