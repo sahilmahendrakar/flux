@@ -3,6 +3,7 @@ import { DropResult } from '@hello-pangea/dnd';
 import { Task, TaskStatus, Agent } from './types';
 import { SEED_TASKS } from './seed';
 import Board from './components/Board';
+import TaskDetailPanel from './components/TaskDetailPanel';
 import { AppShell } from './components/AppShell';
 import { TopBar } from './components/TopBar';
 import type { WorkspaceNavView } from './components/Sidebar';
@@ -10,6 +11,8 @@ import type { WorkspaceNavView } from './components/Sidebar';
 export default function App() {
   const isMac = window.electronAPI.platform === 'darwin';
   const [tasks, setTasks] = useState<Task[]>(SEED_TASKS);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
   const [workspaceView, setWorkspaceView] = useState<WorkspaceNavView>('board');
 
   const handleDragEnd = (result: DropResult) => {
@@ -40,6 +43,7 @@ export default function App() {
 
   const handleDeleteTask = (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    setSelectedTaskId((sid) => (sid === id ? null : sid));
   };
 
   const inProgressCount = tasks.filter((t) => t.status === 'in-progress').length;
@@ -61,12 +65,21 @@ export default function App() {
           <TopBar title={topBarTitle} statusLine={statusLine} />
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {workspaceView === 'board' ? (
-              <div className="min-h-0 flex-1 overflow-hidden">
+              <div className="relative min-h-0 flex-1 overflow-hidden">
                 <Board
                   tasks={tasks}
                   onDragEnd={handleDragEnd}
                   onCreateTask={handleCreateTask}
                   onDeleteTask={handleDeleteTask}
+                  onCardClick={(id) => setSelectedTaskId(id)}
+                />
+                <TaskDetailPanel
+                  task={selectedTask}
+                  onClose={() => setSelectedTaskId(null)}
+                  onUpdate={(id, patch) =>
+                    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
+                  }
+                  onDelete={handleDeleteTask}
                 />
               </div>
             ) : (

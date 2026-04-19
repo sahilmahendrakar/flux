@@ -9,9 +9,16 @@ interface Props {
   onDragEnd: (result: DropResult) => void;
   onCreateTask: (title: string, agent: Agent) => void;
   onDeleteTask: (id: string) => void;
+  onCardClick: (id: string) => void;
 }
 
-export default function Board({ tasks, onDragEnd, onCreateTask, onDeleteTask }: Props) {
+export default function Board({
+  tasks,
+  onDragEnd,
+  onCreateTask,
+  onDeleteTask,
+  onCardClick,
+}: Props) {
   const [modalOpen, setModalOpen] = useState(false);
 
   const tasksByStatus: Record<TaskStatus, Task[]> = {
@@ -35,6 +42,7 @@ export default function Board({ tasks, onDragEnd, onCreateTask, onDeleteTask }: 
             tasks={tasksByStatus[col.id]}
             onNewTask={col.id === 'backlog' ? () => setModalOpen(true) : undefined}
             onDeleteTask={onDeleteTask}
+            onCardClick={onCardClick}
           />
         ))}
       </div>
