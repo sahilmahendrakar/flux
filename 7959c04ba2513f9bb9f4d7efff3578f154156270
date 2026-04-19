@@ -1,0 +1,35 @@
+src/env.d.ts
+  82243dd5345f9566 2-6,26-34
+src/main.ts
+  82243dd5345f9566 8-10,94-96,129,158-192
+src/types.ts
+  82243dd5345f9566 22-34
+src/preload.ts
+  82243dd5345f9566 2-6,29-49
+vite.main.config.ts
+  82243dd5345f9566 4-10
+forge.config.ts
+  82243dd5345f9566 13
+package.json
+  82243dd5345f9566 13-14,25-26,48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "7959c04ba2513f9bb9f4d7efff3578f154156270",
+  "prompts": {
+    "82243dd5345f9566": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "04107632-d20b-44d1-abe6-336be9ca0463",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 110,
+      "overriden_lines": 0
+    }
+  }
+}
