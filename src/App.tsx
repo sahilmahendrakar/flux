@@ -3,10 +3,13 @@ import { DropResult } from '@hello-pangea/dnd';
 import { Task, TaskStatus, Agent } from './types';
 import { SEED_TASKS } from './seed';
 import Board from './components/Board';
+import TaskDetailPanel from './components/TaskDetailPanel';
 
 export default function App() {
   const isMac = window.electronAPI.platform === 'darwin';
   const [tasks, setTasks] = useState<Task[]>(SEED_TASKS);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
 
   const handleDragEnd = (result: DropResult) => {
     const { source, destination, draggableId } = result;
@@ -36,6 +39,7 @@ export default function App() {
 
   const handleDeleteTask = (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    setSelectedTaskId((sid) => (sid === id ? null : sid));
   };
 
   return (
@@ -51,12 +55,21 @@ export default function App() {
           <h1 className="text-lg font-semibold tracking-tight">Flux</h1>
           <span className="text-xs text-gray-500">AI agent task manager</span>
         </header>
-        <div className="flex-1 overflow-hidden">
+        <div className="relative flex-1 overflow-hidden">
           <Board
             tasks={tasks}
             onDragEnd={handleDragEnd}
             onCreateTask={handleCreateTask}
             onDeleteTask={handleDeleteTask}
+            onCardClick={(id) => setSelectedTaskId(id)}
+          />
+          <TaskDetailPanel
+            task={selectedTask}
+            onClose={() => setSelectedTaskId(null)}
+            onUpdate={(id, patch) =>
+              setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
+            }
+            onDelete={handleDeleteTask}
           />
         </div>
       </div>

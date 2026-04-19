@@ -8,9 +8,10 @@ interface Props {
   tasks: Task[];
   onNewTask?: () => void;
   onDeleteTask: (id: string) => void;
+  onCardClick: (id: string) => void;
 }
 
-export default function Column({ id, label, tasks, onNewTask, onDeleteTask }: Props) {
+export default function Column({ id, label, tasks, onNewTask, onDeleteTask, onCardClick }: Props) {
   const isNeedsInput = id === 'needs-input';
 
   return (
@@ -59,6 +60,7 @@ export default function Column({ id, label, tasks, onNewTask, onDeleteTask }: Pr
                 task={task}
                 index={index}
                 onDelete={onDeleteTask}
+                onCardClick={onCardClick}
               />
             ))}
             {provided.placeholder}

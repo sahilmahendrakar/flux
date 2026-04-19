@@ -7,6 +7,7 @@ export interface Task {
   title: string;
   status: TaskStatus;
   agent: Agent;
+  description?: string;
   createdAt: string;
 }
 
