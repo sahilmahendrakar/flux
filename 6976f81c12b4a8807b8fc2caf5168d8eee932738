@@ -1,0 +1,25 @@
+src/types.ts
+  63ef118e998afbf6 45
+src/main/SessionManager.ts
+  63ef118e998afbf6 12,15,17,19,27-29,64,67,79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "6976f81c12b4a8807b8fc2caf5168d8eee932738",
+  "prompts": {
+    "63ef118e998afbf6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "71aae033-ac10-4e94-afbd-986267da5978",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 7,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}
