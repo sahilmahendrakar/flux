@@ -1,0 +1,25 @@
+src/main/SessionManager.ts
+  0e048a908cff59bb 110-113
+src/components/TaskDetailPanel.tsx
+  0e048a908cff59bb 2,57-59,63-75,78-93,103-137,152-159,186-211,290,293,298,303-305
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "7b886dbdcbb9991fe72b84cecc2572f4b979ff55",
+  "prompts": {
+    "0e048a908cff59bb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "12f8965b-9ae3-4b0e-8e9e-230e13ddd7b2",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 117,
+      "total_deletions": 72,
+      "accepted_lines": 112,
+      "overriden_lines": 0
+    }
+  }
+}
