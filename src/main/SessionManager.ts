@@ -9,20 +9,23 @@ export type SessionStartError =
   | { error: 'AGENT_NOT_FOUND'; message: string }
   | { error: 'WORKTREE_FAILED'; message: string };
 
-function agentCommand(agent: Agent): string {
+function agentSpawnSpec(agent: Agent): { command: string; args: string[] } {
   switch (agent) {
     case 'claude-code':
-      return 'claude';
+      return { command: 'claude', args: [] };
     case 'codex':
-      return 'codex';
+      return { command: 'codex', args: [] };
     case 'cursor':
-      return 'cursor';
+      return { command: 'agent', args: ['--model', 'auto'] };
   }
 }
 
 function agentNotFoundMessage(agent: Agent, command: string): string {
   if (agent === 'claude-code') {
     return `${command} not found on PATH. Install with: npm install -g @anthropic-ai/claude-code`;
+  }
+  if (agent === 'cursor') {
+    return `${command} not found on PATH. Install Cursor Agent CLI: https://cursor.com/docs/cli/installation`;
   }
   return `${command} not found on PATH`;
 }
@@ -58,10 +61,10 @@ export class SessionManager {
       return { error: 'WORKTREE_FAILED', message };
     }
 
-    const command = agentCommand(task.agent);
+    const { command, args } = agentSpawnSpec(task.agent);
     let ptyProcess: IPty;
     try {
-      ptyProcess = pty.spawn(command, [], {
+      ptyProcess = pty.spawn(command, args, {
         name: 'xterm-color',
         cols: 220,
         rows: 50,
@@ -73,6 +76,7 @@ export class SessionManager {
       console.error('[SessionManager.startSession] PTY spawn failed', {
         taskId: task.id,
         command,
+        args,
         message,
         err,
       });

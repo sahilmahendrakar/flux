@@ -42,5 +42,5 @@ export const COLUMNS: { id: TaskStatus; label: string }[] = [
 export const AGENTS: { id: Agent; label: string }[] = [
   { id: 'claude-code', label: 'Claude Code' },
   { id: 'codex', label: 'Codex' },
-  { id: 'cursor', label: 'Cursor' },
+  { id: 'cursor', label: 'Cursor Agent' },
 ];
