@@ -36,7 +36,6 @@ Think of it as the project management layer that AI-assisted development has bee
 - Manual "needs input" flagging to move tasks into the attention queue
 - Desktop notifications when tasks are flagged
 - Planning assistant powered by Claude API
-- Local SQLite storage — no cloud, no accounts
 
 ---
 
