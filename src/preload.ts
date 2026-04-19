@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('tasks:create', input) as Promise<Task>,
     update: (
       id: string,
-      patch: Partial<Pick<Task, 'title' | 'status' | 'agent'>>,
+      patch: Partial<Pick<Task, 'title' | 'status' | 'agent' | 'description'>>,
     ) => ipcRenderer.invoke('tasks:update', id, patch) as Promise<Task>,
     delete: (id: string) =>
       ipcRenderer.invoke('tasks:delete', id) as Promise<void>,

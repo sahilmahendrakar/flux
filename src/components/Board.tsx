@@ -31,6 +31,8 @@ export default function Board({
     tasksByStatus[task.status].push(task);
   }
 
+  const boardIsEmpty = tasks.length === 0;
+
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="flex h-full w-full gap-3 overflow-x-auto p-3">
@@ -43,6 +45,11 @@ export default function Board({
             onNewTask={col.id === 'backlog' ? () => setModalOpen(true) : undefined}
             onDeleteTask={onDeleteTask}
             onCardClick={onCardClick}
+            emptyState={
+              col.id === 'backlog' && boardIsEmpty
+                ? 'No tasks yet. Click + New task to get started.'
+                : undefined
+            }
           />
         ))}
       </div>
