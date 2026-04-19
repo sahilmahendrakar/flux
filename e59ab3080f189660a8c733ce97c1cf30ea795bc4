@@ -1,0 +1,31 @@
+src/preload.ts
+  cbdea79279891213 12
+src/App.tsx
+  cbdea79279891213 1,10-13,16-17,21-91,101,103,106-143,165-181
+src/main/TaskStore.ts
+  cbdea79279891213 68
+src/components/Column.tsx
+  cbdea79279891213 1,13,16-24,77-81
+src/components/Board.tsx
+  cbdea79279891213 34-35,48-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "e59ab3080f189660a8c733ce97c1cf30ea795bc4",
+  "prompts": {
+    "cbdea79279891213": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "98cdf3c9-2b2e-4d5d-a3f6-c96bdeb40019",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 660,
+      "total_deletions": 40,
+      "accepted_lines": 642,
+      "overriden_lines": 13
+    }
+  }
+}
