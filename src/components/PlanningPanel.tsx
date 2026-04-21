@@ -4,7 +4,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { Agent, PlanningSession, Project } from '../types';
+import { AGENTS, type Agent, type PlanningSession, type Project } from '../types';
 import Terminal, { type TerminalHandle } from './Terminal';
 
 interface PlanningPanelProps {
@@ -166,28 +166,6 @@ export function PlanningPanel({ project, onClose }: PlanningPanelProps) {
 
   const sessionRunning = planningSession?.status === 'running';
 
-  const agentPill = (agent: Agent, label: string) => (
-    <button
-      type="button"
-      title={
-        agent === 'claude-code'
-          ? 'Claude Code'
-          : agent === 'codex'
-            ? 'Codex'
-            : 'Cursor Agent'
-      }
-      disabled={sessionRunning}
-      onClick={() => setSelectedAgent(agent)}
-      className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors disabled:opacity-40 ${
-        selectedAgent === agent
-          ? 'bg-gray-800 text-gray-200 ring-1 ring-gray-600'
-          : 'bg-gray-900/80 text-gray-500 hover:text-gray-300'
-      }`}
-    >
-      {label}
-    </button>
-  );
-
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col border-l border-gray-800 bg-[#0a0a0a]">
       <header className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-gray-800 px-2.5">
@@ -207,14 +185,25 @@ export function PlanningPanel({ project, onClose }: PlanningPanelProps) {
             </span>
           ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {agentPill('claude-code', 'CC')}
-          {agentPill('codex', 'Co')}
-          {agentPill('cursor', 'Cu')}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <select
+            aria-label="Planning agent"
+            title="Agent for the next planning session"
+            disabled={sessionRunning}
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value as Agent)}
+            className="min-w-0 max-w-[9.5rem] cursor-pointer rounded-md border border-gray-700 bg-gray-900 py-1 pl-2 pr-7 text-[11px] font-medium text-gray-200 focus:border-gray-600 focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {AGENTS.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={onClose}
-            className="ml-0.5 flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-800 hover:text-gray-200"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-800 hover:text-gray-200"
             aria-label="Close planning panel"
           >
             ×
