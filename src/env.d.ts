@@ -1,6 +1,12 @@
 /// <reference types="vite/client" />
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- mirrors shared Task shape (status uses TaskStatus)
-import type { Task, Agent, TaskStatus, LocalProject, Session } from './types';
+import type {
+  Task,
+  Agent,
+  LocalProject,
+  Session,
+  ActiveProjectKey,
+} from './types';
 
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY?: string;
@@ -12,8 +18,6 @@ interface ImportMetaEnv {
 type SessionStartResult =
   | Session
   | { error: 'AGENT_NOT_FOUND' | 'WORKTREE_FAILED'; message: string };
-
-type ActiveProjectKey = { kind: 'local' | 'cloud'; id: string };
 
 type DirPickResult =
   | { rootPath: string }
@@ -31,12 +35,13 @@ declare global {
       platform: string;
       project: {
         get: () => Promise<LocalProject | null>;
-        open: () => Promise<LocalProject | { error: string } | null>;
+        getDir: () => Promise<string | null>;
+        open: () => Promise<LocalProject | { error: 'NOT_GIT_REPO' } | null>;
         clear: () => Promise<void>;
       };
       projects: {
         listLocal: () => Promise<LocalProject[]>;
-        addLocal: () => Promise<LocalProject | { error: string } | null>;
+        addLocal: () => Promise<LocalProject | { error: 'NOT_GIT_REPO' } | null>;
         activateLocal: (id: string | null) => Promise<LocalProject | null>;
         removeLocal: (id: string) => Promise<void>;
         getActiveKey: () => Promise<ActiveProjectKey | null>;

@@ -1,11 +1,9 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
-import type { Agent, LocalProject, Session, Task } from './types';
+import type { ActiveProjectKey, Agent, LocalProject, Session, Task } from './types';
 
 type SessionStartResult =
   | Session
   | { error: 'AGENT_NOT_FOUND' | 'WORKTREE_FAILED'; message: string };
-
-type ActiveProjectKey = { kind: 'local' | 'cloud'; id: string };
 
 type DirPickResult =
   | { rootPath: string }
@@ -21,9 +19,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   project: {
     get: () => ipcRenderer.invoke('project:get') as Promise<LocalProject | null>,
+    getDir: () => ipcRenderer.invoke('project:getDir') as Promise<string | null>,
     open: () =>
       ipcRenderer.invoke('project:open') as Promise<
-        LocalProject | { error: string } | null
+        LocalProject | { error: 'NOT_GIT_REPO' } | null
       >,
     clear: () => ipcRenderer.invoke('project:clear') as Promise<void>,
   },
@@ -32,7 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('projects:listLocal') as Promise<LocalProject[]>,
     addLocal: () =>
       ipcRenderer.invoke('projects:addLocal') as Promise<
-        LocalProject | { error: string } | null
+        LocalProject | { error: 'NOT_GIT_REPO' } | null
       >,
     activateLocal: (id: string | null) =>
       ipcRenderer.invoke('projects:activateLocal', id) as Promise<LocalProject | null>,

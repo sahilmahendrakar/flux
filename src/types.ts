@@ -2,12 +2,22 @@ export type TaskStatus = 'backlog' | 'in-progress' | 'needs-input' | 'done';
 
 export type Agent = 'claude-code' | 'codex' | 'cursor';
 
+export type ActiveProjectKind = 'local' | 'cloud';
+
+/** Remembered active workspace (local folder vs cloud Firestore project). */
+export interface ActiveProjectKey {
+  kind: ActiveProjectKind;
+  id: string;
+}
+
 export interface LocalProject {
   id: string;
   kind: 'local';
   name: string;
   rootPath: string;
   addedAt: string;
+  planningAgent: Agent;
+  defaultTaskAgent: Agent;
 }
 
 /**
