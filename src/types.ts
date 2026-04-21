@@ -69,6 +69,7 @@ export interface Session {
   stoppedAt?: string;
 }
 
+/** Planning assistant PTY session (singleton in the main process). */
 export interface PlanningSession {
   id: string;
   projectId: string;

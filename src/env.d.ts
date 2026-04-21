@@ -4,8 +4,8 @@ import type {
   Task,
   Agent,
   LocalProject,
-  PlanningSession,
   Session,
+  PlanningSession,
   ActiveProjectKey,
 } from './types';
 
@@ -98,7 +98,8 @@ declare global {
         focusDedicatedWindow: (sessionId: string) => Promise<void>;
         onTerminalWindowClosed: (cb: (sessionId: string) => void) => () => void;
       };
-      planning: {
+      /** Omitted until preload exposes planning (defensive for older builds). */
+      planning?: {
         start: () => Promise<PlanningStartResult>;
         stop: () => Promise<void>;
         get: () => Promise<PlanningSession | null>;
