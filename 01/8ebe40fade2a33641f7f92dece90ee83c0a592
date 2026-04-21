@@ -1,0 +1,45 @@
+src/preload.ts
+  064d06fd841ce4bd 6-14,107-111
+src/components/usePresence.ts
+  064d06fd841ce4bd 1-89
+src/index.css
+  064d06fd841ce4bd 27-65
+src/env.d.ts
+  064d06fd841ce4bd 10,86
+src/components/useFlipCards.ts
+  064d06fd841ce4bd 1-96
+src/types.ts
+  064d06fd841ce4bd 59-67
+src/App.tsx
+  064d06fd841ce4bd 18,102-105,115-138
+src/main/McpServer.ts
+  064d06fd841ce4bd 11,48-55,57-74,76,112-113,118,123,145-146,153,161-173
+src/components/Column.tsx
+  064d06fd841ce4bd 1,4-6,18-19,44-79,92,108-111,113,117,127-134
+src/components/TaskCard.tsx
+  064d06fd841ce4bd 1,24-34,41,43-46,96-132
+src/renderer/tasks/TaskProvider.ts
+  064d06fd841ce4bd 1,26-32
+src/renderer/tasks/LocalTaskProvider.ts
+  064d06fd841ce4bd 1,54-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "018ebe40fade2a33641f7f92dece90ee83c0a592",
+  "prompts": {
+    "064d06fd841ce4bd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "63a7e033-8aec-4f34-970e-7459c5216e52",
+        "model": "claude-opus-4-7-thinking-high"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 603,
+      "total_deletions": 145,
+      "accepted_lines": 486,
+      "overriden_lines": 0
+    }
+  }
+}
