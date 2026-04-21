@@ -1,12 +1,13 @@
 import type { Project } from '../types';
 
-export type WorkspaceNavView = 'board' | 'team';
+export type WorkspaceNavView = 'board' | 'team' | 'docs';
 
 interface SidebarProps {
   project: Project;
   workspaceView: WorkspaceNavView;
   onWorkspaceViewChange: (view: WorkspaceNavView) => void;
   onPlanNavClick: () => void;
+  onDocsNavClick: () => void;
   planPanelOpen: boolean;
   onClearProject: () => void;
 }
@@ -59,6 +60,29 @@ function BoardIcon({ className }: { className?: string }) {
   );
 }
 
+function DocsIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width={16}
+      height={16}
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <path
+        d="M4 2.5h5.5L12.5 5v8.5a.5.5 0 0 1-.5.5H4a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+      <path d="M9 2.5V5h2.5" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M5 8.5h6M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function PlanIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -104,6 +128,7 @@ export function Sidebar({
   workspaceView,
   onWorkspaceViewChange,
   onPlanNavClick,
+  onDocsNavClick,
   planPanelOpen,
   onClearProject,
 }: SidebarProps) {
@@ -153,6 +178,16 @@ export function Sidebar({
             <PlanIcon className="shrink-0 opacity-80" />
             <span>Plan</span>
           </button>
+          <div className="ml-2 border-l border-white/[0.06] pl-2">
+            <button
+              type="button"
+              className={navItemClass(workspaceView === 'docs')}
+              onClick={onDocsNavClick}
+            >
+              <DocsIcon className="shrink-0 opacity-80" />
+              <span>Docs</span>
+            </button>
+          </div>
           {project.kind === 'cloud' ? (
             <button
               type="button"

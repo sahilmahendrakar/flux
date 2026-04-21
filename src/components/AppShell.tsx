@@ -9,6 +9,7 @@ interface AppShellProps {
   workspaceView: WorkspaceNavView;
   onWorkspaceViewChange: (view: WorkspaceNavView) => void;
   onPlanNavClick: () => void;
+  onDocsNavClick: () => void;
   planPanelOpen: boolean;
 }
 
@@ -19,6 +20,7 @@ export function AppShell({
   workspaceView,
   onWorkspaceViewChange,
   onPlanNavClick,
+  onDocsNavClick,
   planPanelOpen,
 }: AppShellProps) {
   return (
@@ -28,6 +30,7 @@ export function AppShell({
         workspaceView={workspaceView}
         onWorkspaceViewChange={onWorkspaceViewChange}
         onPlanNavClick={onPlanNavClick}
+        onDocsNavClick={onDocsNavClick}
         planPanelOpen={planPanelOpen}
         onClearProject={onClearProject}
       />

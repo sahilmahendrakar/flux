@@ -694,6 +694,89 @@ app.whenReady().then(async () => {
     sessionManager.resizePlanning(cols, rows);
   });
 
+  function fluxProjectDirOrNull(): string | null {
+    const fromStore = projectStore.getProjectDir();
+    if (fromStore) return fromStore;
+    const fromWorktree = worktreeService.getProjectDir();
+    return fromWorktree || null;
+  }
+
+  function resolvePlanningDocsDir(): string | null {
+    const projectDir = fluxProjectDirOrNull();
+    if (!projectDir) return null;
+    return path.join(projectDir, 'planning');
+  }
+
+  async function collectMarkdownRelPaths(dir: string, base: string): Promise<string[]> {
+    let dirents;
+    try {
+      dirents = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+    const out: string[] = [];
+    const sorted = [...dirents].sort((a, b) => a.name.localeCompare(b.name));
+    for (const ent of sorted) {
+      const rel = base ? `${base}/${ent.name}` : ent.name;
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        out.push(...(await collectMarkdownRelPaths(full, rel)));
+      } else if (ent.isFile() && ent.name.toLowerCase().endsWith('.md')) {
+        out.push(rel.split(path.sep).join('/'));
+      }
+    }
+    return out;
+  }
+
+  function safePlanningMarkdownPath(planningDir: string, relativePath: string): string | null {
+    if (typeof relativePath !== 'string' || relativePath.includes('\0')) return null;
+    const rel = relativePath.replace(/\\/g, '/').replace(/^\/+/, '');
+    const candidate = path.resolve(planningDir, rel);
+    const resolvedRoot = path.resolve(planningDir);
+    if (candidate === resolvedRoot) return null;
+    const relCheck = path.relative(resolvedRoot, candidate);
+    if (relCheck.startsWith('..') || path.isAbsolute(relCheck)) return null;
+    return candidate;
+  }
+
+  ipcMain.handle('planningDocs:list', async () => {
+    const planningDir = resolvePlanningDocsDir();
+    if (!planningDir) {
+      return { error: 'NO_PROJECT' as const };
+    }
+    try {
+      await fs.mkdir(planningDir, { recursive: true });
+    } catch {
+      return { error: 'IO_ERROR' as const };
+    }
+    const relativePaths = await collectMarkdownRelPaths(planningDir, '');
+    return { files: relativePaths.map((p) => ({ relativePath: p })) };
+  });
+
+  ipcMain.handle(
+    'planningDocs:read',
+    async (
+      _e,
+      relativePath: string,
+    ): Promise<{ content: string } | { error: string }> => {
+      const planningDir = resolvePlanningDocsDir();
+      if (!planningDir) {
+        return { error: 'NO_PROJECT' };
+      }
+      const filePath = safePlanningMarkdownPath(planningDir, relativePath);
+      if (!filePath) {
+        return { error: 'INVALID_PATH' };
+      }
+      try {
+        const content = await fs.readFile(filePath, 'utf8');
+        return { content };
+      } catch (err: unknown) {
+        if (errnoCode(err) === 'ENOENT') return { error: 'NOT_FOUND' };
+        return { error: 'READ_FAILED' };
+      }
+    },
+  );
+
   createWindow();
 });
 

@@ -18,6 +18,7 @@ import {
 } from './types';
 import Board from './components/Board';
 import { PlanningPanel } from './components/PlanningPanel';
+import { PlanningDocsView } from './components/PlanningDocsView';
 import TaskDetailPanel from './components/TaskDetailPanel';
 import { AppShell } from './components/AppShell';
 import { TopBar } from './components/TopBar';
@@ -387,6 +388,7 @@ export default function App() {
     setProject(p);
     setSelectedTaskId(null);
     setPlanPanelOpen(false);
+    setWorkspaceView('board');
   }, []);
 
   const handleClearProject = useCallback(async () => {
@@ -395,6 +397,7 @@ export default function App() {
     setTasks([]);
     setSelectedTaskId(null);
     setPlanPanelOpen(false);
+    setWorkspaceView('board');
   }, []);
 
   const handlePlanNav = useCallback(() => {
@@ -406,8 +409,13 @@ export default function App() {
     }
   }, [workspaceView]);
 
+  const handleDocsNav = useCallback(() => {
+    setWorkspaceView('docs');
+    setPlanPanelOpen(false);
+  }, []);
+
   useEffect(() => {
-    if (workspaceView === 'team') {
+    if (workspaceView === 'team' || workspaceView === 'docs') {
       setPlanPanelOpen(false);
     }
   }, [workspaceView]);
@@ -507,7 +515,12 @@ export default function App() {
   const needsInputCount = tasks.filter((t) => t.status === 'needs-input').length;
   const statusLine = `${inProgressCount} in progress · ${needsInputCount} needs input`;
 
-  const topBarTitle = workspaceView === 'board' ? 'Board' : 'Team';
+  const topBarTitle =
+    workspaceView === 'docs'
+      ? 'Planning docs'
+      : workspaceView === 'board'
+        ? 'Board'
+        : 'Team';
 
   // Sort tasks per column for the board (orderKey-aware). Falls back to
   // createdAt/id for rows without a key.
@@ -578,6 +591,7 @@ export default function App() {
           workspaceView={workspaceView}
           onWorkspaceViewChange={setWorkspaceView}
           onPlanNavClick={handlePlanNav}
+          onDocsNavClick={handleDocsNav}
           planPanelOpen={planPanelOpen}
         >
           <TopBar project={project} title={topBarTitle} statusLine={statusLine} />
@@ -642,6 +656,8 @@ export default function App() {
                 currentUserDisplayName={displayName}
                 currentUserEmail={userEmail ?? undefined}
               />
+            ) : workspaceView === 'docs' ? (
+              <PlanningDocsView project={project} />
             ) : null}
           </div>
         </AppShell>

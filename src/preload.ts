@@ -150,4 +150,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('planning:exited', handler);
     },
   },
+  planningDocs: {
+    list: () =>
+      ipcRenderer.invoke('planningDocs:list') as Promise<
+        | { files: { relativePath: string }[] }
+        | { error: 'NO_PROJECT' | 'IO_ERROR' }
+      >,
+    read: (relativePath: string) =>
+      ipcRenderer.invoke('planningDocs:read', relativePath) as Promise<
+        { content: string } | { error: string }
+      >,
+  },
 });
