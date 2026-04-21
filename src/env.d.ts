@@ -116,6 +116,7 @@ declare global {
         read: (relativePath: string) => Promise<
           { content: string } | { error: string }
         >;
+        onChanged: (cb: () => void) => () => void;
       };
     };
   }

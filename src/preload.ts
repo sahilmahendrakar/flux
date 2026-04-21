@@ -160,5 +160,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('planningDocs:read', relativePath) as Promise<
         { content: string } | { error: string }
       >,
+    onChanged: (cb: () => void) => {
+      const handler = () => cb();
+      ipcRenderer.on('planningDocs:changed', handler);
+      return () => ipcRenderer.removeListener('planningDocs:changed', handler);
+    },
   },
 });

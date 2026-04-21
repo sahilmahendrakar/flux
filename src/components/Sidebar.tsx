@@ -17,7 +17,6 @@ interface SidebarProps {
   planningDocsListError: string | null;
   selectedPlanningDocPath: string | null;
   onSelectPlanningDoc: (relativePath: string) => void;
-  onRefreshPlanningDocList: () => void;
   planPanelOpen: boolean;
   onClearProject: () => void;
 }
@@ -168,7 +167,6 @@ export function Sidebar({
   planningDocsListError,
   selectedPlanningDocPath,
   onSelectPlanningDoc,
-  onRefreshPlanningDocList,
   planPanelOpen,
   onClearProject,
 }: SidebarProps) {
@@ -253,7 +251,7 @@ export function Sidebar({
                   ].join(' ')}
                   aria-expanded={docsSidebarExpanded}
                   aria-label={docsSidebarExpanded ? 'Collapse document list' : 'Expand document list'}
-                  title={docsSidebarExpanded ? 'Hide list' : 'Show files in planning/'}
+                  title={docsSidebarExpanded ? 'Hide file list' : 'Show file list'}
                   onClick={(e) => {
                     e.stopPropagation();
                     onDocsSidebarExpandToggle();
@@ -264,19 +262,6 @@ export function Sidebar({
               </div>
               {docsSidebarExpanded ? (
                 <div className="ml-2 max-h-[min(12rem,calc(100vh-16rem))] overflow-y-auto border-l border-white/[0.06] pl-2 pt-0.5">
-                  <div className="mb-1 flex items-center justify-between gap-1 pr-0.5">
-                    <span className="truncate font-mono text-[9px] uppercase tracking-wide text-zinc-600">
-                      planning/
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onRefreshPlanningDocList()}
-                      disabled={planningDocsListLoading}
-                      className="shrink-0 rounded px-1 py-0.5 text-[10px] text-zinc-600 transition hover:bg-white/[0.05] hover:text-zinc-400 disabled:opacity-40"
-                    >
-                      Refresh
-                    </button>
-                  </div>
                   {planningDocsListError ? (
                     <p className="py-1 text-[10px] leading-snug text-red-400/90">{planningDocsListError}</p>
                   ) : planningDocsListLoading && planningDocFiles.length === 0 ? (

@@ -4,9 +4,14 @@ import remarkGfm from 'remark-gfm';
 
 interface PlanningDocsViewProps {
   selectedPath: string | null;
+  /** Increment when the file may have changed on disk (same path). */
+  fileRevision?: number;
 }
 
-export function PlanningDocsView({ selectedPath }: PlanningDocsViewProps) {
+export function PlanningDocsView({
+  selectedPath,
+  fileRevision = 0,
+}: PlanningDocsViewProps) {
   const api = window.electronAPI.planningDocs;
 
   const [content, setContent] = useState<string>('');
@@ -36,7 +41,7 @@ export function PlanningDocsView({ selectedPath }: PlanningDocsViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [api, selectedPath]);
+  }, [api, selectedPath, fileRevision]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#09090b]">

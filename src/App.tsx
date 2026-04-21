@@ -87,6 +87,7 @@ export default function App() {
   const [selectedPlanningDocPath, setSelectedPlanningDocPath] = useState<
     string | null
   >(null);
+  const [planningDocFileRevision, setPlanningDocFileRevision] = useState(0);
   const boardRowRef = useRef<HTMLDivElement>(null);
 
   const auth = useAuth();
@@ -152,6 +153,23 @@ export default function App() {
       setSelectedPlanningDocPath(planningDocFiles[0]?.relativePath ?? null);
     }
   }, [planningDocFiles, selectedPlanningDocPath, planningDocsListLoading]);
+
+  useEffect(() => {
+    if (!project) return;
+    if (!docsSidebarExpanded && workspaceView !== 'docs') return;
+    const unsub = window.electronAPI.planningDocs.onChanged(() => {
+      void refreshPlanningDocList();
+      if (workspaceView === 'docs') {
+        setPlanningDocFileRevision((n) => n + 1);
+      }
+    });
+    return unsub;
+  }, [
+    project?.id,
+    docsSidebarExpanded,
+    workspaceView,
+    refreshPlanningDocList,
+  ]);
 
   // ----- Task provider per active project -----
   const provider = useMemo<TaskProvider | null>(() => {
@@ -455,6 +473,7 @@ export default function App() {
     setPlanningDocFiles([]);
     setPlanningDocsListError(null);
     setSelectedPlanningDocPath(null);
+    setPlanningDocFileRevision(0);
   }, []);
 
   const handleClearProject = useCallback(async () => {
@@ -468,6 +487,7 @@ export default function App() {
     setPlanningDocFiles([]);
     setPlanningDocsListError(null);
     setSelectedPlanningDocPath(null);
+    setPlanningDocFileRevision(0);
   }, []);
 
   const handlePlanNav = useCallback(() => {
@@ -680,7 +700,6 @@ export default function App() {
           planningDocsListError={planningDocsListError}
           selectedPlanningDocPath={selectedPlanningDocPath}
           onSelectPlanningDoc={handleSelectPlanningDoc}
-          onRefreshPlanningDocList={() => void refreshPlanningDocList()}
           planPanelOpen={planPanelOpen}
         >
           <TopBar project={project} title={topBarTitle} statusLine={statusLine} />
@@ -749,6 +768,7 @@ export default function App() {
               <PlanningDocsView
                 key={project.id}
                 selectedPath={selectedPlanningDocPath}
+                fileRevision={planningDocFileRevision}
               />
             ) : null}
           </div>

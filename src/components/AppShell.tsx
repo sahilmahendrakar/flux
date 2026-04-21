@@ -21,7 +21,6 @@ interface AppShellProps {
   planningDocsListError: string | null;
   selectedPlanningDocPath: string | null;
   onSelectPlanningDoc: (relativePath: string) => void;
-  onRefreshPlanningDocList: () => void;
   planPanelOpen: boolean;
 }
 
@@ -40,7 +39,6 @@ export function AppShell({
   planningDocsListError,
   selectedPlanningDocPath,
   onSelectPlanningDoc,
-  onRefreshPlanningDocList,
   planPanelOpen,
 }: AppShellProps) {
   return (
@@ -58,7 +56,6 @@ export function AppShell({
         planningDocsListError={planningDocsListError}
         selectedPlanningDocPath={selectedPlanningDocPath}
         onSelectPlanningDoc={onSelectPlanningDoc}
-        onRefreshPlanningDocList={onRefreshPlanningDocList}
         planPanelOpen={planPanelOpen}
         onClearProject={onClearProject}
       />

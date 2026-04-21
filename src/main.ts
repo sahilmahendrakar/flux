@@ -12,6 +12,7 @@ import { WorktreeService } from './main/WorktreeService';
 import { SessionManager } from './main/SessionManager';
 import { AuthServer } from './main/AuthServer';
 import { EmailService, type InviteEmailInput } from './main/EmailService';
+import { createPlanningDocsWatcher } from './main/PlanningDocsWatcher';
 import type { ActiveProjectKey, Agent, LocalProject, Task } from './types';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -161,6 +162,8 @@ const WINDOW_BACKGROUND = '#030712';
 let mainWindow: BrowserWindow | null = null;
 
 let fluxMcpServer: McpServer | null = null;
+
+let planningDocsWatcher: ReturnType<typeof createPlanningDocsWatcher> | null = null;
 
 /** Session id → dedicated terminal `BrowserWindow` (not the main app window). */
 const dedicatedTerminalWindows = new Map<string, BrowserWindow>();
@@ -749,6 +752,7 @@ app.whenReady().then(async () => {
     } catch {
       return { error: 'IO_ERROR' as const };
     }
+    planningDocsWatcher?.sync();
     const relativePaths = await collectMarkdownRelPaths(planningDir, '');
     return { files: relativePaths.map((p) => ({ relativePath: p })) };
   });
@@ -777,6 +781,9 @@ app.whenReady().then(async () => {
     },
   );
 
+  planningDocsWatcher = createPlanningDocsWatcher(resolvePlanningDocsDir);
+  planningDocsWatcher.sync();
+
   createWindow();
 });
 
@@ -799,6 +806,8 @@ app.on('activate', () => {
 
 app.on('before-quit', () => {
   fluxMcpServer?.stop();
+  planningDocsWatcher?.dispose();
+  planningDocsWatcher = null;
 });
 
 // In this file you can include the rest of your app's specific main process
