@@ -1,0 +1,29 @@
+src/components/AppShell.tsx
+  fedb122041cdf43f 3-7,17-24,36-43,54-61
+src/components/Sidebar.tsx
+  fedb122041cdf43f 5-6,13-20,136-157,164-171,183-198,218-219,222-223,225-226,230-231,233-234,236-319
+src/components/PlanningDocsView.tsx
+  fedb122041cdf43f 1,6,9,20,42-46,48-84,86
+src/App.tsx
+  fedb122041cdf43f 79-89,105-155,454-457,467-470,485-495,676-683,749-752
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "234f66df9e929e18a03f1bb90715559bd07e6bb6",
+  "prompts": {
+    "fedb122041cdf43f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "99431860-61eb-44be-b2f0-7c997b76c89b",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 323,
+      "total_deletions": 177,
+      "accepted_lines": 320,
+      "overriden_lines": 0
+    }
+  }
+}
