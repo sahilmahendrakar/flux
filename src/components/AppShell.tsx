@@ -1,6 +1,10 @@
 import { ReactNode } from 'react';
 import type { Project } from '../types';
-import { Sidebar, WorkspaceNavView } from './Sidebar';
+import {
+  Sidebar,
+  WorkspaceNavView,
+  type PlanningDocFile,
+} from './Sidebar';
 
 interface AppShellProps {
   children: ReactNode;
@@ -10,6 +14,14 @@ interface AppShellProps {
   onWorkspaceViewChange: (view: WorkspaceNavView) => void;
   onPlanNavClick: () => void;
   onDocsNavClick: () => void;
+  docsSidebarExpanded: boolean;
+  onDocsSidebarExpandToggle: () => void;
+  planningDocFiles: PlanningDocFile[];
+  planningDocsListLoading: boolean;
+  planningDocsListError: string | null;
+  selectedPlanningDocPath: string | null;
+  onSelectPlanningDoc: (relativePath: string) => void;
+  onRefreshPlanningDocList: () => void;
   planPanelOpen: boolean;
 }
 
@@ -21,6 +33,14 @@ export function AppShell({
   onWorkspaceViewChange,
   onPlanNavClick,
   onDocsNavClick,
+  docsSidebarExpanded,
+  onDocsSidebarExpandToggle,
+  planningDocFiles,
+  planningDocsListLoading,
+  planningDocsListError,
+  selectedPlanningDocPath,
+  onSelectPlanningDoc,
+  onRefreshPlanningDocList,
   planPanelOpen,
 }: AppShellProps) {
   return (
@@ -31,6 +51,14 @@ export function AppShell({
         onWorkspaceViewChange={onWorkspaceViewChange}
         onPlanNavClick={onPlanNavClick}
         onDocsNavClick={onDocsNavClick}
+        docsSidebarExpanded={docsSidebarExpanded}
+        onDocsSidebarExpandToggle={onDocsSidebarExpandToggle}
+        planningDocFiles={planningDocFiles}
+        planningDocsListLoading={planningDocsListLoading}
+        planningDocsListError={planningDocsListError}
+        selectedPlanningDocPath={selectedPlanningDocPath}
+        onSelectPlanningDoc={onSelectPlanningDoc}
+        onRefreshPlanningDocList={onRefreshPlanningDocList}
         planPanelOpen={planPanelOpen}
         onClearProject={onClearProject}
       />

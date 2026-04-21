@@ -76,6 +76,17 @@ export default function App() {
   const [workspaceView, setWorkspaceView] = useState<WorkspaceNavView>('board');
   const [planPanelOpen, setPlanPanelOpen] = useState(false);
   const [planPanelWidth, setPlanPanelWidth] = useState(DEFAULT_PLANNING_PANEL_WIDTH);
+  const [docsSidebarExpanded, setDocsSidebarExpanded] = useState(false);
+  const [planningDocFiles, setPlanningDocFiles] = useState<{ relativePath: string }[]>(
+    [],
+  );
+  const [planningDocsListLoading, setPlanningDocsListLoading] = useState(false);
+  const [planningDocsListError, setPlanningDocsListError] = useState<string | null>(
+    null,
+  );
+  const [selectedPlanningDocPath, setSelectedPlanningDocPath] = useState<
+    string | null
+  >(null);
   const boardRowRef = useRef<HTMLDivElement>(null);
 
   const auth = useAuth();
@@ -90,6 +101,57 @@ export default function App() {
   useAgentHeartbeat({ projectId: cloudProjectId, uid, displayName });
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
+
+  const refreshPlanningDocList = useCallback(async () => {
+    const api = window.electronAPI.planningDocs;
+    setPlanningDocsListLoading(true);
+    setPlanningDocsListError(null);
+    try {
+      const result = await api.list();
+      if ('error' in result) {
+        setPlanningDocFiles([]);
+        setPlanningDocsListError(
+          result.error === 'NO_PROJECT'
+            ? 'No workspace open.'
+            : 'Could not read the planning folder.',
+        );
+        return;
+      }
+      setPlanningDocFiles(result.files);
+    } catch {
+      setPlanningDocFiles([]);
+      setPlanningDocsListError('Failed to load documents.');
+    } finally {
+      setPlanningDocsListLoading(false);
+    }
+  }, []);
+
+  const shouldLoadPlanningDocs = docsSidebarExpanded || workspaceView === 'docs';
+
+  useEffect(() => {
+    if (!project || !shouldLoadPlanningDocs) return;
+    void refreshPlanningDocList();
+  }, [project?.id, shouldLoadPlanningDocs, refreshPlanningDocList]);
+
+  useEffect(() => {
+    if (workspaceView !== 'docs') return;
+    if (selectedPlanningDocPath != null) return;
+    if (planningDocFiles.length > 0) {
+      setSelectedPlanningDocPath(planningDocFiles[0].relativePath);
+    }
+  }, [workspaceView, selectedPlanningDocPath, planningDocFiles]);
+
+  useEffect(() => {
+    if (selectedPlanningDocPath == null) return;
+    if (planningDocsListLoading) return;
+    if (planningDocFiles.length === 0) {
+      setSelectedPlanningDocPath(null);
+      return;
+    }
+    if (!planningDocFiles.some((f) => f.relativePath === selectedPlanningDocPath)) {
+      setSelectedPlanningDocPath(planningDocFiles[0]?.relativePath ?? null);
+    }
+  }, [planningDocFiles, selectedPlanningDocPath, planningDocsListLoading]);
 
   // ----- Task provider per active project -----
   const provider = useMemo<TaskProvider | null>(() => {
@@ -389,6 +451,10 @@ export default function App() {
     setSelectedTaskId(null);
     setPlanPanelOpen(false);
     setWorkspaceView('board');
+    setDocsSidebarExpanded(false);
+    setPlanningDocFiles([]);
+    setPlanningDocsListError(null);
+    setSelectedPlanningDocPath(null);
   }, []);
 
   const handleClearProject = useCallback(async () => {
@@ -398,6 +464,10 @@ export default function App() {
     setSelectedTaskId(null);
     setPlanPanelOpen(false);
     setWorkspaceView('board');
+    setDocsSidebarExpanded(false);
+    setPlanningDocFiles([]);
+    setPlanningDocsListError(null);
+    setSelectedPlanningDocPath(null);
   }, []);
 
   const handlePlanNav = useCallback(() => {
@@ -410,6 +480,17 @@ export default function App() {
   }, [workspaceView]);
 
   const handleDocsNav = useCallback(() => {
+    setWorkspaceView('docs');
+    setPlanPanelOpen(false);
+    setDocsSidebarExpanded(true);
+  }, []);
+
+  const handleDocsSidebarExpandToggle = useCallback(() => {
+    setDocsSidebarExpanded((v) => !v);
+  }, []);
+
+  const handleSelectPlanningDoc = useCallback((relativePath: string) => {
+    setSelectedPlanningDocPath(relativePath);
     setWorkspaceView('docs');
     setPlanPanelOpen(false);
   }, []);
@@ -592,6 +673,14 @@ export default function App() {
           onWorkspaceViewChange={setWorkspaceView}
           onPlanNavClick={handlePlanNav}
           onDocsNavClick={handleDocsNav}
+          docsSidebarExpanded={docsSidebarExpanded}
+          onDocsSidebarExpandToggle={handleDocsSidebarExpandToggle}
+          planningDocFiles={planningDocFiles}
+          planningDocsListLoading={planningDocsListLoading}
+          planningDocsListError={planningDocsListError}
+          selectedPlanningDocPath={selectedPlanningDocPath}
+          onSelectPlanningDoc={handleSelectPlanningDoc}
+          onRefreshPlanningDocList={() => void refreshPlanningDocList()}
           planPanelOpen={planPanelOpen}
         >
           <TopBar project={project} title={topBarTitle} statusLine={statusLine} />
@@ -657,7 +746,10 @@ export default function App() {
                 currentUserEmail={userEmail ?? undefined}
               />
             ) : workspaceView === 'docs' ? (
-              <PlanningDocsView project={project} />
+              <PlanningDocsView
+                key={project.id}
+                selectedPath={selectedPlanningDocPath}
+              />
             ) : null}
           </div>
         </AppShell>
