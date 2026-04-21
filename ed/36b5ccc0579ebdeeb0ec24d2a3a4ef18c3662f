@@ -1,0 +1,37 @@
+src/main/WorktreeService.ts
+  7f6bd4470626cd32 17-20,26-29,34-36,39-41
+src/env.d.ts
+  7f6bd4470626cd32 3-9,38-39,44
+src/main/ProjectStore.ts
+  7f6bd4470626cd32 3-4,6,8-16,18,20-24,27-28,31-35,37-54,56-84,86-89,91-93,95-97,99-100,102,104,106,108-143,145-146,149-150,153-154,157-162,165-169,172-201,203-207,210-220,223-231,233-234,237-248,250-255,258-259,262-279,283-286
+src/main/TaskStore.ts
+  7f6bd4470626cd32 9-14,16,19-44,47-52,74,84,99,116-118,126-128,146-148,164-166,176-178,186
+src/main/AppStateStore.ts
+  7f6bd4470626cd32 1-81
+src/main.ts
+  7f6bd4470626cd32 4,7-8,14,21-153,231-308,313-315,326-335,362-364,366-371,375-385,387-410,412-416,420-425,430,433-440,442-443,445-450,455-457,461-463,465-470,472,498-500,502-505,539,545,560,563,683
+src/types.ts
+  7f6bd4470626cd32 5-12,19-20
+src/preload.ts
+  7f6bd4470626cd32 2,22,25,34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "ed36b5ccc0579ebdeeb0ec24d2a3a4ef18c3662f",
+  "prompts": {
+    "7f6bd4470626cd32": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6b4fe518-4e06-4356-a7c9-74421766c50a",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 755,
+      "total_deletions": 309,
+      "accepted_lines": 747,
+      "overriden_lines": 0
+    }
+  }
+}
