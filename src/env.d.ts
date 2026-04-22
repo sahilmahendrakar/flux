@@ -1,10 +1,10 @@
 /// <reference types="vite/client" />
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- mirrors shared Task shape (status uses TaskStatus)
 import type {
   Task,
   Agent,
   LocalProject,
   Session,
+  Shell,
   PlanningSession,
   ActiveProjectKey,
 } from './types';
@@ -88,19 +88,23 @@ declare global {
       };
       sessions: {
         start: (task: Task) => Promise<SessionStartResult>;
-        stop: (sessionId: string) => Promise<void>;
+        archive: (sessionId: string) => Promise<void>;
+        deleteWorkspace: (sessionId: string) => Promise<void>;
         get: (taskId: string) => Promise<Session | null>;
         getAll: () => Promise<Session[]>;
         write: (sessionId: string, data: string) => void;
         resize: (sessionId: string, cols: number, rows: number) => void;
         onData: (sessionId: string, cb: (data: string) => void) => () => void;
         onExit: (cb: (session: Session) => void) => () => void;
-        openDedicatedWindow: (
-          sessionId: string,
-        ) => Promise<{ ok: true } | { ok: false; error: 'NO_SESSION' }>;
-        isDedicatedOpen: (sessionId: string) => Promise<boolean>;
-        focusDedicatedWindow: (sessionId: string) => Promise<void>;
-        onTerminalWindowClosed: (cb: (sessionId: string) => void) => () => void;
+      };
+      shells: {
+        open: (sessionId: string) => Promise<Shell>;
+        close: (shellId: string) => Promise<void>;
+        list: (sessionId: string) => Promise<Shell[]>;
+        write: (shellId: string, data: string) => void;
+        resize: (shellId: string, cols: number, rows: number) => void;
+        onData: (shellId: string, cb: (data: string) => void) => () => void;
+        onExit: (cb: (shell: Shell) => void) => () => void;
       };
       planning: {
         start: (agent: Agent) => Promise<PlanningStartResult>;

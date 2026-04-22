@@ -48,6 +48,8 @@ export class WorktreeService {
     await fs.mkdir(worktreesRoot, { recursive: true });
     const worktreePath = path.join(worktreesRoot, taskId);
 
+    await this.reclaimStaleWorktree(worktreePath);
+
     let branchExists = false;
     try {
       await execFile('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], {
@@ -116,6 +118,22 @@ export class WorktreeService {
     }
 
     try {
+      await fs.rm(worktreePath, { recursive: true, force: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[WorktreeService.remove] fs.rm fallback failed: ${worktreePath}`,
+        message,
+      );
+    }
+
+    try {
+      await execFile('git', ['worktree', 'prune'], { cwd: this.rootPath });
+    } catch {
+      // best-effort
+    }
+
+    try {
       await execFile('git', ['branch', '-D', branch], { cwd: this.rootPath });
     } catch (err: unknown) {
       const stderr =
@@ -124,6 +142,55 @@ export class WorktreeService {
           : '';
       const message = err instanceof Error ? err.message : String(err);
       console.warn(`[WorktreeService.remove] git branch -D failed for ${branch}:`, stderr || message);
+    }
+  }
+
+  /**
+   * If a previous session left a stale worktree at the target path (e.g. from a
+   * hard crash where onExit cleanup never ran), reclaim it so `git worktree add`
+   * can succeed. Clears both the on-disk directory and git's worktree metadata.
+   */
+  private async reclaimStaleWorktree(worktreePath: string): Promise<void> {
+    let exists = false;
+    try {
+      await fs.access(worktreePath);
+      exists = true;
+    } catch {
+      exists = false;
+    }
+
+    if (!exists) {
+      try {
+        await execFile('git', ['worktree', 'prune'], { cwd: this.rootPath });
+      } catch {
+        // best-effort
+      }
+      return;
+    }
+
+    console.warn(
+      `[WorktreeService.create] reclaiming stale worktree: ${worktreePath}`,
+    );
+
+    try {
+      await execFile('git', ['worktree', 'remove', worktreePath, '--force'], {
+        cwd: this.rootPath,
+      });
+    } catch {
+      // git may not know about the path; fall through to fs.rm
+    }
+
+    try {
+      await fs.rm(worktreePath, { recursive: true, force: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`Failed to remove stale worktree at ${worktreePath}: ${message}`);
+    }
+
+    try {
+      await execFile('git', ['worktree', 'prune'], { cwd: this.rootPath });
+    } catch {
+      // best-effort
     }
   }
 

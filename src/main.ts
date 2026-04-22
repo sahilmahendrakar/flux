@@ -10,6 +10,7 @@ import { AppStateStore } from './main/AppStateStore';
 import { LocalBindingStore } from './main/LocalBindingStore';
 import { WorktreeService } from './main/WorktreeService';
 import { SessionManager } from './main/SessionManager';
+import { ShellManager } from './main/ShellManager';
 import { AuthServer } from './main/AuthServer';
 import { EmailService, type InviteEmailInput } from './main/EmailService';
 import { createPlanningDocsWatcher } from './main/PlanningDocsWatcher';
@@ -169,29 +170,6 @@ let fluxMcpServer: McpServer | null = null;
 
 let planningDocsWatcher: ReturnType<typeof createPlanningDocsWatcher> | null = null;
 
-/** Session id → dedicated terminal `BrowserWindow` (not the main app window). */
-const dedicatedTerminalWindows = new Map<string, BrowserWindow>();
-
-function broadcastTerminalWindowClosed(sessionId: string): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (win.isDestroyed()) continue;
-    win.webContents.send('session:terminalWindowClosed', sessionId);
-  }
-}
-
-function loadUrlWithTerminalHash(win: BrowserWindow, sessionId: string): void {
-  const fragment = `terminal=${sessionId}`;
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    const base = MAIN_WINDOW_VITE_DEV_SERVER_URL.replace(/#.*$/, '');
-    void win.loadURL(`${base}#${fragment}`);
-  } else {
-    void win.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-      { hash: fragment },
-    );
-  }
-}
-
 const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -250,6 +228,7 @@ app.whenReady().then(async () => {
 
   const worktreeService = new WorktreeService('', '');
   const sessionManager = new SessionManager(worktreeService);
+  const shellManager = new ShellManager();
 
   const userData = app.getPath('userData');
   await migrateLegacyProjectsJson({
@@ -603,13 +582,14 @@ app.whenReady().then(async () => {
     });
   });
 
-  ipcMain.handle('session:stop', async (_e, sessionId: string) => {
-    const termWin = dedicatedTerminalWindows.get(sessionId);
-    if (termWin && !termWin.isDestroyed()) {
-      termWin.close();
-    }
-    dedicatedTerminalWindows.delete(sessionId);
-    return sessionManager.stopSession(sessionId);
+  ipcMain.handle('session:archive', async (_e, sessionId: string) => {
+    shellManager.closeShellsForSession(sessionId);
+    sessionManager.archiveSession(sessionId);
+  });
+
+  ipcMain.handle('session:delete', async (_e, sessionId: string) => {
+    shellManager.closeShellsForSession(sessionId);
+    await sessionManager.deleteWorkspace(sessionId);
   });
 
   ipcMain.handle('session:get', async (_e, taskId: string) => {
@@ -618,62 +598,6 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('session:getAll', async () => {
     return sessionManager.getAllSessions();
-  });
-
-  ipcMain.handle(
-    'session:openDedicatedWindow',
-    (_e, sessionId: string): { ok: true } | { ok: false; error: 'NO_SESSION' } => {
-      const session = sessionManager.getSessionBySessionId(sessionId);
-      if (!session || session.status !== 'running') {
-        return { ok: false, error: 'NO_SESSION' };
-      }
-      const existing = dedicatedTerminalWindows.get(sessionId);
-      if (existing && !existing.isDestroyed()) {
-        existing.focus();
-        return { ok: true };
-      }
-      const termWin = new BrowserWindow({
-        width: 920,
-        height: 640,
-        title: 'Session terminal · Flux',
-        backgroundColor: WINDOW_BACKGROUND,
-        show: false,
-        ...(process.platform === 'darwin'
-          ? {
-              titleBarStyle: 'hiddenInset' as const,
-            }
-          : {}),
-        webPreferences: {
-          preload: path.join(__dirname, 'preload.js'),
-          contextIsolation: true,
-          nodeIntegration: false,
-        },
-      });
-      termWin.once('ready-to-show', () => {
-        if (!termWin.isDestroyed()) {
-          termWin.show();
-        }
-      });
-      dedicatedTerminalWindows.set(sessionId, termWin);
-      termWin.on('closed', () => {
-        dedicatedTerminalWindows.delete(sessionId);
-        broadcastTerminalWindowClosed(sessionId);
-      });
-      loadUrlWithTerminalHash(termWin, sessionId);
-      return { ok: true };
-    },
-  );
-
-  ipcMain.handle('session:isDedicatedOpen', (_e, sessionId: string) => {
-    const w = dedicatedTerminalWindows.get(sessionId);
-    return Boolean(w && !w.isDestroyed());
-  });
-
-  ipcMain.handle('session:focusDedicatedWindow', (_e, sessionId: string) => {
-    const w = dedicatedTerminalWindows.get(sessionId);
-    if (w && !w.isDestroyed()) {
-      w.focus();
-    }
   });
 
   ipcMain.on('session:write', (_e, sessionId: string, data: string) => {
@@ -849,6 +773,32 @@ app.whenReady().then(async () => {
 
   planningDocsWatcher = createPlanningDocsWatcher(resolvePlanningDocsDir);
   planningDocsWatcher.sync();
+
+  // ---- Shells: plain terminals spawned inside a session's worktree ----
+  ipcMain.handle('shell:open', (_e, sessionId: string) => {
+    const sessions = sessionManager.getAllSessions();
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) {
+      throw new Error(`No session for id: ${sessionId}`);
+    }
+    return shellManager.openShell(session.id, session.worktreePath);
+  });
+
+  ipcMain.handle('shell:close', (_e, shellId: string) => {
+    shellManager.closeShell(shellId);
+  });
+
+  ipcMain.handle('shell:list', (_e, sessionId: string) => {
+    return shellManager.listForSession(sessionId);
+  });
+
+  ipcMain.on('shell:write', (_e, shellId: string, data: string) => {
+    shellManager.write(shellId, data);
+  });
+
+  ipcMain.on('shell:resize', (_e, shellId: string, cols: number, rows: number) => {
+    shellManager.resize(shellId, cols, rows);
+  });
 
   createWindow();
 });
