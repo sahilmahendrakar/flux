@@ -1,0 +1,50 @@
+src/App.tsx
+  cf1277bc3d9dac19 633-640
+src/components/PlanningPanel.tsx
+  cf1277bc3d9dac19 13-14,37-41,136-138,145-147,233-235,237,239-253
+src/main.ts
+  cf1277bc3d9dac19 15-19,396-410,687-745
+src/preload.ts
+  cf1277bc3d9dac19 34-37,140-141
+src/env.d.ts
+  cf1277bc3d9dac19 44-46,106
+src/main/ProjectStore.ts
+  cf1277bc3d9dac19 157-175
+src/main/WorktreeService.ts
+  cf1277bc3d9dac19 30-37
+src/main/SessionManager.ts
+  cf1277bc3d9dac19 41-73,102-109,112,114,274,301-305,328,335
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "013fe16b81fb1c41597dcd29b251509aac0d27c5",
+  "prompts": {
+    "cf1277bc3d9dac19": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ff237db1-72c1-42f6-b88f-1a05b6942193",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 211,
+      "total_deletions": 92,
+      "accepted_lines": 209,
+      "overriden_lines": 0
+    },
+    "f88f5fde0b0f862c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1844802a-0e69-4e8b-9693-80e4d669d00b",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 130,
+      "total_deletions": 38,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
