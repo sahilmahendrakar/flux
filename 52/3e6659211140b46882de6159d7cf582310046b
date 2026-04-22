@@ -1,0 +1,27 @@
+src/main/McpServer.ts
+  2eac0672a1395d6d 140
+src/main/SessionManager.ts
+  2eac0672a1395d6d 8,77-78,93,95,98,268,291
+src/main/ProjectStore.ts
+  2eac0672a1395d6d 99-100,103,107-116,124,132,136,143-164,275-279
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "523e6659211140b46882de6159d7cf582310046b",
+  "prompts": {
+    "2eac0672a1395d6d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a0dc214b-7b7e-49d7-99df-62253f232eee",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 56,
+      "total_deletions": 42,
+      "accepted_lines": 52,
+      "overriden_lines": 0
+    }
+  }
+}
