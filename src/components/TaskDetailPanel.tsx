@@ -265,11 +265,13 @@ export default function TaskDetailPanel({
     }
   };
 
-  const handleTerminalResize = (cols: number, rows: number) => {
-    if (session?.status === 'running') {
-      window.electronAPI.sessions.resize(session.id, cols, rows);
-    }
-  };
+  // The panel's embedded terminal is a preview of the running session — it
+  // shares the pty with the workspace tab's terminal. We intentionally do NOT
+  // push this narrower view's cols/rows to the pty: that would make the pty
+  // wrap output to the panel width, which corrupts the workspace terminal's
+  // buffer (lines end mid-row, leaving the right side rendered as the theme
+  // background — i.e. "blacked out where the panel was" when the user
+  // switches back to the workspace tab). The workspace terminal owns pty size.
 
   const handleDelete = () => {
     if (!task) return;
@@ -476,7 +478,6 @@ export default function TaskDetailPanel({
                   ref={terminalRef}
                   sessionId={session?.id ?? null}
                   onData={handleTerminalData}
-                  onResize={handleTerminalResize}
                   hideCursor
                 />
               )}
