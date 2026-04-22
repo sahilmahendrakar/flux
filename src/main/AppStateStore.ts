@@ -3,10 +3,27 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ActiveProjectKey } from '../types';
 
+/**
+ * Tab-strip restoration state — per project, remember which task tabs
+ * were open and which was active. Written by the renderer on tab open /
+ * close / switch so relaunching Flux after cmd-Q paints the same strip
+ * before terminals warm-reattach to the daemon.
+ */
+export interface ProjectTabState {
+  openTaskIds: string[];
+  activeTaskId: string | null;
+}
+
 export interface AppState {
   lastOpenedProjectDir: string | null;
   /** Persisted so team (cloud) projects restore after restart. */
   activeProjectKey: ActiveProjectKey | null;
+  /** Keyed by `${kind}:${id}` — see `projectStateKey`. */
+  projectTabs: Record<string, ProjectTabState>;
+}
+
+export function projectStateKey(key: ActiveProjectKey): string {
+  return `${key.kind}:${key.id}`;
 }
 
 function errnoCode(err: unknown): string | undefined {
@@ -20,6 +37,7 @@ export class AppStateStore {
   private state: AppState = {
     lastOpenedProjectDir: null,
     activeProjectKey: null,
+    projectTabs: {},
   };
 
   constructor() {
@@ -58,10 +76,49 @@ export class AppStateStore {
         this.state.activeProjectKey = { kind: k.kind, id: k.id };
       }
     }
+    if (o.projectTabs && typeof o.projectTabs === 'object') {
+      const tabs: Record<string, ProjectTabState> = {};
+      for (const [key, value] of Object.entries(
+        o.projectTabs as Record<string, unknown>,
+      )) {
+        if (!value || typeof value !== 'object') continue;
+        const v = value as Partial<ProjectTabState>;
+        const ids = Array.isArray(v.openTaskIds)
+          ? v.openTaskIds.filter((x): x is string => typeof x === 'string')
+          : [];
+        const active =
+          typeof v.activeTaskId === 'string' && v.activeTaskId
+            ? v.activeTaskId
+            : null;
+        tabs[key] = { openTaskIds: ids, activeTaskId: active };
+      }
+      this.state.projectTabs = tabs;
+    }
   }
 
   get(): AppState {
-    return { ...this.state };
+    return {
+      ...this.state,
+      projectTabs: { ...this.state.projectTabs },
+    };
+  }
+
+  getProjectTabs(key: ActiveProjectKey): ProjectTabState {
+    const k = projectStateKey(key);
+    return (
+      this.state.projectTabs[k] ?? { openTaskIds: [], activeTaskId: null }
+    );
+  }
+
+  async setProjectTabs(
+    key: ActiveProjectKey,
+    tabs: ProjectTabState,
+  ): Promise<void> {
+    const next = {
+      ...this.state.projectTabs,
+      [projectStateKey(key)]: tabs,
+    };
+    await this.set({ projectTabs: next });
   }
 
   async set(partial: Partial<AppState>): Promise<void> {

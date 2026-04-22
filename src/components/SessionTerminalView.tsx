@@ -2,6 +2,27 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session, Shell } from '../types';
 import Terminal, { type TerminalHandle } from './Terminal';
 
+// Session / shell replay snapshots from the daemon. Module-level so that
+// React 18 StrictMode's dev-only double-mount doesn't double-call attach
+// on the daemon RPC. Superset ran into this exact pattern — see the
+// "React StrictMode Double-Mounts Are Real" note in their blog post.
+const sessionAttachCache = new Map<
+  string,
+  { replay: string; cols: number; rows: number }
+>();
+const shellAttachCache = new Map<
+  string,
+  { replay: string; cols: number; rows: number }
+>();
+
+export function invalidateSessionAttachCache(id: string): void {
+  sessionAttachCache.delete(id);
+}
+
+export function invalidateShellAttachCache(id: string): void {
+  shellAttachCache.delete(id);
+}
+
 function BotIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -49,11 +70,60 @@ function AgentPane({ session, visible }: { session: Session; visible: boolean })
 
   useEffect(() => {
     if (!running) return;
-    const unsub = window.electronAPI.sessions.onData(session.id, (data) => {
-      terminalRef.current?.write(data);
+    const id = session.id;
+
+    // Buffer live chunks that arrive before the replay write lands, so
+    // we don't tear history. The daemon may already be streaming the
+    // next token into session:data:<id> before we finish writing replay.
+    let replayWritten = false;
+    const earlyBuffer: string[] = [];
+    let cancelled = false;
+
+    const unsubData = window.electronAPI.sessions.onData(id, (data) => {
+      if (cancelled) return;
+      if (!replayWritten) {
+        earlyBuffer.push(data);
+      } else {
+        terminalRef.current?.write(data);
+      }
     });
+
+    const writeReplayAndFlush = (replay: string) => {
+      if (cancelled) return;
+      if (replay.length > 0) {
+        terminalRef.current?.write(replay);
+      }
+      replayWritten = true;
+      if (earlyBuffer.length > 0) {
+        for (const chunk of earlyBuffer) terminalRef.current?.write(chunk);
+        earlyBuffer.length = 0;
+      }
+    };
+
+    const cached = sessionAttachCache.get(id);
+    if (cached) {
+      writeReplayAndFlush(cached.replay);
+    } else {
+      void (async () => {
+        try {
+          const result = await window.electronAPI.sessions.attach(id);
+          if (cancelled) return;
+          if (result) {
+            sessionAttachCache.set(id, result);
+            writeReplayAndFlush(result.replay);
+          } else {
+            writeReplayAndFlush('');
+          }
+        } catch (err) {
+          console.error('[AgentPane] attach failed', err);
+          writeReplayAndFlush('');
+        }
+      })();
+    }
+
     return () => {
-      unsub();
+      cancelled = true;
+      unsubData();
     };
   }, [session.id, running]);
 
@@ -94,11 +164,57 @@ function ShellPane({ shell, visible }: { shell: Shell; visible: boolean }) {
 
   useEffect(() => {
     if (!running) return;
-    const unsub = window.electronAPI.shells.onData(shell.id, (data) => {
-      terminalRef.current?.write(data);
+    const id = shell.id;
+
+    let replayWritten = false;
+    const earlyBuffer: string[] = [];
+    let cancelled = false;
+
+    const unsubData = window.electronAPI.shells.onData(id, (data) => {
+      if (cancelled) return;
+      if (!replayWritten) {
+        earlyBuffer.push(data);
+      } else {
+        terminalRef.current?.write(data);
+      }
     });
+
+    const writeReplayAndFlush = (replay: string) => {
+      if (cancelled) return;
+      if (replay.length > 0) {
+        terminalRef.current?.write(replay);
+      }
+      replayWritten = true;
+      if (earlyBuffer.length > 0) {
+        for (const chunk of earlyBuffer) terminalRef.current?.write(chunk);
+        earlyBuffer.length = 0;
+      }
+    };
+
+    const cached = shellAttachCache.get(id);
+    if (cached) {
+      writeReplayAndFlush(cached.replay);
+    } else {
+      void (async () => {
+        try {
+          const result = await window.electronAPI.shells.attach(id);
+          if (cancelled) return;
+          if (result) {
+            shellAttachCache.set(id, result);
+            writeReplayAndFlush(result.replay);
+          } else {
+            writeReplayAndFlush('');
+          }
+        } catch (err) {
+          console.error('[ShellPane] attach failed', err);
+          writeReplayAndFlush('');
+        }
+      })();
+    }
+
     return () => {
-      unsub();
+      cancelled = true;
+      unsubData();
     };
   }, [shell.id, running]);
 
@@ -225,6 +341,7 @@ export function SessionTerminalView({ session, visible = true }: SessionTerminal
   const handleCloseShell = useCallback(
     async (shellId: string) => {
       await window.electronAPI.shells.close(shellId);
+      invalidateShellAttachCache(shellId);
       setShells((prev) => prev.filter((s) => s.id !== shellId));
       setActivePane((prev) => (prev === `shell:${shellId}` ? 'agent' : prev));
     },
