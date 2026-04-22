@@ -1,0 +1,101 @@
+src/components/LoadingScreen.tsx
+  c48f948b0254d3b0 3,9,12
+src/components/ThemeAppearanceSwitch.tsx
+  c48f948b0254d3b0 1-130
+src/components/TopBar.tsx
+  c48f948b0254d3b0 12,16-17,20,24
+src/components/Terminal.tsx
+  c48f948b0254d3b0 5,30-43,48,56-61,79,166,170,179
+src/preload.ts
+  c48f948b0254d3b0 22-25
+src/components/TaskCard.tsx
+  90ff70245b7f6b92 6-7,30
+  c48f948b0254d3b0 8-9,29,33-34,49-51,63
+src/env.d.ts
+  c48f948b0254d3b0 32-34
+src/components/ProjectsListView.tsx
+  90ff70245b7f6b92 26-47,65,69-76,259-286,311,333,360,370,381,424,456,460,551
+  c48f948b0254d3b0 14,228,232,237,245-257,307,322,325,347,353,366,374-375,390,401,404,416,441,448,465,474,480,484,488,498,510,512,514,542-543
+src/components/SettingsView.tsx
+  90ff70245b7f6b92 1-21
+src/renderer.tsx
+  c48f948b0254d3b0 6,20-24
+src/components/AppShell.tsx
+  c48f948b0254d3b0 21
+src/App.tsx
+  90ff70245b7f6b92 18,360-366,463-464
+  c48f948b0254d3b0 386,389,402,405,423,426,467-468
+src/components/InviteTeammateModal.tsx
+  90ff70245b7f6b92 48,54,56-57,60,69,72,78,82,93,101
+src/renderer/theme.ts
+  c48f948b0254d3b0 1-30
+src/components/CreateCloudProjectModal.tsx
+  90ff70245b7f6b92 30,36,38-39,42,51,54,62,69
+src/components/TeamView.tsx
+  c48f948b0254d3b0 89,92,99,101,110,141,145,153,167,174,183,189,212,225,228
+  90ff70245b7f6b92 115,121,126,131,149,178,198,221,234
+tailwind.config.js
+  c48f948b0254d3b0 4,6-31,34
+src/main.ts
+  c48f948b0254d3b0 93-101
+index.html
+  c48f948b0254d3b0 2,6-20
+src/components/Sidebar.tsx
+  c48f948b0254d3b0 110-111,115,117-118,122,128,130,162,174
+  90ff70245b7f6b92 3,165-166
+src/components/AgentBadge.tsx
+  90ff70245b7f6b92 5-9
+src/components/Column.tsx
+  90ff70245b7f6b92 29,35
+  c48f948b0254d3b0 31-32,37-38,41,59,71,85
+src/components/SignInCard.tsx
+  90ff70245b7f6b92 98
+  c48f948b0254d3b0 11-14,21,51,56,59,64,67,73,87,92
+src/renderer/useTheme.ts
+  90ff70245b7f6b92 1,17-21
+  c48f948b0254d3b0 2-16,22-49
+src/components/TaskDetailPanel.tsx
+  90ff70245b7f6b92 47,49,321,324,332,386-388,495,517,543
+  c48f948b0254d3b0 44-45,50,323,338,348,352,360,377,405,411,429,434,450,463,468,470,479,487,504,509,515-516,522,539
+src/index.css
+  90ff70245b7f6b92 33-34,64
+  c48f948b0254d3b0 5-32,35-63,65-66,72,77
+src/components/TerminalWindowPage.tsx
+  c48f948b0254d3b0 65,67-68,73-74,88
+src/components/NewTaskModal.tsx
+  90ff70245b7f6b92 36,74-75,84,88,96
+  c48f948b0254d3b0 40,43-44,46,58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "627be77f3184b7c52d41a4283d270ede6f32d903",
+  "prompts": {
+    "90ff70245b7f6b92": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "27c71bde-a0e3-43f8-b016-8012d7b0d0fd",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 174,
+      "total_deletions": 79,
+      "accepted_lines": 170,
+      "overriden_lines": 0
+    },
+    "c48f948b0254d3b0": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "79d74071-bc91-49a0-b1f8-f2398e3048e3",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 669,
+      "total_deletions": 325,
+      "accepted_lines": 507,
+      "overriden_lines": 0
+    }
+  }
+}
