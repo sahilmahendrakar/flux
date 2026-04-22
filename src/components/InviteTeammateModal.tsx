@@ -45,21 +45,19 @@ export function InviteTeammateModal({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/35 backdrop-blur-sm dark:bg-black/50"
       onClick={onClose}
     >
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => void handleSubmit(e)}
-        className="w-[min(420px,92vw)] rounded-xl border border-white/[0.08] bg-[#0c0c0e] p-5 shadow-2xl"
+        className="w-[min(420px,92vw)] rounded-xl border border-flux-line-strong bg-flux-elevated p-5 shadow-flux-modal"
       >
-        <h2 className="text-[15px] font-semibold text-zinc-100">
-          Invite to {projectName}
-        </h2>
-        <p className="mt-1 text-[12px] text-zinc-500">
+        <h2 className="text-[15px] font-semibold text-flux-fg">Invite to {projectName}</h2>
+        <p className="mt-1 text-[12px] text-flux-muted">
           They'll see the invite on their Flux homepage after signing in.
         </p>
-        <label className="mt-4 block text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-500">
+        <label className="mt-4 block text-[11px] font-medium uppercase tracking-[0.12em] text-flux-subtle">
           Email
         </label>
         <input
@@ -68,20 +66,20 @@ export function InviteTeammateModal({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="teammate@example.com"
-          className="mt-1 w-full rounded-md border border-white/[0.08] bg-[#09090b] px-3 py-2 text-[13px] text-zinc-100 outline-none focus-visible:border-white/[0.14] focus-visible:ring-1 focus-visible:ring-white/[0.12]"
+          className="mt-1 w-full rounded-md border border-flux-line-strong bg-flux-surface px-3 py-2 text-[13px] text-flux-fg outline-none placeholder:text-flux-subtle focus-visible:border-flux-muted focus-visible:ring-1 focus-visible:ring-flux-tint/12"
         />
         {error ? (
-          <p className="mt-3 rounded-md border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-300/95">
+          <p className="mt-3 rounded-md border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-700 dark:text-red-300/95">
             {error}
           </p>
         ) : null}
         {done ? (
           done.emailed ? (
-            <p className="mt-3 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-2 text-[12px] text-emerald-200/95">
+            <p className="mt-3 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-2 text-[12px] text-emerald-800 dark:text-emerald-200/95">
               Invite sent to {email}. They'll also receive an email.
             </p>
           ) : (
-            <p className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/[0.08] px-3 py-2 text-[12px] text-amber-200/95">
+            <p className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/[0.08] px-3 py-2 text-[12px] text-amber-900 dark:text-amber-200/95">
               Invite saved for {email}. Email delivery{' '}
               {done.emailError ? `failed: ${done.emailError}` : 'is not configured'}
               . They'll still see the invite when they sign in.
@@ -92,7 +90,7 @@ export function InviteTeammateModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-[12px] text-zinc-400 transition hover:bg-white/[0.04] hover:text-zinc-200"
+            className="rounded-md px-3 py-1.5 text-[12px] text-flux-muted transition hover:bg-flux-tint/5 hover:text-flux-fg-soft"
           >
             {done ? 'Close' : 'Cancel'}
           </button>
@@ -100,7 +98,7 @@ export function InviteTeammateModal({
             <button
               type="submit"
               disabled={busy || !email.trim()}
-              className="rounded-md bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition hover:bg-zinc-100 disabled:pointer-events-none disabled:opacity-45"
+              className="rounded-md bg-flux-fg px-3 py-1.5 text-[12px] font-medium text-flux-bg transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-45"
             >
               {busy ? 'Sending…' : 'Send invite'}
             </button>

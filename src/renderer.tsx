@@ -3,6 +3,7 @@ import '@xterm/xterm/css/xterm.css';
 import './index.css';
 import App from './App';
 import TerminalWindowPage from './components/TerminalWindowPage';
+import { getStoredTheme, isVisuallyDark } from './renderer/theme';
 
 function parseTerminalSessionIdFromLocation(): string | null {
   const raw = window.location.hash.replace(/^#/, '');
@@ -16,6 +17,11 @@ if (!rootEl) {
   throw new Error('Missing #root element');
 }
 const root = createRoot(rootEl);
+
+void window.electronAPI.theme.syncChrome({
+  visuallyDark: isVisuallyDark(getStoredTheme()),
+});
+
 if (terminalSessionId) {
   root.render(<TerminalWindowPage sessionId={terminalSessionId} />);
 } else {

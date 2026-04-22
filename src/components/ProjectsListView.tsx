@@ -11,6 +11,7 @@ import type { InvitesState } from '../renderer/invites/useInvites';
 import { acceptInvite } from '../renderer/invites/invites';
 import { CreateCloudProjectModal } from './CreateCloudProjectModal';
 import { InviteTeammateModal } from './InviteTeammateModal';
+import { ThemeAppearanceSwitch } from './ThemeAppearanceSwitch';
 
 type ActiveProject = LocalProject | CloudProject;
 
@@ -20,6 +21,28 @@ interface ProjectsListViewProps {
   cloudProjects: CloudProjectsState;
   invites: InvitesState;
   authSlot?: React.ReactNode;
+}
+
+function AppearanceSettingsIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width={18}
+      height={18}
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <circle cx="8" cy="8" r="2.25" stroke="currentColor" strokeWidth="1.2" />
+      <path
+        d="M8 1.25v1.75M8 13v1.75M1.25 8h1.75M13 8h1.75M3.05 3.05l1.24 1.24M11.71 11.71l1.24 1.24M12.95 3.05l-1.24 1.24M4.29 11.71l-1.24 1.24"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }
 
 export function ProjectsListView({
@@ -39,8 +62,18 @@ export function ProjectsListView({
   const [cloudError, setCloudError] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [appearanceMenuOpen, setAppearanceMenuOpen] = useState(false);
 
   const uid = auth.user?.uid ?? null;
+
+  useEffect(() => {
+    if (!appearanceMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setAppearanceMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [appearanceMenuOpen]);
 
   const refreshLocal = async () => {
     try {
@@ -192,16 +225,16 @@ export function ProjectsListView({
   };
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-y-auto bg-[#09090b] text-zinc-100">
+    <div className="relative flex h-full w-full flex-col overflow-y-auto bg-flux-bg text-flux-fg">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-[20%] -top-[10%] h-[min(560px,70vw)] w-[min(560px,70vw)] rounded-full bg-violet-600/[0.12] blur-[100px]" />
         <div className="absolute -bottom-[15%] -right-[15%] h-[min(480px,65vw)] w-[min(480px,65vw)] rounded-full bg-sky-600/[0.1] blur-[100px]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-flux-tint/25" />
       </div>
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.4]"
         style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(var(--flux-grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--flux-grid-line) 1px, transparent 1px)`,
           backgroundSize: '64px 64px',
           maskImage:
             'radial-gradient(ellipse 80% 60% at 50% 40%, black, transparent)',
@@ -209,17 +242,48 @@ export function ProjectsListView({
       />
 
       <div className="relative z-10 mx-auto flex w-full max-w-2xl flex-col px-8 py-16">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] shadow-[0_1px_0_0_rgba(255,255,255,0.06)_inset] backdrop-blur-md">
-            <span className="text-base font-semibold tracking-tight text-white">
-              F
-            </span>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-flux-line-strong bg-flux-tint/5 shadow-[inset_0_1px_0_0_rgb(var(--color-flux-tint)/0.06)] backdrop-blur-md">
+              <span className="text-base font-semibold tracking-tight text-flux-fg">
+                F
+              </span>
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight text-flux-fg">
+                Flux
+              </h1>
+              <p className="text-[13px] text-flux-muted">Projects</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-white">
-              Flux
-            </h1>
-            <p className="text-[13px] text-zinc-500">Projects</p>
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              className="app-window-no-drag flex items-center justify-center rounded-md border border-transparent p-2 text-flux-muted transition hover:border-flux-line hover:bg-flux-tint/5 hover:text-flux-fg-soft"
+              aria-expanded={appearanceMenuOpen}
+              aria-haspopup="dialog"
+              aria-label="Appearance and theme"
+              onClick={() => setAppearanceMenuOpen((o) => !o)}
+            >
+              <AppearanceSettingsIcon />
+            </button>
+            {appearanceMenuOpen ? (
+              <>
+                <button
+                  type="button"
+                  className="app-window-no-drag fixed inset-0 z-40 cursor-default bg-transparent"
+                  aria-label="Close appearance menu"
+                  onClick={() => setAppearanceMenuOpen(false)}
+                />
+                <div
+                  role="dialog"
+                  aria-label="Appearance"
+                  className="app-window-no-drag absolute right-0 top-full z-50 mt-2 w-[min(calc(100vw-2rem),240px)] rounded-lg border border-flux-line-strong bg-flux-elevated p-4 shadow-flux-modal"
+                >
+                  <ThemeAppearanceSwitch showLabel className="w-full" />
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
 
@@ -240,11 +304,11 @@ export function ProjectsListView({
           if (actionable.length === 0) return null;
           return (
           <div className="mt-8">
-            <h2 className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+            <h2 className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-flux-muted">
               Invitations
             </h2>
             {inviteError ? (
-              <p className="mb-2 rounded-md border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-300/95">
+              <p className="mb-2 rounded-md border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-700 dark:text-red-300/95">
                 {inviteError}
               </p>
             ) : null}
@@ -255,10 +319,10 @@ export function ProjectsListView({
                   className="flex items-center gap-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2.5"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium text-zinc-100">
+                    <div className="truncate text-[13px] font-medium text-flux-fg">
                       {inv.projectName || '(unknown project)'}
                     </div>
-                    <div className="truncate text-[11px] text-zinc-500">
+                    <div className="truncate text-[11px] text-flux-muted">
                       Invited to collaborate
                     </div>
                   </div>
@@ -266,7 +330,7 @@ export function ProjectsListView({
                     type="button"
                     disabled={acceptingId === inv.projectId}
                     onClick={() => void handleAcceptInvite(inv.projectId, inv.email)}
-                    className="rounded-md bg-white px-2.5 py-1 text-[12px] font-medium text-zinc-950 transition hover:bg-zinc-100 disabled:pointer-events-none disabled:opacity-45"
+                    className="rounded-md bg-flux-fg px-2.5 py-1 text-[12px] font-medium text-flux-bg transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-45"
                   >
                     {acceptingId === inv.projectId ? 'Accepting…' : 'Accept'}
                   </button>
@@ -280,41 +344,41 @@ export function ProjectsListView({
         {auth.status === 'signedIn' ? (
           <div className="mt-8">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+              <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-flux-muted">
                 Team projects
               </h2>
               <button
                 type="button"
                 onClick={() => setCreateCloudOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[12px] font-medium text-zinc-200 transition hover:bg-white/[0.06] active:scale-[0.98]"
+                className="inline-flex items-center gap-1.5 rounded-md border border-flux-line-strong bg-flux-tint/[0.05] px-2.5 py-1 text-[12px] font-medium text-flux-fg-soft transition hover:bg-flux-tint/[0.08] active:scale-[0.98]"
               >
                 + New team project
               </button>
             </div>
 
             {cloudError ? (
-              <p className="mb-3 rounded-lg border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[13px] leading-snug text-red-300/95">
+              <p className="mb-3 rounded-lg border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[13px] leading-snug text-red-700 dark:text-red-300/95">
                 {cloudError}
               </p>
             ) : null}
 
             {cloudProjects.status === 'loading' ? (
-              <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-6 text-center text-[13px] text-zinc-500">
+              <div className="rounded-lg border border-flux-line bg-flux-tint/[0.03] px-4 py-6 text-center text-[13px] text-flux-muted">
                 Loading…
               </div>
             ) : cloudProjects.status === 'error' ? (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/[0.08] px-4 py-3 text-[12px] text-red-300/95">
+              <div className="rounded-lg border border-red-500/20 bg-red-500/[0.08] px-4 py-3 text-[12px] text-red-700 dark:text-red-300/95">
                 Couldn't load team projects: {cloudProjects.error}
               </div>
             ) : cloudProjects.projects.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-white/[0.08] bg-white/[0.015] px-6 py-8 text-center">
-                <p className="text-[13px] text-zinc-400">
+              <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-flux-line-strong bg-flux-tint/[0.02] px-6 py-8 text-center">
+                <p className="text-[13px] text-flux-muted">
                   No team projects yet.
                 </p>
                 <button
                   type="button"
                   onClick={() => setCreateCloudOpen(true)}
-                  className="rounded-md bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition hover:bg-zinc-100"
+                  className="rounded-md bg-flux-fg px-3 py-1.5 text-[12px] font-medium text-flux-bg transition hover:opacity-90"
                 >
                   Create team project
                 </button>
@@ -323,7 +387,7 @@ export function ProjectsListView({
               <ul className="flex flex-col gap-1.5">
                 {cloudProjects.projects.map((p) => (
                   <li key={p.id}>
-                    <div className="group flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 transition hover:border-white/[0.12] hover:bg-white/[0.04]">
+                    <div className="group flex items-center gap-3 rounded-lg border border-flux-line bg-flux-tint/[0.03] px-3 py-2.5 transition hover:border-flux-line-strong hover:bg-flux-tint/[0.05]">
                       <button
                         type="button"
                         disabled={activatingId === p.id}
@@ -334,10 +398,10 @@ export function ProjectsListView({
                           {p.name.slice(0, 1).toUpperCase()}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[13px] font-medium text-zinc-100">
+                          <div className="truncate text-[13px] font-medium text-flux-fg">
                             {p.name}
                           </div>
-                          <div className="truncate text-[11px] text-zinc-500">
+                          <div className="truncate text-[11px] text-flux-muted">
                             {p.ownerId === uid
                               ? `Owner · ${p.memberIds.length} member${p.memberIds.length === 1 ? '' : 's'}`
                               : `Member · ${p.memberIds.length} members`}
@@ -349,7 +413,7 @@ export function ProjectsListView({
                           <button
                             type="button"
                             onClick={() => setInviteFor(p)}
-                            className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-400 opacity-0 transition hover:bg-white/[0.06] hover:text-zinc-200 group-hover:opacity-100"
+                            className="rounded-md px-2 py-1 text-[11px] font-medium text-flux-muted opacity-0 transition hover:bg-flux-tint/[0.08] hover:text-flux-fg-soft group-hover:opacity-100"
                             title="Invite teammate"
                           >
                             Invite
@@ -357,7 +421,7 @@ export function ProjectsListView({
                           <button
                             type="button"
                             onClick={() => void handleDeleteCloud(p)}
-                            className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-500 opacity-0 transition hover:bg-white/[0.06] hover:text-red-300 group-hover:opacity-100"
+                            className="rounded-md px-2 py-1 text-[11px] font-medium text-flux-muted opacity-0 transition hover:bg-flux-tint/[0.08] hover:text-red-700 dark:hover:text-red-300 group-hover:opacity-100"
                             title="Delete project"
                           >
                             Delete
@@ -374,14 +438,14 @@ export function ProjectsListView({
 
         <div className="mt-8">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+            <h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-flux-muted">
               Local projects
             </h2>
             <button
               type="button"
               disabled={adding}
               onClick={() => void handleAddLocal()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-2.5 py-1 text-[12px] font-medium text-zinc-200 transition hover:bg-white/[0.06] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45"
+              className="inline-flex items-center gap-1.5 rounded-md border border-flux-line-strong bg-flux-tint/[0.05] px-2.5 py-1 text-[12px] font-medium text-flux-fg-soft transition hover:bg-flux-tint/[0.08] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45"
             >
               {adding ? 'Opening…' : '+ Add project'}
             </button>
@@ -389,16 +453,16 @@ export function ProjectsListView({
 
           {gitError ? (
             <p
-              className="mb-4 rounded-lg border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[13px] leading-snug text-red-300/95"
+              className="mb-4 rounded-lg border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[13px] leading-snug text-red-700 dark:text-red-300/95"
               role="alert"
             >
               That folder isn&apos;t a git repository. Run{' '}
-              <code className="font-mono text-red-200">git init</code> first.
+              <code className="font-mono text-red-800 dark:text-red-200">git init</code> first.
             </p>
           ) : null}
 
           {loading ? (
-            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-6 text-center text-[13px] text-zinc-500">
+            <div className="rounded-lg border border-flux-line bg-flux-tint/[0.03] px-4 py-6 text-center text-[13px] text-flux-muted">
               Loading…
             </div>
           ) : projects.length === 0 ? (
@@ -407,21 +471,21 @@ export function ProjectsListView({
             <ul className="flex flex-col gap-1.5">
               {projects.map((p) => (
                 <li key={p.id}>
-                  <div className="group flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 transition hover:border-white/[0.12] hover:bg-white/[0.04]">
+                  <div className="group flex items-center gap-3 rounded-lg border border-flux-line bg-flux-tint/[0.03] px-3 py-2.5 transition hover:border-flux-line-strong hover:bg-flux-tint/[0.05]">
                     <button
                       type="button"
                       onClick={() => void handleOpenLocal(p.id)}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left"
                     >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/[0.05] text-[13px] font-medium text-zinc-300">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-flux-tint/[0.06] text-[13px] font-medium text-flux-fg-soft">
                         {p.name.slice(0, 1).toUpperCase()}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-[13px] font-medium text-zinc-100">
+                        <div className="truncate text-[13px] font-medium text-flux-fg">
                           {p.name}
                         </div>
                         <div
-                          className="truncate font-mono text-[11px] text-zinc-500"
+                          className="truncate font-mono text-[11px] text-flux-muted"
                           title={p.rootPath}
                         >
                           {p.rootPath}
@@ -431,7 +495,7 @@ export function ProjectsListView({
                     <button
                       type="button"
                       onClick={() => void handleRemoveLocal(p.id)}
-                      className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-500 opacity-0 transition hover:bg-white/[0.06] hover:text-zinc-300 group-hover:opacity-100"
+                      className="rounded-md px-2 py-1 text-[11px] font-medium text-flux-muted opacity-0 transition hover:bg-flux-tint/[0.08] hover:text-flux-fg-soft group-hover:opacity-100"
                       title="Remove from list"
                     >
                       Remove
@@ -443,11 +507,11 @@ export function ProjectsListView({
           )}
         </div>
 
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-white/[0.06] pt-8 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-600">
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-flux-line pt-8 text-[11px] font-medium uppercase tracking-[0.14em] text-flux-subtle">
           <span>Claude Code</span>
-          <span className="hidden text-zinc-700 sm:inline">·</span>
+          <span className="hidden text-flux-muted sm:inline">·</span>
           <span>Codex</span>
-          <span className="hidden text-zinc-700 sm:inline">·</span>
+          <span className="hidden text-flux-muted sm:inline">·</span>
           <span>Cursor</span>
         </div>
       </div>
@@ -475,8 +539,8 @@ export function ProjectsListView({
 
 function EmptyLocalState({ onAdd, busy }: { onAdd: () => void; busy: boolean }) {
   return (
-    <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-white/[0.08] bg-white/[0.015] px-6 py-10 text-center">
-      <p className="max-w-sm text-[14px] leading-relaxed text-zinc-400">
+    <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-flux-line-strong bg-flux-tint/[0.02] px-6 py-10 text-center">
+      <p className="max-w-sm text-[14px] leading-relaxed text-flux-muted">
         No projects yet. Add a folder with a git repository to start running
         agents on it.
       </p>
@@ -484,7 +548,7 @@ function EmptyLocalState({ onAdd, busy }: { onAdd: () => void; busy: boolean }) 
         type="button"
         disabled={busy}
         onClick={onAdd}
-        className="inline-flex min-h-[38px] min-w-[180px] items-center justify-center rounded-lg bg-white px-5 text-[13px] font-medium text-zinc-950 shadow-[0_0_0_1px_rgba(255,255,255,0.12)_inset,0_1px_2px_rgba(0,0,0,0.24)] transition hover:bg-zinc-100 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45"
+        className="inline-flex min-h-[38px] min-w-[180px] items-center justify-center rounded-lg bg-flux-fg px-5 text-[13px] font-medium text-flux-bg shadow-sm transition hover:opacity-90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45"
       >
         {busy ? 'Opening…' : 'Add project'}
       </button>

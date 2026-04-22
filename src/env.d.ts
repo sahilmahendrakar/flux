@@ -29,6 +29,9 @@ declare global {
   interface Window {
     electronAPI: {
       platform: string;
+      theme: {
+        syncChrome: (opts: { visuallyDark: boolean }) => Promise<void>;
+      };
       project: {
         get: () => Promise<LocalProject | null>;
         open: () => Promise<LocalProject | { error: string } | null>;

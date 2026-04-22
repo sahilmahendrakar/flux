@@ -2,18 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Matches workspace zinc base; avoids flash before the app paints. */
+/* Theme tokens: `.dark` on `<html>` toggles dark palette (see inline script in index.html). */
+:root {
+  color-scheme: light;
+  --color-flux-bg: 250 250 250;
+  --color-flux-sidebar: 244 244 245;
+  --color-flux-column: 244 244 245;
+  --color-flux-surface: 255 255 255;
+  --color-flux-elevated: 255 255 255;
+  --color-flux-card: 255 255 255;
+  --color-flux-card-hover: 244 244 245;
+  --color-flux-card-active: 244 244 245;
+  --color-flux-line: 228 228 231;
+  --color-flux-line-strong: 212 212 216;
+  --color-flux-tint: 0 0 0;
+  --color-flux-fg: 24 24 27;
+  --color-flux-fg-soft: 39 39 42;
+  --color-flux-muted: 113 113 122;
+  --color-flux-subtle: 82 82 91;
+  --color-flux-pill: 244 244 245;
+  --flux-shadow-detail: 0 25px 50px -12px rgb(0 0 0 / 0.12);
+  --flux-shadow-modal: 0 25px 50px -12px rgb(0 0 0 / 0.15);
+  --flux-terminal-bg: #fafafa;
+  --flux-terminal-fg: #3f3f46;
+  --flux-terminal-cursor: #71717a;
+  --flux-terminal-selection: rgba(0, 0, 0, 0.12);
+  --flux-terminal-black: #fafafa;
+  --flux-terminal-bright-black: #a1a1aa;
+  --flux-grid-line: rgba(0, 0, 0, 0.06);
+  /* Task detail sheet backdrop: soft frosted dim (avoids a flat gray-black wash on light UI) */
+  --flux-detail-scrim: rgb(24 24 27 / 0.075);
+}
+
+.dark {
+  color-scheme: dark;
+  --color-flux-bg: 9 9 11;
+  --color-flux-sidebar: 12 12 14;
+  --color-flux-column: 12 12 14;
+  --color-flux-surface: 9 9 11;
+  --color-flux-elevated: 16 16 18;
+  --color-flux-card: 20 20 22;
+  --color-flux-card-hover: 22 22 24;
+  --color-flux-card-active: 24 24 27;
+  --color-flux-line: 39 39 42;
+  --color-flux-line-strong: 63 63 70;
+  --color-flux-tint: 255 255 255;
+  --color-flux-fg: 244 244 245;
+  --color-flux-fg-soft: 228 228 231;
+  --color-flux-muted: 113 113 122;
+  --color-flux-subtle: 82 82 91;
+  --color-flux-pill: 39 39 42;
+  --flux-shadow-detail: 0 25px 50px -12px rgb(0 0 0 / 0.45);
+  --flux-shadow-modal: 0 25px 50px -12px rgb(0 0 0 / 0.4);
+  --flux-terminal-bg: #09090b;
+  --flux-terminal-fg: #d4d4d8;
+  --flux-terminal-cursor: #a1a1aa;
+  --flux-terminal-selection: rgba(255, 255, 255, 0.12);
+  --flux-terminal-black: #09090b;
+  --flux-terminal-bright-black: #52525b;
+  --flux-grid-line: rgba(255, 255, 255, 0.028);
+  --flux-detail-scrim: rgb(0 0 0 / 0.52);
+}
+
 html,
 body {
   margin: 0;
   min-height: 100%;
   height: 100%;
-  background-color: #09090b;
+  background-color: rgb(var(--color-flux-bg) / 1);
 }
 
 #root {
   min-height: 100%;
-  background-color: #09090b;
+  background-color: rgb(var(--color-flux-bg) / 1);
 }
 
 /* macOS custom title bar (`hiddenInset`): native drag chrome is gone. */

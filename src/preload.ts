@@ -19,6 +19,10 @@ type ActivateCloudResult =
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
+  theme: {
+    syncChrome: (opts: { visuallyDark: boolean }) =>
+      ipcRenderer.invoke('theme:syncChrome', opts) as Promise<void>,
+  },
   project: {
     get: () => ipcRenderer.invoke('project:get') as Promise<LocalProject | null>,
     open: () =>

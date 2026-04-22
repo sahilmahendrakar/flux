@@ -90,12 +90,15 @@ const createWindow = () => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
-  if (process.platform === 'darwin') {
-    // With `hiddenInset`, a light system appearance can leave a 1px bright seam on
-    // the top edge (macOS + Electron; see electron/electron#51015). Dark window chrome
-    // matches this app and removes that line.
-    nativeTheme.themeSource = 'dark';
-  }
+  ipcMain.handle('theme:syncChrome', (_e, opts: { visuallyDark: boolean }) => {
+    nativeTheme.themeSource = opts.visuallyDark ? 'dark' : 'light';
+    const bg = opts.visuallyDark ? '#09090b' : '#fafafa';
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.setBackgroundColor(bg);
+      }
+    }
+  });
 
   const projectStore = new ProjectStore();
   await projectStore.init();

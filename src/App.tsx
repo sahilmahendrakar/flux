@@ -15,6 +15,7 @@ import { LoadingScreen } from './components/LoadingScreen';
 import { ProjectsListView } from './components/ProjectsListView';
 import { SignInCard } from './components/SignInCard';
 import { TeamView } from './components/TeamView';
+import { SettingsView } from './components/SettingsView';
 import type { WorkspaceNavView } from './components/Sidebar';
 import { useAuth } from './renderer/auth/useAuth';
 import { useCloudProjects } from './renderer/projects/useCloudProjects';
@@ -356,7 +357,13 @@ export default function App() {
   const statusLine = `${inProgressCount} in progress · ${needsInputCount} needs input`;
 
   const topBarTitle =
-    workspaceView === 'board' ? 'Board' : workspaceView === 'team' ? 'Team' : 'Plan';
+    workspaceView === 'board'
+      ? 'Board'
+      : workspaceView === 'team'
+        ? 'Team'
+        : workspaceView === 'settings'
+          ? 'Settings'
+          : 'Plan';
 
   // Sort tasks per column for the board (orderKey-aware). Falls back to
   // createdAt/id for rows without a key.
@@ -376,10 +383,10 @@ export default function App() {
 
   if (activationLoading || auth.status === 'loading') {
     return (
-      <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#09090b] text-white">
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-flux-bg text-flux-fg">
         {isMac ? (
           <div
-            className="app-window-drag h-10 w-full shrink-0 bg-[#09090b]"
+            className="app-window-drag h-10 w-full shrink-0 bg-flux-bg"
             aria-hidden
           />
         ) : null}
@@ -392,10 +399,10 @@ export default function App() {
 
   if (!project) {
     return (
-      <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#09090b] text-white">
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-flux-bg text-flux-fg">
         {isMac ? (
           <div
-            className="app-window-drag h-10 w-full shrink-0 bg-[#09090b]"
+            className="app-window-drag h-10 w-full shrink-0 bg-flux-bg"
             aria-hidden
           />
         ) : null}
@@ -413,10 +420,10 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#09090b] text-zinc-100">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-flux-bg text-flux-fg">
       {isMac ? (
         <div
-          className="app-window-drag h-10 w-full shrink-0 bg-[#09090b]"
+          className="app-window-drag h-10 w-full shrink-0 bg-flux-bg"
           aria-hidden
         />
       ) : null}
@@ -453,10 +460,12 @@ export default function App() {
                 currentUserDisplayName={displayName}
                 currentUserEmail={userEmail ?? undefined}
               />
+            ) : workspaceView === 'settings' ? (
+              <SettingsView />
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-                <p className="text-sm font-medium text-zinc-300">Plan</p>
-                <p className="max-w-sm text-sm text-zinc-500">
+                <p className="text-sm font-medium text-flux-fg-soft">Plan</p>
+                <p className="max-w-sm text-sm text-flux-muted">
                   Planning assistant coming soon.
                 </p>
               </div>

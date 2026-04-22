@@ -18,7 +18,7 @@ export function AppShell({
   onWorkspaceViewChange,
 }: AppShellProps) {
   return (
-    <div className="flex h-full min-h-0 w-full overflow-hidden bg-[#09090b] text-zinc-100">
+    <div className="flex h-full min-h-0 w-full overflow-hidden bg-flux-bg text-flux-fg">
       <Sidebar
         project={project}
         workspaceView={workspaceView}

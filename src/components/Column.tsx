@@ -26,19 +26,19 @@ export default function Column({
   const isDone = id === 'done';
 
   const headerTint = isNeedsInput
-    ? 'text-amber-400/90'
+    ? 'text-amber-800 dark:text-amber-400/90'
     : isDone
-      ? 'text-zinc-500'
-      : 'text-zinc-400';
+      ? 'text-flux-muted'
+      : 'text-flux-muted';
 
   const countClass = isNeedsInput
-    ? 'bg-amber-500/10 text-amber-400/90 ring-1 ring-amber-500/15'
+    ? 'bg-amber-500/10 text-amber-900 dark:text-amber-400/90 ring-1 ring-amber-500/15'
     : isDone
-      ? 'bg-zinc-800/80 text-zinc-500 ring-1 ring-white/[0.05]'
-      : 'bg-zinc-800/80 text-zinc-500 ring-1 ring-white/[0.05]';
+      ? 'bg-flux-pill text-flux-muted ring-1 ring-flux-tint/10'
+      : 'bg-flux-pill text-flux-muted ring-1 ring-flux-tint/10';
 
   return (
-    <div className="flex min-w-[272px] flex-1 flex-col rounded-lg border border-white/[0.06] bg-[#0c0c0e]/80">
+    <div className="flex min-w-[272px] flex-1 flex-col rounded-lg border border-flux-line bg-flux-column/80">
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <h2
@@ -56,7 +56,7 @@ export default function Column({
           <button
             type="button"
             onClick={onNewTask}
-            className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-500 transition hover:bg-white/[0.05] hover:text-zinc-200"
+            className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-flux-muted transition hover:bg-flux-tint/[0.06] hover:text-flux-fg-soft"
           >
             + New
           </button>
@@ -68,7 +68,7 @@ export default function Column({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={`flex flex-1 flex-col gap-1.5 overflow-y-auto px-2 pb-3 transition-colors ${
-              snapshot.isDraggingOver ? 'bg-white/[0.02]' : ''
+              snapshot.isDraggingOver ? 'bg-flux-tint/[0.03]' : ''
             }`}
           >
             {tasks.map((task, index) => (
@@ -82,7 +82,7 @@ export default function Column({
             ))}
             {provided.placeholder}
             {tasks.length === 0 && emptyState ? (
-              <div className="flex flex-1 items-center justify-center px-3 py-10 text-center text-[13px] leading-relaxed text-zinc-600">
+              <div className="flex flex-1 items-center justify-center px-3 py-10 text-center text-[13px] leading-relaxed text-flux-subtle">
                 {emptyState}
               </div>
             ) : null}

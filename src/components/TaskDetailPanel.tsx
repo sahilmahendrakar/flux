@@ -41,12 +41,13 @@ function readStoredDetailWidth(): number | null {
 }
 
 const STATUS_BADGE: Record<TaskStatus, string> = {
-  backlog: 'border-white/[0.08] bg-white/[0.04] text-zinc-400 ring-1 ring-inset ring-white/[0.04]',
+  backlog:
+    'border-flux-line-strong bg-flux-tint/[0.05] text-flux-muted ring-1 ring-inset ring-flux-tint/10',
   'in-progress':
-    'border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-200/90 ring-1 ring-inset ring-emerald-500/10',
+    'border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-800 dark:text-emerald-200/90 ring-1 ring-inset ring-emerald-500/10',
   'needs-input':
-    'border-amber-500/25 bg-amber-500/[0.1] text-amber-200/90 ring-1 ring-inset ring-amber-500/12',
-  done: 'border-white/[0.06] bg-white/[0.03] text-zinc-500 ring-1 ring-inset ring-white/[0.04]',
+    'border-amber-500/25 bg-amber-500/[0.1] text-amber-900 dark:text-amber-200/90 ring-1 ring-inset ring-amber-500/12',
+  done: 'border-flux-line bg-flux-tint/[0.04] text-flux-muted ring-1 ring-inset ring-flux-tint/8',
 };
 
 function formatCreatedLabel(iso: string): string {
@@ -317,10 +318,10 @@ export default function TaskDetailPanel({
 
   const startButtonLabel = sessionLoading ? 'Starting…' : sessionError ? 'Retry' : 'Start session';
   const startButtonClass = sessionError
-    ? 'rounded-md border border-red-500/25 bg-red-500/[0.08] px-3 py-1.5 text-[12px] font-medium text-red-200/90 transition hover:bg-red-500/[0.12]'
+    ? 'rounded-md border border-red-500/25 bg-red-500/[0.08] px-3 py-1.5 text-[12px] font-medium text-red-800 dark:text-red-200/90 transition hover:bg-red-500/[0.12]'
     : sessionLoading
-      ? 'cursor-not-allowed rounded-md border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-[12px] font-medium text-zinc-600'
-      : 'rounded-md border border-emerald-500/25 bg-emerald-500/[0.1] px-3 py-1.5 text-[12px] font-medium text-emerald-100/90 transition hover:bg-emerald-500/[0.14]';
+      ? 'cursor-not-allowed rounded-md border border-flux-line bg-flux-tint/[0.04] px-3 py-1.5 text-[12px] font-medium text-flux-subtle'
+      : 'rounded-md border border-emerald-500/25 bg-emerald-500/[0.1] px-3 py-1.5 text-[12px] font-medium text-emerald-900 dark:text-emerald-100/90 transition hover:bg-emerald-500/[0.14]';
 
   return (
     <>
@@ -328,13 +329,13 @@ export default function TaskDetailPanel({
         type="button"
         tabIndex={-1}
         aria-label="Close task details"
-        className="absolute inset-0 z-10 bg-black/40 backdrop-blur-[1px]"
+        className="absolute inset-0 z-10 bg-[color:var(--flux-detail-scrim)] backdrop-blur-[2px] dark:backdrop-blur-[1px]"
         onClick={onClose}
       />
       <aside
         ref={asideRef}
         style={{ width: detailWidth }}
-        className="absolute inset-y-0 right-0 z-20 flex min-w-0 flex-col border-l border-white/[0.06] bg-[#0c0c0e] shadow-2xl shadow-black/50"
+        className="absolute inset-y-0 right-0 z-20 flex min-w-0 flex-col border-l border-flux-line bg-flux-sidebar shadow-flux-detail"
         role="dialog"
         aria-modal="true"
         aria-labelledby="task-detail-title"
@@ -344,11 +345,11 @@ export default function TaskDetailPanel({
           aria-orientation="vertical"
           aria-label="Resize task details"
           title="Drag to resize. Double-click to reset."
-          className="absolute bottom-0 left-0 top-0 z-30 w-3 -translate-x-1/2 cursor-col-resize touch-none outline-none before:pointer-events-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-white/[0.1] before:content-[''] hover:before:bg-white/[0.22] focus-visible:ring-1 focus-visible:ring-white/25"
+          className="absolute bottom-0 left-0 top-0 z-30 w-3 -translate-x-1/2 cursor-col-resize touch-none outline-none before:pointer-events-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-flux-tint/15 before:content-[''] hover:before:bg-flux-tint/25 focus-visible:ring-1 focus-visible:ring-flux-tint/20"
           onPointerDown={handleResizePointerDown}
           onDoubleClick={handleResizeDoubleClick}
         />
-        <div className="flex shrink-0 flex-col gap-3 border-b border-white/[0.06] p-4">
+        <div className="flex shrink-0 flex-col gap-3 border-b border-flux-line p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <span
@@ -356,7 +357,7 @@ export default function TaskDetailPanel({
               >
                 {statusLabel}
               </span>
-              <p className="mt-1.5 text-[11px] text-zinc-600">{formatCreatedLabel(task.createdAt)}</p>
+              <p className="mt-1.5 text-[11px] text-flux-subtle">{formatCreatedLabel(task.createdAt)}</p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <div className="flex items-center gap-2">
@@ -373,7 +374,7 @@ export default function TaskDetailPanel({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="shrink-0 rounded-md p-1 text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-200"
+                  className="shrink-0 rounded-md p-1 text-flux-muted transition hover:bg-flux-tint/[0.08] hover:text-flux-fg-soft"
                   aria-label="Close"
                 >
                   <span className="text-lg leading-none" aria-hidden>
@@ -382,7 +383,9 @@ export default function TaskDetailPanel({
                 </button>
               </div>
               {sessionError && !sessionRunning ? (
-                <p className="mt-1 max-w-[220px] text-right text-[11px] text-red-300/90">{sessionError}</p>
+                <p className="mt-1 max-w-[220px] text-right text-[11px] text-red-700 dark:text-red-300/90">
+                  {sessionError}
+                </p>
               ) : null}
             </div>
           </div>
@@ -399,13 +402,13 @@ export default function TaskDetailPanel({
                 onUpdate(task.id, { title: e.target.value });
                 titleArea.resize();
               }}
-              className="w-full resize-none bg-transparent text-xl font-semibold leading-snug tracking-tight text-zinc-100 outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-white/20"
+              className="w-full resize-none bg-transparent text-xl font-semibold leading-snug tracking-tight text-flux-fg outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-flux-tint/15"
               placeholder="Title"
             />
 
             <div>
               <dl className="grid grid-cols-[minmax(0,7rem)_1fr] gap-x-3 gap-y-2 text-[13px]">
-                <dt className="text-zinc-600">Agent</dt>
+                <dt className="text-flux-subtle">Agent</dt>
                 <dd className="min-w-0">
                   <div className="relative inline-flex max-w-full">
                     <select
@@ -423,12 +426,12 @@ export default function TaskDetailPanel({
                     <AgentBadge agent={task.agent} />
                   </div>
                 </dd>
-                <dt className="text-zinc-600">Status</dt>
+                <dt className="text-flux-subtle">Status</dt>
                 <dd>
                   <select
                     value={task.status}
                     onChange={(e) => onUpdate(task.id, { status: e.target.value as TaskStatus })}
-                    className="w-full max-w-[220px] cursor-pointer rounded-md border border-white/[0.08] bg-[#09090b] px-2 py-1.5 text-[13px] text-zinc-200 outline-none focus-visible:border-white/[0.14] focus-visible:ring-1 focus-visible:ring-white/[0.12]"
+                    className="w-full max-w-[220px] cursor-pointer rounded-md border border-flux-line-strong bg-flux-surface px-2 py-1.5 text-[13px] text-flux-fg-soft outline-none focus-visible:border-flux-muted focus-visible:ring-1 focus-visible:ring-flux-tint/12"
                     aria-label="Change status"
                   >
                     {COLUMNS.map((c) => (
@@ -444,7 +447,7 @@ export default function TaskDetailPanel({
             <div className="flex flex-col">
               <label
                 htmlFor="task-detail-description"
-                className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-600"
+                className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-flux-subtle"
               >
                 Description
               </label>
@@ -457,14 +460,14 @@ export default function TaskDetailPanel({
                   descriptionArea.resize();
                 }}
                 placeholder="Add a description..."
-                className="min-h-[120px] w-full resize-none rounded-md border border-white/[0.08] bg-[#09090b] p-3 text-[13px] leading-relaxed text-zinc-200 outline-none placeholder:text-zinc-600 focus-visible:border-white/[0.14] focus-visible:ring-1 focus-visible:ring-white/[0.12]"
+                className="min-h-[120px] w-full resize-none rounded-md border border-flux-line-strong bg-flux-surface p-3 text-[13px] leading-relaxed text-flux-fg-soft outline-none placeholder:text-flux-subtle focus-visible:border-flux-muted focus-visible:ring-1 focus-visible:ring-flux-tint/12"
               />
             </div>
           </div>
 
-          <div className="flex min-h-[200px] flex-1 flex-col border-t border-white/[0.06]">
+          <div className="flex min-h-[200px] flex-1 flex-col border-t border-flux-line">
             <div className="flex items-center justify-between px-4 py-2">
-              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-600">
+              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-flux-subtle">
                 Session
               </span>
               {sessionRunning ? (
@@ -473,7 +476,7 @@ export default function TaskDetailPanel({
                     <button
                       type="button"
                       onClick={handleFocusDedicatedTerminal}
-                      className="text-[11px] font-medium text-zinc-400 transition hover:text-zinc-200"
+                      className="text-[11px] font-medium text-flux-muted transition hover:text-flux-fg-soft"
                     >
                       Focus window
                     </button>
@@ -481,7 +484,7 @@ export default function TaskDetailPanel({
                     <button
                       type="button"
                       onClick={() => void handleOpenDedicatedTerminal()}
-                      className="text-[11px] font-medium text-zinc-400 transition hover:text-zinc-200"
+                      className="text-[11px] font-medium text-flux-muted transition hover:text-flux-fg-soft"
                     >
                       Open in window
                     </button>
@@ -489,7 +492,7 @@ export default function TaskDetailPanel({
                   <button
                     type="button"
                     onClick={() => void handleStopSession()}
-                    className="text-[11px] font-medium text-red-400/90 transition hover:text-red-300"
+                    className="text-[11px] font-medium text-red-700 transition hover:text-red-600 dark:text-red-400/90 dark:hover:text-red-300"
                   >
                     Stop
                   </button>
@@ -498,25 +501,25 @@ export default function TaskDetailPanel({
             </div>
             <div className="min-h-0 flex-1 px-2 pb-2">
               {terminalPoppedOut && sessionRunning ? (
-                <div className="flex h-full flex-col items-center justify-center gap-3 px-3 text-center text-[13px] leading-relaxed text-zinc-500">
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-3 text-center text-[13px] leading-relaxed text-flux-muted">
                   <p>Terminal is open in a separate window.</p>
                   <button
                     type="button"
                     onClick={handleFocusDedicatedTerminal}
-                    className="rounded-md border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-[12px] font-medium text-zinc-200 transition hover:bg-white/[0.08]"
+                    className="rounded-md border border-flux-line-strong bg-flux-tint/[0.05] px-3 py-1.5 text-[12px] font-medium text-flux-fg-soft transition hover:bg-flux-tint/[0.08]"
                   >
                     Focus terminal window
                   </button>
                 </div>
               ) : remoteRunner && !session ? (
-                <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[13px] leading-relaxed text-zinc-500">
-                  <div className="flex items-center gap-2 text-zinc-300">
-                    <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-[13px] leading-relaxed text-flux-muted">
+                  <div className="flex items-center gap-2 text-flux-fg-soft">
+                    <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-emerald-600 dark:bg-emerald-400" />
                     <span className="font-medium">
                       {remoteRunner.displayName ?? 'A teammate'} is running an agent
                     </span>
                   </div>
-                  <p className="max-w-xs text-zinc-500">
+                  <p className="max-w-xs text-flux-muted">
                     Terminal output stays on their machine for now. You'll see
                     status updates here as they work.
                   </p>
@@ -533,11 +536,11 @@ export default function TaskDetailPanel({
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-white/[0.06] p-4">
+        <div className="shrink-0 border-t border-flux-line p-4">
           <button
             type="button"
             onClick={handleDelete}
-            className="text-[13px] text-zinc-500 transition hover:text-red-400/90"
+            className="text-[13px] text-flux-muted transition hover:text-red-700 dark:hover:text-red-400/90"
           >
             Delete task
           </button>

@@ -2,6 +2,7 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useReducer,
   useRef,
 } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
@@ -26,16 +27,37 @@ function containerHasUsableSize(el: HTMLElement): boolean {
   );
 }
 
+function readXtermTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  const pick = (name: string, fallback: string) =>
+    cs.getPropertyValue(name).trim() || fallback;
+  return {
+    background: pick('--flux-terminal-bg', '#09090b'),
+    foreground: pick('--flux-terminal-fg', '#d4d4d8'),
+    cursor: pick('--flux-terminal-cursor', '#a1a1aa'),
+    selectionBackground: pick('--flux-terminal-selection', 'rgba(255,255,255,0.12)'),
+    black: pick('--flux-terminal-black', '#09090b'),
+    brightBlack: pick('--flux-terminal-bright-black', '#52525b'),
+  };
+}
+
 const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
   { sessionId, onData, onResize },
   ref,
 ) {
+  const [themeEpoch, bumpThemeEpoch] = useReducer((n: number) => n + 1, 0);
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<XTerm | null>(null);
   const onDataRef = useRef(onData);
   const onResizeRef = useRef(onResize);
   onDataRef.current = onData;
   onResizeRef.current = onResize;
+
+  useEffect(() => {
+    const onTheme = () => bumpThemeEpoch();
+    window.addEventListener('flux-theme-changed', onTheme);
+    return () => window.removeEventListener('flux-theme-changed', onTheme);
+  }, []);
 
   useImperativeHandle(ref, () => ({
     write: (data: string) => {
@@ -54,14 +76,7 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
     }
 
     const term = new XTerm({
-      theme: {
-        background: '#09090b',
-        foreground: '#d4d4d8',
-        cursor: '#a1a1aa',
-        selectionBackground: 'rgba(255,255,255,0.12)',
-        black: '#09090b',
-        brightBlack: '#52525b',
-      },
+      theme: readXtermTheme(),
       fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
       fontSize: 13,
       lineHeight: 1.4,
@@ -148,11 +163,11 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
       term.dispose();
       termRef.current = null;
     };
-  }, [sessionId]);
+  }, [sessionId, themeEpoch]);
 
   if (!sessionId) {
     return (
-      <div className="flex h-full items-center justify-center px-4 text-center text-[13px] leading-relaxed text-zinc-600">
+      <div className="flex h-full items-center justify-center px-4 text-center text-[13px] leading-relaxed text-flux-subtle">
         No active session — start a session to use the terminal.
       </div>
     );
@@ -161,7 +176,7 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
   return (
     <div
       ref={containerRef}
-      className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-md border border-white/[0.06] bg-[#09090b]"
+      className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-md border border-flux-line bg-flux-surface"
     />
   );
 });

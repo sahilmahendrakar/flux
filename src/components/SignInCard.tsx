@@ -8,17 +8,17 @@ export function SignInCard() {
 
   if (status === 'unconfigured') {
     return (
-      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-[12px] text-zinc-500">
-        Sign-in disabled — set <code className="font-mono text-zinc-400">VITE_FIREBASE_*</code> and{' '}
-        <code className="font-mono text-zinc-400">VITE_GOOGLE_DESKTOP_CLIENT_ID</code> in{' '}
-        <code className="font-mono text-zinc-400">.env.local</code> to enable teams.
+      <div className="rounded-lg border border-flux-line bg-flux-tint/[0.03] px-4 py-3 text-[12px] text-flux-muted">
+        Sign-in disabled — set <code className="font-mono text-flux-muted">VITE_FIREBASE_*</code> and{' '}
+        <code className="font-mono text-flux-muted">VITE_GOOGLE_DESKTOP_CLIENT_ID</code> in{' '}
+        <code className="font-mono text-flux-muted">.env.local</code> to enable teams.
       </div>
     );
   }
 
   if (status === 'loading') {
     return (
-      <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-[13px] text-zinc-500">
+      <div className="rounded-lg border border-flux-line bg-flux-tint/[0.03] px-4 py-3 text-[13px] text-flux-muted">
         Checking sign-in…
       </div>
     );
@@ -48,29 +48,29 @@ export function SignInCard() {
 
   if (status === 'signedIn' && user) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-4 py-3">
+      <div className="flex items-center gap-3 rounded-lg border border-flux-line bg-flux-tint/[0.03] px-4 py-3">
         {user.photoURL ? (
           <img
             src={user.photoURL}
             alt=""
-            className="h-9 w-9 rounded-full border border-white/[0.08]"
+            className="h-9 w-9 rounded-full border border-flux-line-strong"
           />
         ) : (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.06] text-[13px] font-medium text-zinc-200">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-flux-tint/[0.06] text-[13px] font-medium text-flux-fg-soft">
             {(user.displayName ?? user.email ?? '?').slice(0, 1).toUpperCase()}
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium text-zinc-100">
+          <div className="truncate text-[13px] font-medium text-flux-fg">
             {user.displayName ?? 'Signed in'}
           </div>
-          <div className="truncate text-[11px] text-zinc-500">{user.email}</div>
+          <div className="truncate text-[11px] text-flux-muted">{user.email}</div>
         </div>
         <button
           type="button"
           onClick={() => void handleSignOut()}
           disabled={busy}
-          className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[12px] font-medium text-zinc-300 transition hover:bg-white/[0.06] disabled:opacity-45"
+          className="rounded-md border border-flux-line-strong bg-flux-tint/[0.04] px-2.5 py-1 text-[12px] font-medium text-flux-fg-soft transition hover:bg-flux-tint/[0.07] disabled:opacity-45"
         >
           Sign out
         </button>
@@ -84,18 +84,18 @@ export function SignInCard() {
         type="button"
         onClick={() => void handleSignIn()}
         disabled={busy}
-        className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-[13px] font-medium text-zinc-100 transition hover:bg-white/[0.06] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-45"
+        className="inline-flex items-center justify-center gap-2 rounded-lg border border-flux-line-strong bg-flux-tint/[0.05] px-4 py-2.5 text-[13px] font-medium text-flux-fg transition hover:bg-flux-tint/[0.08] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-45"
       >
         <GoogleGlyph />
         {busy ? 'Opening browser…' : 'Sign in with Google'}
       </button>
-      <p className="text-[11px] text-zinc-500">
+      <p className="text-[11px] text-flux-muted">
         Sign in to create team projects and sync tasks. Local projects work
         without signing in.
       </p>
       {error ? (
         <p
-          className="rounded-md border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-300/95"
+          className="rounded-md border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-700 dark:text-red-300/95"
           role="alert"
         >
           {error}

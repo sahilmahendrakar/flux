@@ -86,19 +86,19 @@ export function TeamView({
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto w-full max-w-2xl px-8 py-10">
-        <h1 className="text-[18px] font-semibold tracking-tight text-zinc-100">
+        <h1 className="text-[18px] font-semibold tracking-tight text-flux-fg">
           Team
         </h1>
-        <p className="mt-1 text-[13px] text-zinc-500">
+        <p className="mt-1 text-[13px] text-flux-muted">
           Invite teammates and manage who can collaborate on {project.name}.
         </p>
 
         {isOwner ? (
           <form
             onSubmit={(e) => void handleSubmit(e)}
-            className="mt-6 rounded-xl border border-white/[0.08] bg-white/[0.02] p-4"
+            className="mt-6 rounded-xl border border-flux-line-strong bg-flux-tint/[0.03] p-4"
           >
-            <label className="block text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-500">
+            <label className="block text-[11px] font-medium uppercase tracking-[0.12em] text-flux-muted">
               Invite by email
             </label>
             <div className="mt-2 flex gap-2">
@@ -107,28 +107,28 @@ export function TeamView({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="teammate@example.com"
-                className="flex-1 rounded-md border border-white/[0.08] bg-[#09090b] px-3 py-2 text-[13px] text-zinc-100 outline-none focus-visible:border-white/[0.14] focus-visible:ring-1 focus-visible:ring-white/[0.12]"
+                className="flex-1 rounded-md border border-flux-line-strong bg-flux-surface px-3 py-2 text-[13px] text-flux-fg outline-none focus-visible:border-flux-muted focus-visible:ring-1 focus-visible:ring-flux-tint/12"
               />
               <button
                 type="submit"
                 disabled={busy || !email.trim()}
-                className="rounded-md bg-white px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition hover:bg-zinc-100 disabled:pointer-events-none disabled:opacity-45"
+                className="rounded-md bg-flux-fg px-3 py-1.5 text-[12px] font-medium text-flux-bg transition hover:opacity-90 disabled:pointer-events-none disabled:opacity-45"
               >
                 {busy ? 'Sending…' : 'Send invite'}
               </button>
             </div>
             {formError ? (
-              <p className="mt-3 rounded-md border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-300/95">
+              <p className="mt-3 rounded-md border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-700 dark:text-red-300/95">
                 {formError}
               </p>
             ) : null}
             {notice?.kind === 'sent' ? (
-              <p className="mt-3 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-2 text-[12px] text-emerald-200/95">
+              <p className="mt-3 rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-3 py-2 text-[12px] text-emerald-800 dark:text-emerald-200/95">
                 Invite sent to {notice.email}. They'll also receive an email.
               </p>
             ) : null}
             {notice?.kind === 'saved' ? (
-              <p className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/[0.08] px-3 py-2 text-[12px] text-amber-200/95">
+              <p className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/[0.08] px-3 py-2 text-[12px] text-amber-900 dark:text-amber-200/95">
                 Invite saved for {notice.email}. Email delivery{' '}
                 {notice.reason ? `failed: ${notice.reason}` : 'is not configured'}
                 . They'll still see the invite when they sign in.
@@ -138,19 +138,19 @@ export function TeamView({
         ) : null}
 
         <div className="mt-8">
-          <h2 className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+          <h2 className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-flux-muted">
             Members
           </h2>
           {status === 'loading' ? (
-            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-4 text-center text-[12px] text-zinc-500">
+            <div className="rounded-lg border border-flux-line bg-flux-tint/[0.03] px-3 py-4 text-center text-[12px] text-flux-muted">
               Loading…
             </div>
           ) : status === 'error' ? (
-            <div className="rounded-lg border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-300/95">
+            <div className="rounded-lg border border-red-500/20 bg-red-500/[0.08] px-3 py-2 text-[12px] text-red-700 dark:text-red-300/95">
               Couldn't load members: {error}
             </div>
           ) : members.length === 0 ? (
-            <div className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-4 text-center text-[12px] text-zinc-500">
+            <div className="rounded-lg border border-flux-line bg-flux-tint/[0.03] px-3 py-4 text-center text-[12px] text-flux-muted">
               No members yet.
             </div>
           ) : (
@@ -164,29 +164,29 @@ export function TeamView({
                 return (
                   <li
                     key={m.uid}
-                    className="group flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
+                    className="group flex items-center gap-3 rounded-lg border border-flux-line bg-flux-tint/[0.03] px-3 py-2.5"
                   >
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sky-500/[0.12] text-[13px] font-medium text-sky-200/90">
                       {initial}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="truncate text-[13px] font-medium text-zinc-100">
+                        <span className="truncate text-[13px] font-medium text-flux-fg">
                           {name}
                         </span>
                         {m.role === 'owner' ? (
-                          <span className="rounded-sm bg-amber-500/[0.12] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-amber-300/90">
+                          <span className="rounded-sm bg-amber-500/[0.12] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-amber-900 dark:text-amber-300/90">
                             Owner
                           </span>
                         ) : null}
                         {m.uid === currentUid ? (
-                          <span className="rounded-sm bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-zinc-400">
+                          <span className="rounded-sm bg-flux-tint/[0.08] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] text-flux-muted">
                             You
                           </span>
                         ) : null}
                       </div>
                       {m.email && m.email !== name ? (
-                        <div className="truncate text-[11px] text-zinc-500">
+                        <div className="truncate text-[11px] text-flux-muted">
                           {m.email}
                         </div>
                       ) : null}
@@ -195,7 +195,7 @@ export function TeamView({
                       <button
                         type="button"
                         onClick={() => void handleRemove(m.uid)}
-                        className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-500 opacity-0 transition hover:bg-white/[0.06] hover:text-red-300 group-hover:opacity-100"
+                        className="rounded-md px-2 py-1 text-[11px] font-medium text-flux-muted opacity-0 transition hover:bg-flux-tint/[0.08] hover:text-red-700 dark:hover:text-red-300 group-hover:opacity-100"
                       >
                         Remove
                       </button>
@@ -209,7 +209,7 @@ export function TeamView({
 
         {invites.length > 0 ? (
           <div className="mt-6">
-            <h2 className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+            <h2 className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-flux-muted">
               Pending invites
             </h2>
             <ul className="flex flex-col gap-1.5">
@@ -218,20 +218,20 @@ export function TeamView({
                   key={inv.email}
                   className="group flex items-center gap-3 rounded-lg border border-amber-500/15 bg-amber-500/[0.04] px-3 py-2.5"
                 >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-amber-500/[0.12] text-[13px] font-medium text-amber-200/90">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-amber-500/[0.12] text-[13px] font-medium text-amber-900 dark:text-amber-200/90">
                     {inv.email.slice(0, 1).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium text-zinc-100">
+                    <div className="truncate text-[13px] font-medium text-flux-fg">
                       {inv.email}
                     </div>
-                    <div className="text-[11px] text-zinc-500">Invite pending</div>
+                    <div className="text-[11px] text-flux-muted">Invite pending</div>
                   </div>
                   {isOwner ? (
                     <button
                       type="button"
                       onClick={() => void handleCancelInvite(inv.email)}
-                      className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-500 opacity-0 transition hover:bg-white/[0.06] hover:text-red-300 group-hover:opacity-100"
+                      className="rounded-md px-2 py-1 text-[11px] font-medium text-flux-muted opacity-0 transition hover:bg-flux-tint/[0.08] hover:text-red-700 dark:hover:text-red-300 group-hover:opacity-100"
                     >
                       Cancel
                     </button>

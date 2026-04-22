@@ -1,6 +1,6 @@
 import type { Project } from '../types';
 
-export type WorkspaceNavView = 'board' | 'plan' | 'team';
+export type WorkspaceNavView = 'board' | 'plan' | 'team' | 'settings';
 
 interface SidebarProps {
   project: Project;
@@ -107,27 +107,27 @@ export function Sidebar({
     [
       'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors',
       active
-        ? 'bg-white/[0.06] text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]'
-        : 'text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-200',
+        ? 'bg-flux-tint/10 text-flux-fg shadow-[inset_0_0_0_1px_rgb(var(--color-flux-tint)/0.08)]'
+        : 'text-flux-muted hover:bg-flux-tint/5 hover:text-flux-fg-soft',
     ].join(' ');
 
   return (
-    <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-white/[0.06] bg-[#0c0c0e] text-zinc-100">
+    <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-flux-line bg-flux-sidebar text-flux-fg">
       <div className="px-3 pb-3 pt-3.5">
-        <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-600">Flux</div>
-        <div className="mt-2 truncate text-[13px] font-medium tracking-tight text-zinc-100">
+        <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-flux-subtle">Flux</div>
+        <div className="mt-2 truncate text-[13px] font-medium tracking-tight text-flux-fg">
           {project.name}
         </div>
         <div
-          className="mt-0.5 max-w-full truncate font-mono text-[11px] text-zinc-600"
+          className="mt-0.5 max-w-full truncate font-mono text-[11px] text-flux-subtle"
           title={project.rootPath}
         >
           {project.rootPath}
         </div>
       </div>
-      <div className="mx-3 border-t border-white/[0.06]" />
+      <div className="mx-3 border-t border-flux-line" />
       <div className="flex min-h-0 flex-1 flex-col px-2 py-3">
-        <div className="px-2 pb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-600">
+        <div className="px-2 pb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-flux-subtle">
           Workspace
         </div>
         <div className="flex flex-col gap-0.5">
@@ -159,10 +159,11 @@ export function Sidebar({
           ) : null}
         </div>
         <div className="min-h-0 flex-1" aria-hidden />
-        <div className="border-t border-white/[0.06] pt-2">
+        <div className="border-t border-flux-line pt-2">
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] text-zinc-500 transition-colors hover:bg-white/[0.04] hover:text-zinc-200"
+            className={navItemClass(workspaceView === 'settings')}
+            onClick={() => onWorkspaceViewChange('settings')}
           >
             <SettingsIcon className="shrink-0 opacity-80" />
             <span>Settings</span>
@@ -170,7 +171,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onClearProject}
-            className="mt-0.5 w-full rounded-md px-2 py-1.5 text-left text-[12px] text-zinc-600 transition-colors hover:bg-white/[0.03] hover:text-zinc-400"
+            className="mt-0.5 w-full rounded-md px-2 py-1.5 text-left text-[12px] text-flux-subtle transition-colors hover:bg-flux-tint/5 hover:text-flux-muted"
           >
             Close project
           </button>

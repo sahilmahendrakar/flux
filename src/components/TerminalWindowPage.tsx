@@ -62,16 +62,16 @@ export default function TerminalWindowPage({ sessionId }: TerminalWindowPageProp
   const running = session?.status === 'running';
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#09090b] text-zinc-100">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-flux-bg text-flux-fg">
       {isMac ? (
-        <div className="app-window-drag flex h-10 shrink-0 items-center border-b border-white/[0.06] bg-[#09090b] pl-20 pr-3">
-          <span className="app-window-no-drag min-w-0 flex-1 truncate text-[13px] text-zinc-400">
+        <div className="app-window-drag flex h-10 shrink-0 items-center border-b border-flux-line bg-flux-bg pl-20 pr-3">
+          <span className="app-window-no-drag min-w-0 flex-1 truncate text-[13px] text-flux-muted">
             {taskTitle || 'Session terminal'}
           </span>
         </div>
       ) : (
-        <div className="flex shrink-0 border-b border-white/[0.06] px-3 py-2">
-          <span className="truncate text-[13px] text-zinc-400">
+        <div className="flex shrink-0 border-b border-flux-line px-3 py-2">
+          <span className="truncate text-[13px] text-flux-muted">
             {taskTitle || 'Session terminal'}
           </span>
         </div>
@@ -85,7 +85,7 @@ export default function TerminalWindowPage({ sessionId }: TerminalWindowPageProp
             onResize={handleTerminalResize}
           />
         ) : (
-          <div className="flex h-full items-center justify-center px-4 text-center text-[13px] text-zinc-500">
+          <div className="flex h-full items-center justify-center px-4 text-center text-[13px] text-flux-muted">
             {session == null
               ? 'Loading session…'
               : 'This session is no longer running.'}
