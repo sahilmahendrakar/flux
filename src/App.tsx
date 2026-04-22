@@ -16,6 +16,7 @@ import {
   CloudProject,
   LocalProject,
   Session,
+  type ActiveProjectKey,
 } from './types';
 import Board from './components/Board';
 import { PlanningPanel } from './components/PlanningPanel';
@@ -334,7 +335,57 @@ export default function App() {
     }
     setSessions((prev) => prev.filter((s) => s.projectId === project.id));
     setActiveTabId((prev) => (STATIC_TAB_IDS.has(prev) ? prev : 'board'));
-  }, [project?.id]);
+
+    // Hydrate live sessions from the daemon and restore the persisted tab
+    // strip — the whole point of Milestone A session continuity. The
+    // terminals inside each pane fetch their own replay buffers on
+    // mount via `sessions.attach(id)`.
+    let cancelled = false;
+    const projectKey: ActiveProjectKey = { kind: project.kind, id: project.id };
+    void (async () => {
+      try {
+        const all = await window.electronAPI.sessions.getAll();
+        if (cancelled) return;
+        const projectSessions = all.filter((s) => s.projectId === project.id);
+        setSessions(projectSessions);
+
+        const persisted = await window.electronAPI.projects.getTabs(projectKey);
+        if (cancelled) return;
+        const aliveIds = new Set(projectSessions.map((s) => s.id));
+        const restoredOpen = persisted.openTaskIds.filter((id) =>
+          aliveIds.has(id),
+        );
+        setOpenTabIds(new Set(restoredOpen));
+        if (
+          persisted.activeTaskId &&
+          (STATIC_TAB_IDS.has(persisted.activeTaskId) ||
+            aliveIds.has(persisted.activeTaskId))
+        ) {
+          setActiveTabId(persisted.activeTaskId);
+        }
+      } catch (err) {
+        console.error('[App] restore tabs failed', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.id, project?.kind]);
+
+  // Persist tab strip whenever it changes for the active project.
+  useEffect(() => {
+    if (!project) return;
+    const projectKey: ActiveProjectKey = { kind: project.kind, id: project.id };
+    const tabs = {
+      openTaskIds: Array.from(openTabIds),
+      activeTaskId: activeTabId,
+    };
+    void window.electronAPI.projects
+      .setTabs(projectKey, tabs)
+      .catch((err) => {
+        console.error('[App] persist tabs failed', err);
+      });
+  }, [project?.id, project?.kind, openTabIds, activeTabId]);
 
   const pendingRef = useRef<
     Map<string, { patch: TaskPatch; timer: ReturnType<typeof setTimeout> }>

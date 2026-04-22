@@ -14,6 +14,13 @@ interface PlanningPanelProps {
   onLocalProjectRefresh?: () => void | Promise<void>;
 }
 
+// Planning replay snapshot cache — keyed by planning session id, same
+// StrictMode-defusing trick as the agent/shell caches.
+const planningAttachCache = new Map<
+  string,
+  { replay: string; cols: number; rows: number }
+>();
+
 const OUTPUT_TAIL_MAX = 12_000;
 
 const ESC = String.fromCharCode(27);
@@ -84,6 +91,7 @@ export function PlanningPanel({
   useEffect(() => {
     if (!planningApi) return;
     return planningApi.onExit((exited) => {
+      planningAttachCache.delete(exited.id);
       setPlanningSession((prev) => (prev?.id === exited.id ? null : prev));
       setNeedsInput(false);
       outputBufferRef.current = '';
@@ -107,11 +115,61 @@ export function PlanningPanel({
     ) {
       return;
     }
+    const id = planningSession.id;
+
+    let replayWritten = false;
+    const earlyBuffer: string[] = [];
+    let cancelled = false;
+
     const unsub = planningApi.onData((data) => {
-      terminalRef.current?.write(data);
+      if (cancelled) return;
       appendOutputAndDetectNeedsInput(data);
+      if (!replayWritten) {
+        earlyBuffer.push(data);
+      } else {
+        terminalRef.current?.write(data);
+      }
     });
+
+    const writeReplayAndFlush = (replay: string) => {
+      if (cancelled) return;
+      if (replay.length > 0) {
+        terminalRef.current?.write(replay);
+      }
+      replayWritten = true;
+      if (earlyBuffer.length > 0) {
+        for (const chunk of earlyBuffer) terminalRef.current?.write(chunk);
+        earlyBuffer.length = 0;
+      }
+    };
+
+    const cached = planningAttachCache.get(id);
+    if (cached) {
+      writeReplayAndFlush(cached.replay);
+    } else {
+      void (async () => {
+        try {
+          const result = await planningApi.attach();
+          if (cancelled) return;
+          if (result) {
+            planningAttachCache.set(id, {
+              replay: result.replay,
+              cols: result.cols,
+              rows: result.rows,
+            });
+            writeReplayAndFlush(result.replay);
+          } else {
+            writeReplayAndFlush('');
+          }
+        } catch (err) {
+          console.error('[PlanningPanel] attach failed', err);
+          writeReplayAndFlush('');
+        }
+      })();
+    }
+
     return () => {
+      cancelled = true;
       unsub();
     };
   }, [

@@ -9,12 +9,26 @@ import { McpServer } from './main/McpServer';
 import { AppStateStore } from './main/AppStateStore';
 import { LocalBindingStore } from './main/LocalBindingStore';
 import { WorktreeService } from './main/WorktreeService';
-import { SessionManager } from './main/SessionManager';
-import { ShellManager } from './main/ShellManager';
+import { DaemonClient } from './main/DaemonClient';
+import {
+  agentNotFoundMessage,
+  agentSpawnSpec,
+  ensurePlanningDirCursorMcp,
+  planningSpawnSpec,
+  taskInitialPrompt,
+} from './main/agentSpawn';
 import { AuthServer } from './main/AuthServer';
 import { EmailService, type InviteEmailInput } from './main/EmailService';
 import { createPlanningDocsWatcher } from './main/PlanningDocsWatcher';
-import type { ActiveProjectKey, Agent, LocalProject, Project, Task } from './types';
+import type {
+  ActiveProjectKey,
+  Agent,
+  LocalProject,
+  PlanningSession,
+  Project,
+  Session,
+  Task,
+} from './types';
 
 function isPlanningAgent(value: unknown): value is Agent {
   return value === 'claude-code' || value === 'codex' || value === 'cursor';
@@ -227,8 +241,12 @@ app.whenReady().then(async () => {
   await taskStore.init();
 
   const worktreeService = new WorktreeService('', '');
-  const sessionManager = new SessionManager(worktreeService);
-  const shellManager = new ShellManager();
+  const daemonClient = new DaemonClient();
+  try {
+    await daemonClient.ensureRunning();
+  } catch (err) {
+    console.error('[main] failed to start flux-daemon', err);
+  }
 
   const userData = app.getPath('userData');
   await migrateLegacyProjectsJson({
@@ -465,6 +483,23 @@ app.whenReady().then(async () => {
   ipcMain.handle('projects:getActiveKey', (): ActiveProjectKey | null => {
     return appStateStore.get().activeProjectKey;
   });
+
+  // ---- Tab strip restoration (per project open task tabs + active tab) ----
+  ipcMain.handle(
+    'projects:getTabs',
+    (_e, key: ActiveProjectKey) => appStateStore.getProjectTabs(key),
+  );
+  ipcMain.handle(
+    'projects:setTabs',
+    async (
+      _e,
+      key: ActiveProjectKey,
+      tabs: { openTaskIds: string[]; activeTaskId: string | null },
+    ) => {
+      await appStateStore.setProjectTabs(key, tabs);
+    },
+  );
+
   ipcMain.handle('projects:clearActive', async () => {
     await appStateStore.set({
       activeProjectKey: null,
@@ -557,21 +592,17 @@ app.whenReady().then(async () => {
   );
   ipcMain.handle('tasks:delete', async (_e, id) => taskStore.delete(id));
 
-  ipcMain.handle('session:start', async (_e, task: Task) => {
-    // For session start, we need a rootPath. For local projects, look up the
-    // active local project; for cloud projects, the worktree service already
-    // has rootPath set by activateCloud.
+  async function resolveProjectForStart(): Promise<Project> {
     const activeKey = appStateStore.get().activeProjectKey;
     if (!activeKey) throw new Error('No project open');
     if (activeKey.kind === 'local') {
       const project = projectStore.get();
       if (!project) throw new Error('No local project open');
-      return sessionManager.startSession(task, project);
+      return project;
     }
-    // Cloud: construct a minimal shape for SessionManager. It only needs id+rootPath+name.
     const binding = bindingStore.get(activeKey.id);
     if (!binding) throw new Error('Cloud project is not bound to a local folder');
-    return sessionManager.startSession(task, {
+    return {
       id: activeKey.id,
       kind: 'cloud',
       name: path.basename(binding.rootPath),
@@ -579,33 +610,117 @@ app.whenReady().then(async () => {
       ownerId: '',
       memberIds: [],
       createdAt: '',
+    };
+  }
+
+  async function startSessionForTask(
+    task: Task,
+  ): Promise<
+    | Session
+    | { error: 'AGENT_NOT_FOUND' | 'WORKTREE_FAILED'; message: string }
+  > {
+    const project = await resolveProjectForStart();
+
+    // Dedup against the daemon's live registry.
+    const existing = (await daemonClient.listSessions()).find(
+      (s) => s.taskId === task.id && s.status === 'running',
+    );
+    if (existing) return existing;
+
+    let worktreePath = '';
+    let branch = '';
+    try {
+      const created = await worktreeService.create(task.id);
+      worktreePath = created.worktreePath;
+      branch = created.branch;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[session:start] worktree create failed', {
+        taskId: task.id,
+        projectId: project.id,
+        message,
+      });
+      return { error: 'WORKTREE_FAILED', message };
+    }
+
+    const initialPrompt = taskInitialPrompt(task);
+    const { command, args } = agentSpawnSpec(task.agent, initialPrompt);
+    const result = await daemonClient.createSession({
+      worktreePath,
+      branch,
+      taskId: task.id,
+      projectId: project.id,
+      agent: task.agent,
+      command,
+      args,
+      cols: 80,
+      rows: 24,
     });
-  });
+    if ('error' in result) {
+      console.error('[session:start] daemon spawn failed', {
+        taskId: task.id,
+        command,
+        args,
+        error: result.error,
+        message: result.message,
+      });
+      try {
+        await worktreeService.remove(worktreePath);
+      } catch (removeErr: unknown) {
+        console.error('[session:start] cleanup worktree after spawn failure', removeErr);
+      }
+      if (result.error === 'AGENT_NOT_FOUND') {
+        return {
+          error: 'AGENT_NOT_FOUND',
+          message: agentNotFoundMessage(task.agent, command),
+        };
+      }
+      return { error: 'AGENT_NOT_FOUND', message: result.message };
+    }
+    return result;
+  }
+
+  ipcMain.handle('session:start', async (_e, task: Task) => startSessionForTask(task));
 
   ipcMain.handle('session:archive', async (_e, sessionId: string) => {
-    shellManager.closeShellsForSession(sessionId);
-    sessionManager.archiveSession(sessionId);
+    await daemonClient.closeShellsForSession(sessionId);
+    await daemonClient.stopSession(sessionId);
   });
 
   ipcMain.handle('session:delete', async (_e, sessionId: string) => {
-    shellManager.closeShellsForSession(sessionId);
-    await sessionManager.deleteWorkspace(sessionId);
+    const sessions = await daemonClient.listSessions();
+    const target = sessions.find((s) => s.id === sessionId);
+    await daemonClient.closeShellsForSession(sessionId);
+    await daemonClient.stopSession(sessionId);
+    if (target?.worktreePath) {
+      try {
+        await worktreeService.remove(target.worktreePath);
+      } catch (err: unknown) {
+        console.error('[session:delete] worktree remove failed', {
+          sessionId,
+          err,
+        });
+      }
+    }
   });
 
   ipcMain.handle('session:get', async (_e, taskId: string) => {
-    return sessionManager.getSession(taskId);
+    const sessions = await daemonClient.listSessions();
+    return sessions.find((s) => s.taskId === taskId) ?? null;
   });
 
-  ipcMain.handle('session:getAll', async () => {
-    return sessionManager.getAllSessions();
-  });
+  ipcMain.handle('session:getAll', async () => daemonClient.listSessions());
+
+  ipcMain.handle('session:attach', async (_e, sessionId: string) =>
+    daemonClient.attachSession(sessionId),
+  );
 
   ipcMain.on('session:write', (_e, sessionId: string, data: string) => {
-    sessionManager.write(sessionId, data);
+    daemonClient.writeSession(sessionId, data);
   });
 
   ipcMain.on('session:resize', (_e, sessionId: string, cols: number, rows: number) => {
-    sessionManager.resize(sessionId, cols, rows);
+    daemonClient.resizeSession(sessionId, cols, rows);
   });
 
   fluxMcpServer = new McpServer(taskStore, projectStore, () => mainWindow);
@@ -617,10 +732,6 @@ app.whenReady().then(async () => {
       const activeKey = appStateStore.get().activeProjectKey;
       if (!activeKey) {
         return { error: 'No project open' };
-      }
-      const win = mainWindow;
-      if (!win || win.isDestroyed()) {
-        return { error: 'NO_WINDOW', message: 'Main window is not available' };
       }
 
       let project: Project;
@@ -662,29 +773,95 @@ app.whenReady().then(async () => {
         planningAgent = 'claude-code';
       }
 
-      return sessionManager.startPlanningSession(
-        project,
-        projectDir,
-        win,
-        planningAgent,
+      // If the daemon already has a planning session running, reuse it.
+      const existing = await daemonClient.getPlanning();
+      if (existing) return existing;
+
+      const planningDir = path.join(projectDir, 'planning');
+      const mcpConfigPath = path.join(projectDir, 'mcp.json');
+      await fs.mkdir(planningDir, { recursive: true });
+      const { ensurePlanningAssistantMarkdownFiles } = await import(
+        './main/ProjectStore'
       );
+      await ensurePlanningAssistantMarkdownFiles(
+        planningDir,
+        project.name,
+        project.rootPath,
+      );
+      try {
+        await fs.access(mcpConfigPath);
+      } catch {
+        await fs.writeFile(
+          mcpConfigPath,
+          `${JSON.stringify(
+            {
+              mcpServers: {
+                flux: { type: 'sse', url: 'http://localhost:47432/sse' },
+              },
+            },
+            null,
+            2,
+          )}\n`,
+          'utf8',
+        );
+      }
+      if (planningAgent === 'cursor') {
+        await ensurePlanningDirCursorMcp(planningDir);
+      }
+
+      const { command, args } = planningSpawnSpec(planningAgent, mcpConfigPath);
+      const result = await daemonClient.startPlanning({
+        projectId: project.id,
+        agent: planningAgent,
+        planningDir,
+        command,
+        args,
+        cols: 220,
+        rows: 50,
+      });
+      if ('error' in result) {
+        console.error('[planning:start] daemon spawn failed', {
+          projectId: project.id,
+          command,
+          args,
+          error: result.error,
+          message: result.message,
+        });
+        if (result.error === 'AGENT_NOT_FOUND') {
+          return {
+            error: 'AGENT_NOT_FOUND',
+            message: agentNotFoundMessage(planningAgent, command),
+          };
+        }
+        return { error: result.error, message: result.message };
+      }
+      return result;
     },
   );
 
-  ipcMain.handle('planning:stop', async () => {
-    return sessionManager.stopPlanningSession();
-  });
+  ipcMain.handle('planning:stop', async () => daemonClient.stopPlanning());
 
-  ipcMain.handle('planning:get', async () => {
-    return sessionManager.getPlanningSession();
-  });
+  ipcMain.handle('planning:get', async () => daemonClient.getPlanning());
+
+  ipcMain.handle(
+    'planning:attach',
+    async (): Promise<
+      | {
+          replay: string;
+          cols: number;
+          rows: number;
+          session: PlanningSession;
+        }
+      | null
+    > => daemonClient.attachPlanning(),
+  );
 
   ipcMain.on('planning:write', (_e, data: string) => {
-    sessionManager.writePlanning(data);
+    daemonClient.writePlanning(data);
   });
 
   ipcMain.on('planning:resize', (_e, cols: number, rows: number) => {
-    sessionManager.resizePlanning(cols, rows);
+    daemonClient.resizePlanning(cols, rows);
   });
 
   function fluxProjectDirOrNull(): string | null {
@@ -775,29 +952,38 @@ app.whenReady().then(async () => {
   planningDocsWatcher.sync();
 
   // ---- Shells: plain terminals spawned inside a session's worktree ----
-  ipcMain.handle('shell:open', (_e, sessionId: string) => {
-    const sessions = sessionManager.getAllSessions();
+  ipcMain.handle('shell:open', async (_e, sessionId: string) => {
+    const sessions = await daemonClient.listSessions();
     const session = sessions.find((s) => s.id === sessionId);
     if (!session) {
       throw new Error(`No session for id: ${sessionId}`);
     }
-    return shellManager.openShell(session.id, session.worktreePath);
+    return daemonClient.createShell({
+      sessionId: session.id,
+      worktreePath: session.worktreePath,
+      cols: 80,
+      rows: 24,
+    });
   });
 
-  ipcMain.handle('shell:close', (_e, shellId: string) => {
-    shellManager.closeShell(shellId);
+  ipcMain.handle('shell:close', async (_e, shellId: string) => {
+    await daemonClient.closeShell(shellId);
   });
 
-  ipcMain.handle('shell:list', (_e, sessionId: string) => {
-    return shellManager.listForSession(sessionId);
-  });
+  ipcMain.handle('shell:list', async (_e, sessionId: string) =>
+    daemonClient.listShells(sessionId),
+  );
+
+  ipcMain.handle('shell:attach', async (_e, shellId: string) =>
+    daemonClient.attachShell(shellId),
+  );
 
   ipcMain.on('shell:write', (_e, shellId: string, data: string) => {
-    shellManager.write(shellId, data);
+    daemonClient.writeShell(shellId, data);
   });
 
   ipcMain.on('shell:resize', (_e, shellId: string, cols: number, rows: number) => {
-    shellManager.resize(shellId, cols, rows);
+    daemonClient.resizeShell(shellId, cols, rows);
   });
 
   createWindow();
@@ -824,6 +1010,9 @@ app.on('before-quit', () => {
   fluxMcpServer?.stop();
   planningDocsWatcher?.dispose();
   planningDocsWatcher = null;
+  // Intentionally do NOT shut down the flux-daemon here; that's the whole
+  // point of the daemon architecture. Quitting Flux must leave live PTYs
+  // running so the next launch can warm-reattach. See 0001-session-daemon.md.
 });
 
 // In this file you can include the rest of your app's specific main process

@@ -31,6 +31,13 @@ const config: ForgeConfig = {
           target: 'main',
         },
         {
+          // Detached PTY daemon; spawned via ELECTRON_RUN_AS_NODE=1 so it
+          // outlives the Electron main process. See 0001-session-daemon.md.
+          entry: 'src/daemon/daemon.ts',
+          config: 'vite.daemon.config.ts',
+          target: 'main',
+        },
+        {
           entry: 'src/preload.ts',
           config: 'vite.preload.config.ts',
           target: 'preload',
@@ -47,7 +54,9 @@ const config: ForgeConfig = {
     // at package time, before code signing the application
     new FusesPlugin({
       version: FuseVersion.V1,
-      [FuseV1Options.RunAsNode]: false,
+      // Enabled so main can spawn the Flux daemon by re-invoking the
+      // Electron binary with ELECTRON_RUN_AS_NODE=1. See 0001-session-daemon.md.
+      [FuseV1Options.RunAsNode]: true,
       [FuseV1Options.EnableCookieEncryption]: true,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,

@@ -15,6 +15,10 @@ type SessionStartResult =
 
 type PlanningStartResult = PlanningSession | { error: string; message?: string };
 
+/** Replay snapshot returned on attach: prefix of terminal output + geometry. */
+type AttachResult = { replay: string; cols: number; rows: number };
+type PlanningAttachResult = AttachResult & { session: PlanningSession };
+
 type DirPickResult =
   | { rootPath: string }
   | { error: 'NOT_GIT_REPO' }
@@ -54,6 +58,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getActiveKey: () =>
       ipcRenderer.invoke('projects:getActiveKey') as Promise<ActiveProjectKey | null>,
     clearActive: () => ipcRenderer.invoke('projects:clearActive') as Promise<void>,
+    /** Per-project tab strip state, for session-continuity restoration. */
+    getTabs: (key: ActiveProjectKey) =>
+      ipcRenderer.invoke('projects:getTabs', key) as Promise<{
+        openTaskIds: string[];
+        activeTaskId: string | null;
+      }>,
+    setTabs: (
+      key: ActiveProjectKey,
+      tabs: { openTaskIds: string[]; activeTaskId: string | null },
+    ) => ipcRenderer.invoke('projects:setTabs', key, tabs) as Promise<void>,
     getLocalBinding: (cloudProjectId: string) =>
       ipcRenderer.invoke('projects:getLocalBinding', cloudProjectId) as Promise<
         { rootPath: string; lastOpenedAt: string } | null
@@ -115,6 +129,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     get: (taskId: string) =>
       ipcRenderer.invoke('session:get', taskId) as Promise<Session | null>,
     getAll: () => ipcRenderer.invoke('session:getAll') as Promise<Session[]>,
+    /** Warm-reattach: get the daemon's replay buffer for this session. */
+    attach: (sessionId: string) =>
+      ipcRenderer.invoke('session:attach', sessionId) as Promise<AttachResult | null>,
     write: (sessionId: string, data: string) =>
       ipcRenderer.send('session:write', sessionId, data),
     resize: (sessionId: string, cols: number, rows: number) =>
@@ -136,6 +153,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('shell:close', shellId) as Promise<void>,
     list: (sessionId: string) =>
       ipcRenderer.invoke('shell:list', sessionId) as Promise<Shell[]>,
+    attach: (shellId: string) =>
+      ipcRenderer.invoke('shell:attach', shellId) as Promise<AttachResult | null>,
     write: (shellId: string, data: string) =>
       ipcRenderer.send('shell:write', shellId, data),
     resize: (shellId: string, cols: number, rows: number) =>
@@ -155,6 +174,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('planning:start', agent) as Promise<PlanningStartResult>,
     stop: () => ipcRenderer.invoke('planning:stop') as Promise<void>,
     get: () => ipcRenderer.invoke('planning:get') as Promise<PlanningSession | null>,
+    attach: () =>
+      ipcRenderer.invoke('planning:attach') as Promise<PlanningAttachResult | null>,
     write: (data: string) => ipcRenderer.send('planning:write', data),
     resize: (cols: number, rows: number) => ipcRenderer.send('planning:resize', cols, rows),
     onData: (cb: (data: string) => void) => {

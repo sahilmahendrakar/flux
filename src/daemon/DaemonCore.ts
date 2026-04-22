@@ -1,0 +1,357 @@
+import { randomUUID } from 'node:crypto';
+import os from 'node:os';
+import type {
+  PlanningSession,
+  Session,
+  Shell,
+} from '../types';
+import type {
+  CreateSessionParams,
+  CreateSessionResult,
+  CreateShellParams,
+  StartPlanningParams,
+  StartPlanningResult,
+  StreamFrame,
+} from './protocol';
+import { SessionRuntime } from './SessionRuntime';
+
+interface SessionEntry {
+  runtime: SessionRuntime;
+  session: Session;
+}
+
+interface ShellEntry {
+  runtime: SessionRuntime;
+  shell: Shell;
+}
+
+interface PlanningEntry {
+  runtime: SessionRuntime;
+  session: PlanningSession;
+}
+
+/** Idle-shutdown timer: exit after N ms with zero live PTYs. */
+const DEFAULT_IDLE_MS = 24 * 60 * 60 * 1000;
+
+function defaultShellCommand(): { command: string; args: string[] } {
+  if (process.platform === 'win32') {
+    return { command: process.env.COMSPEC ?? 'cmd.exe', args: [] };
+  }
+  const sh = process.env.SHELL ?? '/bin/bash';
+  // Login shell gives users their normal PATH / aliases.
+  return { command: sh, args: ['-l'] };
+}
+
+/**
+ * In-daemon registry for every PTY the daemon currently owns. Pure
+ * business logic — socket I/O lives in the daemon entry point. The
+ * daemon broadcasts PTY output by handing a `broadcast` callback to
+ * each `SessionRuntime`.
+ */
+export class DaemonCore {
+  private sessions = new Map<string, SessionEntry>();
+  private shells = new Map<string, ShellEntry>();
+  private planning: PlanningEntry | null = null;
+  private idleTimer: NodeJS.Timeout | null = null;
+  private readonly idleMs: number;
+
+  constructor(
+    private readonly broadcast: (frame: StreamFrame) => void,
+    opts: { idleMs?: number } = {},
+  ) {
+    this.idleMs = opts.idleMs ?? DEFAULT_IDLE_MS;
+    this.armIdleTimer();
+  }
+
+  // ------------------------------------------------------------------- sessions
+
+  createSession(params: CreateSessionParams): CreateSessionResult {
+    const id = randomUUID();
+    const session: Session = {
+      id,
+      taskId: params.taskId,
+      projectId: params.projectId,
+      worktreePath: params.worktreePath,
+      branch: params.branch,
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    };
+
+    let runtime: SessionRuntime;
+    try {
+      runtime = new SessionRuntime(
+        {
+          command: params.command,
+          args: params.args,
+          cwd: params.worktreePath,
+          cols: params.cols,
+          rows: params.rows,
+        },
+        {
+          onData: (data) => {
+            this.broadcast({ kind: 'data', target: 'session', id, data });
+          },
+          onExit: ({ exitCode }) => {
+            const entry = this.sessions.get(id);
+            if (!entry) return;
+            entry.session.status = exitCode === 0 ? 'stopped' : 'error';
+            entry.session.stoppedAt = new Date().toISOString();
+            this.broadcast({
+              kind: 'session-exit',
+              id,
+              session: { ...entry.session },
+            });
+            // Intentionally leave the entry in the map so list/get can still
+            // surface the stopped session to main until it's archived.
+          },
+        },
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { error: 'AGENT_NOT_FOUND', message };
+    }
+
+    this.sessions.set(id, { runtime, session });
+    this.cancelIdleTimer();
+    return session;
+  }
+
+  listSessions(): Session[] {
+    return [...this.sessions.values()].map((e) => ({ ...e.session }));
+  }
+
+  attachSession(id: string): { replay: string; cols: number; rows: number } | null {
+    const entry = this.sessions.get(id);
+    if (!entry) return null;
+    return entry.runtime.snapshot();
+  }
+
+  writeSession(id: string, data: string): void {
+    this.sessions.get(id)?.runtime.write(data);
+  }
+
+  resizeSession(id: string, cols: number, rows: number): void {
+    this.sessions.get(id)?.runtime.resize(cols, rows);
+  }
+
+  /** Kill + forget. Worktree removal is main's job. */
+  stopSession(id: string): void {
+    const entry = this.sessions.get(id);
+    if (!entry) return;
+    entry.runtime.kill();
+    entry.runtime.dispose();
+    this.sessions.delete(id);
+    this.armIdleTimer();
+  }
+
+  // --------------------------------------------------------------------- shells
+
+  createShell(params: CreateShellParams): Shell {
+    const id = randomUUID();
+    const { command, args } = defaultShellCommand();
+    const shell: Shell = {
+      id,
+      sessionId: params.sessionId,
+      worktreePath: params.worktreePath,
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    };
+
+    const runtime = new SessionRuntime(
+      {
+        command,
+        args,
+        cwd: params.worktreePath,
+        cols: params.cols,
+        rows: params.rows,
+        env: { ...process.env, HOME: process.env.HOME ?? os.homedir() },
+      },
+      {
+        onData: (data) => {
+          this.broadcast({ kind: 'data', target: 'shell', id, data });
+        },
+        onExit: ({ exitCode }) => {
+          const entry = this.shells.get(id);
+          if (!entry) return;
+          entry.shell.status = exitCode === 0 ? 'stopped' : 'error';
+          entry.shell.stoppedAt = new Date().toISOString();
+          this.broadcast({
+            kind: 'shell-exit',
+            id,
+            shell: { ...entry.shell },
+          });
+          entry.runtime.dispose();
+          this.shells.delete(id);
+          this.armIdleTimer();
+        },
+      },
+    );
+
+    this.shells.set(id, { runtime, shell });
+    this.cancelIdleTimer();
+    return shell;
+  }
+
+  listShells(sessionId?: string): Shell[] {
+    const all = [...this.shells.values()].map((e) => ({ ...e.shell }));
+    return sessionId ? all.filter((s) => s.sessionId === sessionId) : all;
+  }
+
+  attachShell(id: string): { replay: string; cols: number; rows: number } | null {
+    const entry = this.shells.get(id);
+    if (!entry) return null;
+    return entry.runtime.snapshot();
+  }
+
+  writeShell(id: string, data: string): void {
+    this.shells.get(id)?.runtime.write(data);
+  }
+
+  resizeShell(id: string, cols: number, rows: number): void {
+    this.shells.get(id)?.runtime.resize(cols, rows);
+  }
+
+  closeShell(id: string): void {
+    const entry = this.shells.get(id);
+    if (!entry) return;
+    entry.runtime.kill();
+    entry.runtime.dispose();
+    this.shells.delete(id);
+    this.armIdleTimer();
+  }
+
+  closeShellsForSession(sessionId: string): void {
+    for (const [id, entry] of this.shells) {
+      if (entry.shell.sessionId === sessionId) {
+        entry.runtime.kill();
+        entry.runtime.dispose();
+        this.shells.delete(id);
+      }
+    }
+    this.armIdleTimer();
+  }
+
+  // ------------------------------------------------------------------- planning
+
+  startPlanning(params: StartPlanningParams): StartPlanningResult {
+    if (this.planning) return { ...this.planning.session };
+
+    const id = randomUUID();
+    const session: PlanningSession = {
+      id,
+      projectId: params.projectId,
+      agent: params.agent,
+      planningDir: params.planningDir,
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    };
+
+    let runtime: SessionRuntime;
+    try {
+      runtime = new SessionRuntime(
+        {
+          command: params.command,
+          args: params.args,
+          cwd: params.planningDir,
+          cols: params.cols,
+          rows: params.rows,
+        },
+        {
+          onData: (data) => {
+            this.broadcast({ kind: 'data', target: 'planning', id, data });
+          },
+          onExit: ({ exitCode }) => {
+            const current = this.planning;
+            if (!current || current.session.id !== id) return;
+            current.session.status = exitCode === 0 ? 'stopped' : 'error';
+            current.session.stoppedAt = new Date().toISOString();
+            this.broadcast({
+              kind: 'planning-exit',
+              id,
+              session: { ...current.session },
+            });
+            current.runtime.dispose();
+            this.planning = null;
+            this.armIdleTimer();
+          },
+        },
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { error: 'AGENT_NOT_FOUND', message };
+    }
+
+    this.planning = { runtime, session };
+    this.cancelIdleTimer();
+    return { ...session };
+  }
+
+  stopPlanning(): void {
+    if (!this.planning) return;
+    this.planning.runtime.kill();
+    this.planning.runtime.dispose();
+    this.planning = null;
+    this.armIdleTimer();
+  }
+
+  getPlanning(): PlanningSession | null {
+    return this.planning ? { ...this.planning.session } : null;
+  }
+
+  attachPlanning():
+    | { replay: string; cols: number; rows: number; session: PlanningSession }
+    | null {
+    if (!this.planning) return null;
+    return {
+      ...this.planning.runtime.snapshot(),
+      session: { ...this.planning.session },
+    };
+  }
+
+  writePlanning(data: string): void {
+    this.planning?.runtime.write(data);
+  }
+
+  resizePlanning(cols: number, rows: number): void {
+    this.planning?.runtime.resize(cols, rows);
+  }
+
+  // -------------------------------------------------------------- lifecycle
+
+  /** Kill every PTY this daemon owns. Called from signal handlers. */
+  killAll(): void {
+    for (const { runtime } of this.sessions.values()) runtime.kill();
+    for (const { runtime } of this.shells.values()) runtime.kill();
+    this.planning?.runtime.kill();
+  }
+
+  private isIdle(): boolean {
+    if (this.planning) return false;
+    for (const entry of this.sessions.values()) {
+      if (!entry.runtime.isExited) return false;
+    }
+    for (const entry of this.shells.values()) {
+      if (!entry.runtime.isExited) return false;
+    }
+    return true;
+  }
+
+  private armIdleTimer(): void {
+    if (this.idleTimer) return;
+    if (!this.isIdle()) return;
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      if (this.isIdle()) {
+        process.exit(0);
+      }
+    }, this.idleMs);
+    this.idleTimer.unref?.();
+  }
+
+  private cancelIdleTimer(): void {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
+  }
+}

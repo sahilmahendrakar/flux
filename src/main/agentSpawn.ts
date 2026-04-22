@@ -1,0 +1,97 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import type { Agent, Task } from '../types';
+
+/** Compose the first prompt for an agent spawn from the task row. */
+export function taskInitialPrompt(task: Task): string {
+  const desc = (task.description ?? '').trim();
+  return desc ? `${task.title}\n\n${desc}` : task.title;
+}
+
+export function agentSpawnSpec(
+  agent: Agent,
+  initialPrompt: string,
+): { command: string; args: string[] } {
+  switch (agent) {
+    case 'claude-code':
+      return { command: 'claude', args: [initialPrompt] };
+    case 'codex':
+      return { command: 'codex', args: [] };
+    case 'cursor':
+      return { command: 'agent', args: ['--model', 'auto', initialPrompt] };
+  }
+}
+
+const FLUX_SSE_MCP_ENTRY = {
+  type: 'sse' as const,
+  url: 'http://localhost:47432/sse',
+};
+
+/** Cursor CLI loads project MCP from planningDir/.cursor/mcp.json (cwd is planningDir). */
+export async function ensurePlanningDirCursorMcp(planningDir: string): Promise<void> {
+  const cursorDir = path.join(planningDir, '.cursor');
+  await fs.mkdir(cursorDir, { recursive: true });
+  const mcpPath = path.join(cursorDir, 'mcp.json');
+  let merged: { mcpServers: Record<string, unknown> };
+  try {
+    const raw = await fs.readFile(mcpPath, 'utf8');
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'mcpServers' in parsed &&
+      typeof (parsed as { mcpServers: unknown }).mcpServers === 'object' &&
+      (parsed as { mcpServers: unknown }).mcpServers !== null
+    ) {
+      const servers = {
+        ...((parsed as { mcpServers: Record<string, unknown> }).mcpServers),
+      };
+      servers.flux = FLUX_SSE_MCP_ENTRY;
+      merged = { mcpServers: servers };
+    } else {
+      merged = { mcpServers: { flux: FLUX_SSE_MCP_ENTRY } };
+    }
+  } catch {
+    merged = { mcpServers: { flux: FLUX_SSE_MCP_ENTRY } };
+  }
+  await fs.writeFile(mcpPath, `${JSON.stringify(merged, null, 2)}\n`, 'utf8');
+}
+
+/** Planning agents read scope from CLAUDE.md / AGENTS.md; no initial user prompt so the PTY stays idle until the user types. */
+export function planningSpawnSpec(
+  agent: Agent,
+  mcpConfigPath: string,
+): { command: string; args: string[] } {
+  switch (agent) {
+    case 'claude-code':
+      return {
+        command: 'claude',
+        args: [
+          '--mcp-config',
+          mcpConfigPath,
+          '--append-system-prompt',
+          'You are a planning assistant for a software project. Help the developer plan features, maintain documentation in this directory, and manage tasks on the Flux board using the available flux__ tools. Do not write application code.',
+        ],
+      };
+    case 'codex':
+      return {
+        command: 'codex',
+        args: [],
+      };
+    case 'cursor':
+      return {
+        command: 'agent',
+        args: ['--model', 'auto', '--approve-mcps'],
+      };
+  }
+}
+
+export function agentNotFoundMessage(agent: Agent, command: string): string {
+  if (agent === 'claude-code') {
+    return `${command} not found on PATH. Install with: npm install -g @anthropic-ai/claude-code`;
+  }
+  if (agent === 'cursor') {
+    return `${command} not found on PATH. Install Cursor Agent CLI: https://cursor.com/docs/cli/installation`;
+  }
+  return `${command} not found on PATH`;
+}
