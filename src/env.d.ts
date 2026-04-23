@@ -33,10 +33,21 @@ type ActivateCloudResult =
   | { error: 'NOT_GIT_REPO' }
   | null;
 
+/** Replay snapshot returned by the daemon on attach. */
+type AttachResult = { replay: string; cols: number; rows: number };
+type PlanningAttachResult = AttachResult & { session: PlanningSession };
+
+type ProjectTabsState = {
+  openTaskIds: string[];
+  activeTaskId: string | null;
+};
+
 declare global {
   interface Window {
     electronAPI: {
       platform: string;
+      /** Opens http(s) URLs in the system default browser (not an in-app window). */
+      openExternalUrl: (url: string) => Promise<void>;
       project: {
         get: () => Promise<LocalProject | null>;
         getDir: () => Promise<string | null>;
@@ -58,6 +69,11 @@ declare global {
         removeLocal: (id: string) => Promise<void>;
         getActiveKey: () => Promise<ActiveProjectKey | null>;
         clearActive: () => Promise<void>;
+        getTabs: (key: ActiveProjectKey) => Promise<ProjectTabsState>;
+        setTabs: (
+          key: ActiveProjectKey,
+          tabs: ProjectTabsState,
+        ) => Promise<void>;
         getLocalBinding: (
           cloudProjectId: string,
         ) => Promise<{ rootPath: string; lastOpenedAt: string } | null>;
@@ -98,6 +114,7 @@ declare global {
         deleteWorkspace: (sessionId: string) => Promise<void>;
         get: (taskId: string) => Promise<Session | null>;
         getAll: () => Promise<Session[]>;
+        attach: (sessionId: string) => Promise<AttachResult | null>;
         write: (sessionId: string, data: string) => void;
         resize: (sessionId: string, cols: number, rows: number) => void;
         onData: (sessionId: string, cb: (data: string) => void) => () => void;
@@ -107,6 +124,7 @@ declare global {
         open: (sessionId: string) => Promise<Shell>;
         close: (shellId: string) => Promise<void>;
         list: (sessionId: string) => Promise<Shell[]>;
+        attach: (shellId: string) => Promise<AttachResult | null>;
         write: (shellId: string, data: string) => void;
         resize: (shellId: string, cols: number, rows: number) => void;
         onData: (shellId: string, cb: (data: string) => void) => () => void;
@@ -116,6 +134,7 @@ declare global {
         start: (agent: Agent) => Promise<PlanningStartResult>;
         stop: () => Promise<void>;
         get: () => Promise<PlanningSession | null>;
+        attach: () => Promise<PlanningAttachResult | null>;
         write: (data: string) => void;
         resize: (cols: number, rows: number) => void;
         onData: (cb: (data: string) => void) => () => void;
