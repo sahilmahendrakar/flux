@@ -11,6 +11,10 @@ import { LocalBindingStore } from './main/LocalBindingStore';
 import { WorktreeService } from './main/WorktreeService';
 import { DaemonClient } from './main/DaemonClient';
 import {
+  deleteSessionWorkspaceAndStop,
+  teardownEphemeralResourcesForTask,
+} from './main/taskEphemeralTeardown';
+import {
   agentNotFoundMessage,
   agentSpawnSpec,
   ensurePlanningDirCursorMcp,
@@ -653,6 +657,18 @@ app.whenReady().then(async () => {
   ipcMain.handle('tasks:update', async (_e, id, patch) =>
     taskStore.update(id, patch),
   );
+  ipcMain.handle(
+    'tasks:cleanupResources',
+    async (_e, taskId: string): Promise<{ errors: string[] }> => {
+      const errors = await teardownEphemeralResourcesForTask(
+        daemonClient,
+        worktreeService,
+        taskId,
+      );
+      return { errors };
+    },
+  );
+
   ipcMain.handle('tasks:delete', async (_e, id) => taskStore.delete(id));
 
   async function resolveProjectForStart(): Promise<Project> {
@@ -751,20 +767,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('session:delete', async (_e, sessionId: string) => {
-    const sessions = await daemonClient.listSessions();
-    const target = sessions.find((s) => s.id === sessionId);
-    await daemonClient.closeShellsForSession(sessionId);
-    await daemonClient.stopSession(sessionId);
-    if (target?.worktreePath) {
-      try {
-        await worktreeService.remove(target.worktreePath);
-      } catch (err: unknown) {
-        console.error('[session:delete] worktree remove failed', {
-          sessionId,
-          err,
-        });
-      }
-    }
+    await deleteSessionWorkspaceAndStop(daemonClient, worktreeService, sessionId);
   });
 
   ipcMain.handle('session:get', async (_e, taskId: string) => {

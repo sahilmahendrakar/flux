@@ -141,7 +141,9 @@ export class TaskStore {
 
   async update(
     id: string,
-    patch: Partial<Pick<Task, 'title' | 'status' | 'agent' | 'description' | 'orderKey'>>,
+    patch: Partial<
+      Pick<Task, 'title' | 'status' | 'agent' | 'description' | 'orderKey' | 'workspaceCleanedAt'>
+    >,
   ): Promise<Task> {
     if (!this.filePath) {
       throw new Error('No project directory open for tasks');

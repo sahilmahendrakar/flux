@@ -107,6 +107,9 @@ export class FirestoreTaskProvider implements TaskProvider {
     if (patch.agent !== undefined) updates.agent = patch.agent;
     if (patch.description !== undefined) updates.description = patch.description;
     if (patch.orderKey !== undefined) updates.orderKey = patch.orderKey;
+    if (patch.workspaceCleanedAt !== undefined) {
+      updates.workspaceCleanedAt = patch.workspaceCleanedAt;
+    }
     await updateDoc(ref, updates);
     const after = await getDoc(ref);
     return toTask(
@@ -144,6 +147,8 @@ function toTask(
     createdAt: tsToIso(data.createdAt) ?? new Date().toISOString(),
     projectId,
     orderKey: typeof data.orderKey === 'string' ? data.orderKey : undefined,
+    workspaceCleanedAt:
+      typeof data.workspaceCleanedAt === 'string' ? data.workspaceCleanedAt : undefined,
     createdBy: typeof data.createdBy === 'string' ? data.createdBy : undefined,
     updatedAt: tsToIso(data.updatedAt),
     updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : undefined,
