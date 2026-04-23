@@ -9,6 +9,8 @@ interface Props {
   onDragEnd: (result: DropResult) => void;
   onCreateTask: (title: string, agent: Agent) => void;
   onDeleteTask: (id: string) => void;
+  onRequestCleanupTask: (id: string) => void;
+  cleanupLoadingTaskId: string | null;
   onCardClick: (id: string) => void;
   planPanelOpen: boolean;
   onTogglePlanPanel: () => void;
@@ -19,6 +21,8 @@ export default function Board({
   onDragEnd,
   onCreateTask,
   onDeleteTask,
+  onRequestCleanupTask,
+  cleanupLoadingTaskId,
   onCardClick,
   planPanelOpen,
   onTogglePlanPanel,
@@ -69,6 +73,8 @@ export default function Board({
             tasks={tasksByStatus[col.id]}
             onNewTask={col.id === 'backlog' ? () => setModalOpen(true) : undefined}
             onDeleteTask={onDeleteTask}
+            onRequestCleanupTask={col.id === 'done' ? onRequestCleanupTask : undefined}
+            cleanupLoadingTaskId={col.id === 'done' ? cleanupLoadingTaskId : null}
             onCardClick={onCardClick}
             emptyState={
               col.id === 'backlog' && boardIsEmpty

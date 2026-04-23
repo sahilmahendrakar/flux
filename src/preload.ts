@@ -120,11 +120,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     update: (
       id: string,
       patch: Partial<
-        Pick<Task, 'title' | 'status' | 'agent' | 'description' | 'orderKey'>
+        Pick<Task, 'title' | 'status' | 'agent' | 'description' | 'orderKey' | 'workspaceCleanedAt'>
       >,
     ) => ipcRenderer.invoke('tasks:update', id, patch) as Promise<Task>,
     delete: (id: string) =>
       ipcRenderer.invoke('tasks:delete', id) as Promise<void>,
+    cleanupResources: (id: string) =>
+      ipcRenderer.invoke('tasks:cleanupResources', id) as Promise<{ errors: string[] }>,
     onChanged: (cb: () => void) => {
       const handler = () => cb();
       ipcRenderer.on('tasks:changed', handler);

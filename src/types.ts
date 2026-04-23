@@ -63,6 +63,8 @@ export interface Task {
   projectId: string;
   /** Fractional ranking key for stable drag ordering within a column. */
   orderKey?: string;
+  /** Set after a successful workspace cleanup while the task remains in Done. */
+  workspaceCleanedAt?: string;
   /** Cloud-only: uid of the user who created the task. */
   createdBy?: string;
   /** Cloud-only. */

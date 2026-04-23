@@ -1,4 +1,6 @@
 import { Draggable } from '@hello-pangea/dnd';
+import { broom } from '@lucide/lab';
+import { Icon } from 'lucide-react';
 import { Task } from '../types';
 import AgentBadge from './AgentBadge';
 
@@ -13,12 +15,22 @@ interface Props {
   task: Task;
   index: number;
   onDelete: (id: string) => void;
+  onRequestCleanupTask?: (id: string) => void;
+  cleanupLoading?: boolean;
   onCardClick: (id: string) => void;
 }
 
-export default function TaskCard({ task, index, onDelete, onCardClick }: Props) {
+export default function TaskCard({
+  task,
+  index,
+  onDelete,
+  onRequestCleanupTask,
+  cleanupLoading = false,
+  onCardClick,
+}: Props) {
   const isNeedsInput = task.status === 'needs-input';
   const isDone = task.status === 'done';
+  const workspaceCleaned = Boolean(task.workspaceCleanedAt);
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -45,7 +57,7 @@ export default function TaskCard({ task, index, onDelete, onCardClick }: Props) 
             >
               <div className="flex items-start justify-between gap-2">
                 <p
-                  className={`text-[13px] font-medium leading-snug tracking-tight break-words ${
+                  className={`min-w-0 flex-1 text-[13px] font-medium leading-snug tracking-tight break-words ${
                     isDone ? 'text-zinc-500 line-through decoration-zinc-600' : 'text-zinc-200'
                   }`}
                 >
@@ -66,10 +78,50 @@ export default function TaskCard({ task, index, onDelete, onCardClick }: Props) 
               </div>
               <div className="mt-3 flex items-center justify-between gap-2">
                 <AgentBadge agent={task.agent} />
-                <span
-                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[task.status]}`}
-                  aria-hidden
-                />
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {isDone && onRequestCleanupTask ? (
+                    workspaceCleaned ? (
+                      <span
+                        className="-m-0.5 flex h-6 w-6 cursor-default items-center justify-center rounded text-zinc-600/45 opacity-50"
+                        title="task cleaned"
+                        aria-label="Task workspace already cleaned"
+                      >
+                        <Icon
+                          iconNode={broom}
+                          size={14}
+                          strokeWidth={1.75}
+                          className="text-zinc-600/70"
+                          aria-hidden
+                        />
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={cleanupLoading}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRequestCleanupTask(task.id);
+                        }}
+                        className="-m-0.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded text-zinc-500 transition hover:bg-white/[0.05] hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-35"
+                        aria-label="Clean up workspace for this task"
+                        title="Clean up workspace"
+                      >
+                        <Icon
+                          iconNode={broom}
+                          size={14}
+                          strokeWidth={1.75}
+                          className={cleanupLoading ? 'animate-pulse opacity-50' : ''}
+                          aria-hidden
+                        />
+                      </button>
+                    )
+                  ) : null}
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[task.status]}`}
+                    aria-hidden
+                  />
+                </div>
               </div>
             </div>
           </div>

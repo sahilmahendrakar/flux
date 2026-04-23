@@ -102,10 +102,14 @@ declare global {
         update: (
           id: string,
           patch: Partial<
-            Pick<Task, 'title' | 'status' | 'agent' | 'description' | 'orderKey'>
+            Pick<
+              Task,
+              'title' | 'status' | 'agent' | 'description' | 'orderKey' | 'workspaceCleanedAt'
+            >
           >,
         ) => Promise<Task>;
         delete: (id: string) => Promise<void>;
+        cleanupResources: (id: string) => Promise<{ errors: string[] }>;
         onChanged: (cb: () => void) => () => void;
       };
       sessions: {

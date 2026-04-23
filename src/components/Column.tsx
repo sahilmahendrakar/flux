@@ -9,6 +9,8 @@ interface Props {
   tasks: Task[];
   onNewTask?: () => void;
   onDeleteTask: (id: string) => void;
+  onRequestCleanupTask?: (id: string) => void;
+  cleanupLoadingTaskId?: string | null;
   onCardClick: (id: string) => void;
   emptyState?: ReactNode;
 }
@@ -19,6 +21,8 @@ export default function Column({
   tasks,
   onNewTask,
   onDeleteTask,
+  onRequestCleanupTask,
+  cleanupLoadingTaskId,
   onCardClick,
   emptyState,
 }: Props) {
@@ -77,6 +81,8 @@ export default function Column({
                 task={task}
                 index={index}
                 onDelete={onDeleteTask}
+                onRequestCleanupTask={onRequestCleanupTask}
+                cleanupLoading={cleanupLoadingTaskId === task.id}
                 onCardClick={onCardClick}
               />
             ))}

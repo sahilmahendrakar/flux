@@ -38,14 +38,11 @@ import {
   useAgentHeartbeat,
   useRunners,
 } from './renderer/runners/useRunners';
-import type { TaskProvider } from './renderer/tasks/TaskProvider';
+import type { TaskPatch, TaskProvider } from './renderer/tasks/TaskProvider';
 import { LocalTaskProvider } from './renderer/tasks/LocalTaskProvider';
 import { FirestoreTaskProvider } from './renderer/tasks/FirestoreTaskProvider';
 import { keyForInsert, sortColumn } from './renderer/tasks/orderKey';
 
-type TaskPatch = Partial<
-  Pick<Task, 'title' | 'status' | 'agent' | 'description' | 'orderKey'>
->;
 type ActiveProject = LocalProject | CloudProject;
 
 const UPDATE_DEBOUNCE_MS = 300;
@@ -90,6 +87,9 @@ export default function App() {
     }
   });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [cleanupConfirmTaskId, setCleanupConfirmTaskId] = useState<string | null>(null);
+  const [cleanupLoadingTaskId, setCleanupLoadingTaskId] = useState<string | null>(null);
+  const [cleanupError, setCleanupError] = useState<string | null>(null);
   const [planPanelOpen, setPlanPanelOpen] = useState(false);
   const [planPanelWidth, setPlanPanelWidth] = useState(DEFAULT_PLANNING_PANEL_WIDTH);
   const [docsSidebarExpanded, setDocsSidebarExpanded] = useState(false);
@@ -105,6 +105,8 @@ export default function App() {
   >(null);
   const [planningDocFileRevision, setPlanningDocFileRevision] = useState(0);
   const boardRowRef = useRef<HTMLDivElement>(null);
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
 
   const auth = useAuth();
   const uid = auth.user?.uid ?? null;
@@ -438,6 +440,9 @@ export default function App() {
       if (patch.status !== undefined) persistable.status = patch.status;
       if (patch.agent !== undefined) persistable.agent = patch.agent;
       if (patch.orderKey !== undefined) persistable.orderKey = patch.orderKey;
+      if (patch.workspaceCleanedAt !== undefined) {
+        persistable.workspaceCleanedAt = patch.workspaceCleanedAt;
+      }
       if (Object.keys(persistable).length === 0) return;
 
       const existing = pendingRef.current.get(id);
@@ -531,6 +536,19 @@ export default function App() {
     [provider, tasks],
   );
 
+  const stripLocalSessionStateForTask = useCallback((taskId: string) => {
+    const ids = sessionsRef.current
+      .filter((s) => s.taskId === taskId)
+      .map((s) => s.id);
+    setSessions((prev) => prev.filter((s) => s.taskId !== taskId));
+    setOpenTabIds((prev) => {
+      const next = new Set(prev);
+      for (const sid of ids) next.delete(sid);
+      return next;
+    });
+    setActiveTabId((prev) => (ids.includes(prev) ? 'board' : prev));
+  }, []);
+
   const handleDeleteTask = useCallback(
     async (id: string) => {
       if (!provider) return;
@@ -540,30 +558,75 @@ export default function App() {
         pendingRef.current.delete(id);
       }
       try {
+        const { errors } = await window.electronAPI.tasks.cleanupResources(id);
+        if (errors.length > 0) {
+          console.error('[tasks.cleanupResources] during task delete', errors);
+          setCleanupError(
+            `Workspace cleanup had issues (the task was still removed):\n${errors.join('\n')}`,
+          );
+        }
+        stripLocalSessionStateForTask(id);
         await provider.delete(id);
         setTasks((prev) => prev.filter((t) => t.id !== id));
         setSelectedTaskId((sid) => (sid === id ? null : sid));
-        const removed = sessions.find((s) => s.taskId === id);
-        if (removed) {
-          setSessions((prev) => prev.filter((s) => s.taskId !== id));
-          setOpenTabIds((prev) => {
-            if (!prev.has(removed.id)) return prev;
-            const next = new Set(prev);
-            next.delete(removed.id);
-            return next;
-          });
-          setActiveTabId((prev) => (prev === removed.id ? 'board' : prev));
-        }
       } catch (err) {
         console.error('[tasks.delete] failed', err);
+        setCleanupError(
+          err instanceof Error ? err.message : 'Could not delete task or clean up workspace.',
+        );
       }
     },
-    [provider, sessions],
+    [provider, stripLocalSessionStateForTask],
   );
+
+  const requestCleanupTask = useCallback(
+    (taskId: string) => {
+      const task = tasks.find((t) => t.id === taskId);
+      if (!task || task.status !== 'done' || task.workspaceCleanedAt) return;
+      setCleanupError(null);
+      setCleanupConfirmTaskId(taskId);
+    },
+    [tasks],
+  );
+
+  const cancelCleanupTask = useCallback(() => {
+    setCleanupConfirmTaskId(null);
+  }, []);
+
+  const confirmCleanupTask = useCallback(async () => {
+    const taskId = cleanupConfirmTaskId;
+    if (!taskId) return;
+    setCleanupConfirmTaskId(null);
+    setCleanupLoadingTaskId(taskId);
+    setCleanupError(null);
+    try {
+      const { errors } = await window.electronAPI.tasks.cleanupResources(taskId);
+      stripLocalSessionStateForTask(taskId);
+      if (errors.length > 0) {
+        setCleanupError(errors.join('\n'));
+      } else if (provider) {
+        try {
+          const updated = await provider.update(taskId, {
+            workspaceCleanedAt: new Date().toISOString(),
+          });
+          setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+        } catch (err) {
+          console.error('[tasks.update] workspaceCleanedAt failed', err);
+        }
+      }
+    } catch (err) {
+      setCleanupError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCleanupLoadingTaskId(null);
+    }
+  }, [cleanupConfirmTaskId, provider, stripLocalSessionStateForTask]);
 
   const handleProjectActivated = useCallback((p: ActiveProject) => {
     setProject(p);
     setSelectedTaskId(null);
+    setCleanupConfirmTaskId(null);
+    setCleanupLoadingTaskId(null);
+    setCleanupError(null);
     setPlanPanelOpen(false);
     setActiveTabId('board');
     setDocsSidebarExpanded(false);
@@ -578,6 +641,9 @@ export default function App() {
     setProject(null);
     setTasks([]);
     setSelectedTaskId(null);
+    setCleanupConfirmTaskId(null);
+    setCleanupLoadingTaskId(null);
+    setCleanupError(null);
     setPlanPanelOpen(false);
     setDocsSidebarExpanded(false);
     setPlanningDocFiles([]);
@@ -856,6 +922,14 @@ export default function App() {
     [deleteConfirmId, sessionItems],
   );
 
+  const cleanupConfirmTask = useMemo(
+    () =>
+      cleanupConfirmTaskId
+        ? tasks.find((t) => t.id === cleanupConfirmTaskId) ?? null
+        : null,
+    [cleanupConfirmTaskId, tasks],
+  );
+
   // Sort tasks per column for the board (orderKey-aware). Falls back to
   // createdAt/id for rows without a key.
   const sortedTasks = useMemo(() => {
@@ -919,6 +993,21 @@ export default function App() {
         />
       ) : null}
       <div className="app-window-no-drag flex min-h-0 flex-1 flex-col overflow-hidden">
+        {cleanupError ? (
+          <div
+            role="alert"
+            className="flex shrink-0 items-start gap-2 border-b border-amber-500/20 bg-amber-500/[0.08] px-4 py-2 text-[13px] text-amber-100/95"
+          >
+            <p className="min-w-0 flex-1 whitespace-pre-wrap leading-snug">{cleanupError}</p>
+            <button
+              type="button"
+              onClick={() => setCleanupError(null)}
+              className="shrink-0 rounded px-2 py-0.5 text-[12px] font-medium text-amber-200/90 hover:bg-amber-500/15"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
         <AppShell
           project={project}
           onClearProject={() => void handleClearProject()}
@@ -996,6 +1085,8 @@ export default function App() {
                       onDragEnd={handleDragEnd}
                       onCreateTask={handleCreateTask}
                       onDeleteTask={handleDeleteTask}
+                      onRequestCleanupTask={requestCleanupTask}
+                      cleanupLoadingTaskId={cleanupLoadingTaskId}
                       onCardClick={(id) => setSelectedTaskId(id)}
                       planPanelOpen={planPanelOpen}
                       onTogglePlanPanel={() => {
@@ -1098,6 +1189,21 @@ export default function App() {
           destructive
           onConfirm={() => void confirmDeleteWorkspace()}
           onCancel={cancelDeleteWorkspace}
+        />
+      ) : null}
+      {cleanupConfirmTask ? (
+        <ConfirmDialog
+          title="Clean up task workspace?"
+          description={`This tears down the agent workspace for "${cleanupConfirmTask.title}". The task stays in Done on the board.`}
+          bullets={[
+            'Stop any running agent session for this task',
+            'Close terminals opened in this workspace',
+            'Remove the git worktree from disk',
+          ]}
+          confirmLabel="Clean up"
+          destructive={false}
+          onConfirm={() => void confirmCleanupTask()}
+          onCancel={cancelCleanupTask}
         />
       ) : null}
     </div>
