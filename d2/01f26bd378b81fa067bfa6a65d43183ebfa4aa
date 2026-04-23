@@ -1,0 +1,29 @@
+README.md
+  c47f01b677219485 81-86
+src/main/agentSpawn.ts
+  c47f01b677219485 73
+src/main/ProjectStore.ts
+  c47f01b677219485 112,123-125,128-129,140
+src/main/McpServer.ts
+  c47f01b677219485 55-64,134-144,159-211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "d201f26bd378b81fa067bfa6a65d43183ebfa4aa",
+  "prompts": {
+    "c47f01b677219485": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3cb42505-4c75-4eef-9725-8432839e24a1",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 94,
+      "total_deletions": 4,
+      "accepted_lines": 94,
+      "overriden_lines": 0
+    }
+  }
+}
