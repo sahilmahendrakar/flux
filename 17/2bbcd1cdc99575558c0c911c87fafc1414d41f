@@ -1,0 +1,38 @@
+package.json
+  78185d0966775050 10
+.gitignore
+  78185d0966775050 93-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "172bbcd1cdc99575558c0c911c87fafc1414d41f",
+  "prompts": {
+    "78185d0966775050": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "dea82d66-a25f-4a22-9425-74ac230a4faf",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    },
+    "d4b40780e8271d5d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d2ca8b72-cd6d-478b-ae6c-91952b9c60bb",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 0,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
