@@ -7,7 +7,8 @@
 //     stdio: 'ignore',
 //   }).unref()
 //
-// Opens two servers in userDataPath:
+// Opens two Unix servers (short paths under os.tmpdir(), keyed by userData) or
+// Windows named pipes:
 //   - flux-daemon.rpc.sock    — request/response NDJSON
 //   - flux-daemon.stream.sock — server-push NDJSON (PTY output)
 //
@@ -23,12 +24,11 @@ import { DaemonCore } from './DaemonCore';
 import {
   DAEMON_LOG_FILE,
   DAEMON_PID_FILE,
-  DAEMON_RPC_SOCK,
-  DAEMON_STREAM_SOCK,
   NdjsonSplitter,
   PROTOCOL_VERSION,
   WIN_RPC_PIPE,
   WIN_STREAM_PIPE,
+  daemonUnixSocketPaths,
   encodeLine,
 } from './protocol';
 import type {
@@ -51,10 +51,19 @@ if (!userData) {
 const isWin = process.platform === 'win32';
 const pidPath = path.join(userData, DAEMON_PID_FILE);
 const logPath = path.join(userData, DAEMON_LOG_FILE);
-const rpcPath = isWin ? WIN_RPC_PIPE : path.join(userData, DAEMON_RPC_SOCK);
-const streamPath = isWin
-  ? WIN_STREAM_PIPE
-  : path.join(userData, DAEMON_STREAM_SOCK);
+let rpcPath: string;
+let streamPath: string;
+/** Non-null on Unix: directory created in main() before listen(). */
+let socketRuntimeDir: string | null = null;
+if (isWin) {
+  rpcPath = WIN_RPC_PIPE;
+  streamPath = WIN_STREAM_PIPE;
+} else {
+  const u = daemonUnixSocketPaths(userData);
+  rpcPath = u.rpcPath;
+  streamPath = u.streamPath;
+  socketRuntimeDir = u.runtimeDir;
+}
 
 function log(...parts: unknown[]): void {
   const line = `[${new Date().toISOString()}] ${parts
@@ -363,6 +372,10 @@ async function main(): Promise<void> {
     }
   } catch {
     // ignore
+  }
+
+  if (socketRuntimeDir) {
+    await fsp.mkdir(socketRuntimeDir, { recursive: true });
   }
 
   await cleanStaleSocket(rpcPath);

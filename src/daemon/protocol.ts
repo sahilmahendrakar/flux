@@ -8,6 +8,9 @@
 // fill the kernel buffer, which would otherwise queue RPC responses behind
 // megabytes of `cat bigfile.log`.
 
+import crypto from 'node:crypto';
+import os from 'node:os';
+import path from 'node:path';
 import type { Agent, PlanningSession, Session, Shell } from '../types';
 
 export const PROTOCOL_VERSION = 2;
@@ -21,6 +24,27 @@ export const DAEMON_LOG_FILE = 'flux-daemon.log';
 /** Windows named pipe paths. */
 export const WIN_RPC_PIPE = '\\\\.\\pipe\\flux-daemon-rpc';
 export const WIN_STREAM_PIPE = '\\\\.\\pipe\\flux-daemon-stream';
+
+/**
+ * Unix domain socket paths for the daemon must stay short: macOS `sun_path`
+ * is ~104 bytes, and Electron `userData` under Flux worktrees can exceed that.
+ * We place sockets under `os.tmpdir()` keyed by a hash of the resolved
+ * `userData` path so profiles stay isolated.
+ */
+export function daemonUnixSocketPaths(userData: string): {
+  runtimeDir: string;
+  rpcPath: string;
+  streamPath: string;
+} {
+  const resolved = path.resolve(userData);
+  const hash = crypto.createHash('sha256').update(resolved, 'utf8').digest('hex').slice(0, 16);
+  const runtimeDir = path.join(os.tmpdir(), `flux-daemon-${hash}`);
+  return {
+    runtimeDir,
+    rpcPath: path.join(runtimeDir, DAEMON_RPC_SOCK),
+    streamPath: path.join(runtimeDir, DAEMON_STREAM_SOCK),
+  };
+}
 
 /** First line either side writes on connect. Mismatched major version → close. */
 export interface Hello {

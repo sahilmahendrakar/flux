@@ -11,6 +11,7 @@ import type {
   Shell,
 } from '../types';
 import {
+  DAEMON_LOG_FILE,
   DAEMON_PID_FILE,
   DAEMON_RPC_SOCK,
   DAEMON_STREAM_SOCK,
@@ -18,6 +19,7 @@ import {
   PROTOCOL_VERSION,
   WIN_RPC_PIPE,
   WIN_STREAM_PIPE,
+  daemonUnixSocketPaths,
   encodeLine,
 } from '../daemon/protocol';
 import type {
@@ -87,19 +89,29 @@ export class DaemonClient {
   >();
   private connecting: Promise<void> | null = null;
 
+  /** Set when the last spawned daemon child exits (for timeout diagnostics). */
+  private lastSpawnExit: { code: number | null; signal: NodeJS.Signals | null } | null =
+    null;
+
   private readonly userData: string;
   private readonly rpcPath: string;
   private readonly streamPath: string;
   private readonly pidPath: string;
+  private readonly daemonLogPath: string;
 
   constructor() {
     this.userData = app.getPath('userData');
     const isWin = process.platform === 'win32';
-    this.rpcPath = isWin ? WIN_RPC_PIPE : path.join(this.userData, DAEMON_RPC_SOCK);
-    this.streamPath = isWin
-      ? WIN_STREAM_PIPE
-      : path.join(this.userData, DAEMON_STREAM_SOCK);
+    if (isWin) {
+      this.rpcPath = WIN_RPC_PIPE;
+      this.streamPath = WIN_STREAM_PIPE;
+    } else {
+      const { rpcPath, streamPath } = daemonUnixSocketPaths(this.userData);
+      this.rpcPath = rpcPath;
+      this.streamPath = streamPath;
+    }
     this.pidPath = path.join(this.userData, DAEMON_PID_FILE);
+    this.daemonLogPath = path.join(this.userData, DAEMON_LOG_FILE);
   }
 
   async ensureRunning(): Promise<void> {
@@ -146,8 +158,13 @@ export class DaemonClient {
       }
       await sleep(100);
     }
+    const spawnHint =
+      this.lastSpawnExit !== null
+        ? `daemon child exit: code=${this.lastSpawnExit.code} signal=${this.lastSpawnExit.signal ?? 'none'}`
+        : 'daemon child exit: (none observed yet)';
     throw new Error(
-      `flux-daemon did not become reachable within ${SPAWN_CONNECT_TIMEOUT_MS}ms: ${String(lastErr)}`,
+      `flux-daemon did not become reachable within ${SPAWN_CONNECT_TIMEOUT_MS}ms ` +
+        `(log=${this.daemonLogPath}, rpc=${this.rpcPath}). ${spawnHint}. Last error: ${String(lastErr)}`,
     );
   }
 
@@ -163,7 +180,16 @@ export class DaemonClient {
     if (!pidAlive) return false;
 
     try {
-      if (!(await this.connectBoth())) return false;
+      let connected = await this.connectBoth();
+      if (!connected) {
+        // Legacy daemons bound sockets next to userData (pre short-path fix).
+        const legacyRpc = path.join(this.userData, DAEMON_RPC_SOCK);
+        const legacyStream = path.join(this.userData, DAEMON_STREAM_SOCK);
+        if ((await pathExists(legacyRpc)) && (await pathExists(legacyStream))) {
+          connected = await this.connectBoth({ rpc: legacyRpc, stream: legacyStream });
+        }
+        if (!connected) return false;
+      }
       const pong = (await this.request<PingResult>('ping')) as PingResult;
       if (pong.protocolVersion !== PROTOCOL_VERSION) {
         this.tearDownSockets();
@@ -202,6 +228,7 @@ export class DaemonClient {
     // process, which would otherwise try to reinitialize Chromium state.
     delete env.ELECTRON_NO_ATTACH_CONSOLE;
 
+    this.lastSpawnExit = null;
     const child = spawn(process.execPath, [daemonScript], {
       env,
       detached: true,
@@ -211,15 +238,29 @@ export class DaemonClient {
     child.on('error', (err) => {
       console.error('[DaemonClient] spawn error', err);
     });
+    child.on('exit', (code, signal) => {
+      this.lastSpawnExit = { code, signal };
+      console.error('[DaemonClient] flux-daemon child exited', {
+        code,
+        signal,
+        log: this.daemonLogPath,
+        rpc: this.rpcPath,
+      });
+    });
     child.unref();
   }
 
   // ---------------------------------------------------------------- sockets
 
-  private async connectBoth(): Promise<boolean> {
-    const rpc = await this.connectSocket(this.rpcPath);
+  private async connectBoth(override?: {
+    rpc: string;
+    stream: string;
+  }): Promise<boolean> {
+    const rpcPath = override?.rpc ?? this.rpcPath;
+    const streamPath = override?.stream ?? this.streamPath;
+    const rpc = await this.connectSocket(rpcPath);
     if (!rpc) return false;
-    const stream = await this.connectSocket(this.streamPath);
+    const stream = await this.connectSocket(streamPath);
     if (!stream) {
       rpc.destroy();
       return false;
