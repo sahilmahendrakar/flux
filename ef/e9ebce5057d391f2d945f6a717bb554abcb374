@@ -1,0 +1,27 @@
+src/main/DaemonClient.ts
+  6a5e0402c5ddcce4 14,22,92-95,100,105-112,114,161-164,166-167,183-192,231,241-249,255-261,263
+src/daemon/protocol.ts
+  6a5e0402c5ddcce4 11-13,28-48
+src/daemon/daemon.ts
+  6a5e0402c5ddcce4 10-11,31,54-66,377-380
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "efe9ebce5057d391f2d945f6a717bb554abcb374",
+  "prompts": {
+    "6a5e0402c5ddcce4": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "40458b52-43f5-4bbb-beb1-e0e16f5aaf07",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 103,
+      "total_deletions": 25,
+      "accepted_lines": 95,
+      "overriden_lines": 0
+    }
+  }
+}
