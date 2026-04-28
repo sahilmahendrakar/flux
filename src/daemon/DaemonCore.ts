@@ -6,9 +6,11 @@ import type {
   Shell,
 } from '../types';
 import type {
+  AttachResult,
   CreateSessionParams,
   CreateSessionResult,
   CreateShellParams,
+  PlanningAttachResult,
   StartPlanningParams,
   StartPlanningResult,
   StreamFrame,
@@ -120,7 +122,7 @@ export class DaemonCore {
     return [...this.sessions.values()].map((e) => ({ ...e.session }));
   }
 
-  attachSession(id: string): { replay: string; cols: number; rows: number } | null {
+  attachSession(id: string): AttachResult | null {
     const entry = this.sessions.get(id);
     if (!entry) return null;
     return entry.runtime.snapshot();
@@ -197,7 +199,7 @@ export class DaemonCore {
     return sessionId ? all.filter((s) => s.sessionId === sessionId) : all;
   }
 
-  attachShell(id: string): { replay: string; cols: number; rows: number } | null {
+  attachShell(id: string): AttachResult | null {
     const entry = this.shells.get(id);
     if (!entry) return null;
     return entry.runtime.snapshot();
@@ -303,9 +305,7 @@ export class DaemonCore {
     return entry ? { ...entry.session } : null;
   }
 
-  attachPlanning(id: string):
-    | { replay: string; cols: number; rows: number; session: PlanningSession }
-    | null {
+  attachPlanning(id: string): PlanningAttachResult | null {
     const entry = this.planning.get(id);
     if (!entry) return null;
     return {

@@ -1,6 +1,7 @@
 import * as pty from 'node-pty';
 import type { IPty } from 'node-pty';
 import { Terminal as HeadlessTerminal } from '@xterm/headless';
+import type { AttachResult } from './protocol';
 
 const DEFAULT_REPLAY_BYTES = 256 * 1024;
 
@@ -26,10 +27,9 @@ export interface SessionRuntimeCallbacks {
  * free-form shells, and the planning PTY — the only difference between
  * them lives in the registry at the Daemon layer.
  *
- * The replay buffer is what a newly-attached client receives on
- * attach(): the daemon writes `{replay}` into the RPC response and
- * immediately starts streaming new chunks on the stream socket, so the
- * renderer can paint a prefix snapshot and then continue live.
+ * Attach RPC returns `AttachResult`: legacy `replay` plus optional
+ * `snapshot` (serialized headless state) once the daemon implements it.
+ * Live bytes continue on the stream socket after the RPC response.
  */
 export class SessionRuntime {
   readonly pty: IPty;
@@ -94,8 +94,8 @@ export class SessionRuntime {
     }
   }
 
-  /** Snapshot of the replay buffer for a newly-attached client. */
-  snapshot(): { replay: string; cols: number; rows: number } {
+  /** Attach payload: replay buffer today; optional `snapshot` added in SessionRuntime later. */
+  snapshot(): AttachResult {
     return {
       replay: this.replay.join(''),
       cols: this.cols,

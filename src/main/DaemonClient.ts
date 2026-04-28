@@ -21,19 +21,18 @@ import {
   WIN_STREAM_PIPE,
   daemonUnixSocketPaths,
   encodeLine,
-} from '../daemon/protocol';
-import type {
-  AttachResult,
-  CreateSessionParams,
-  CreateSessionResult,
-  CreateShellParams,
-  Hello,
-  PingResult,
-  RpcRequest,
-  RpcResponse,
-  StartPlanningParams,
-  StartPlanningResult,
-  StreamFrame,
+  type AttachResult,
+  type CreateSessionParams,
+  type CreateSessionResult,
+  type CreateShellParams,
+  type Hello,
+  type PingResult,
+  type PlanningAttachResult,
+  type RpcRequest,
+  type RpcResponse,
+  type StartPlanningParams,
+  type StartPlanningResult,
+  type StreamFrame,
 } from '../daemon/protocol';
 
 const HANDSHAKE_TIMEOUT_MS = 3000;
@@ -581,14 +580,9 @@ export class DaemonClient {
     return this.request<PlanningSession | null>('getPlanning', { id });
   }
 
-  async attachPlanning(
-    id: string,
-  ): Promise<(AttachResult & { session: PlanningSession }) | null> {
+  async attachPlanning(id: string): Promise<PlanningAttachResult | null> {
     await this.ensureRunning();
-    return this.request<(AttachResult & { session: PlanningSession }) | null>(
-      'attachPlanning',
-      { id },
-    );
+    return this.request<PlanningAttachResult | null>('attachPlanning', { id });
   }
 
   writePlanning(id: string, data: string): void {

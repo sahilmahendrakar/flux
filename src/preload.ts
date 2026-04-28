@@ -11,12 +11,9 @@ import type {
   Shell,
   Task,
 } from './types';
+import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
 
 type PlanningStartResult = PlanningSession | { error: string; message?: string };
-
-/** Replay snapshot returned on attach: prefix of terminal output + geometry. */
-type AttachResult = { replay: string; cols: number; rows: number };
-type PlanningAttachResult = AttachResult & { session: PlanningSession };
 
 type DirPickResult =
   | { rootPath: string }
@@ -159,7 +156,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     get: (taskId: string) =>
       ipcRenderer.invoke('session:get', taskId) as Promise<Session | null>,
     getAll: () => ipcRenderer.invoke('session:getAll') as Promise<Session[]>,
-    /** Warm-reattach: get the daemon's replay buffer for this session. */
+    /** Warm-reattach: daemon attach payload (`replay` and optional `snapshot`). */
     attach: (sessionId: string) =>
       ipcRenderer.invoke('session:attach', sessionId) as Promise<AttachResult | null>,
     write: (sessionId: string, data: string) =>

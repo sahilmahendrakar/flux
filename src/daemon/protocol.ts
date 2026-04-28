@@ -13,7 +13,18 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Agent, PlanningSession, Session, Shell } from '../types';
 
-export const PROTOCOL_VERSION = 2;
+/**
+ * Wire protocol generation for the main ↔ daemon NDJSON handshake and RPC.
+ * Main and daemon must match exactly; a running v2 daemon is discarded when
+ * the app upgrades to v3 (spawn fresh).
+ *
+ * - **v2** — Stream frames + attach `{ replay, cols, rows }` only.
+ * - **v3** — Attach payloads may include optional `snapshot` (`TerminalSnapshot`).
+ *   Consumers should prefer `snapshot` for warm-reattach when defined; `replay`
+ *   remains for transition/debug. The daemon may omit `snapshot` until
+ *   `SessionRuntime` emits serialized headless state.
+ */
+export const PROTOCOL_VERSION = 3;
 
 /** Unix socket / named pipe names inside Electron userData. */
 export const DAEMON_PID_FILE = 'flux-daemon.pid';
@@ -93,11 +104,71 @@ export type CreateSessionResult =
   | Session
   | { error: 'AGENT_NOT_FOUND' | 'INVALID_PARAMS'; message: string };
 
-export interface AttachResult {
-  replay: string;
+/**
+ * DECSET-style flags the daemon tracks from PTY output so the renderer can
+ * replay `rehydrateSequences` after applying `snapshotAnsi`. Names follow
+ * common xterm/VT documentation (CSI ?Pm h / l).
+ */
+export interface TerminalModes {
+  /** DECCKM — application cursor keys (`CSI ?1`) */
+  applicationCursorKeys: boolean;
+  /** DECOM — origin mode (`CSI ?6`) */
+  originMode: boolean;
+  /** DECAWM — autowrap (`CSI ?7`) */
+  autoWrap: boolean;
+  /** DECTCEM — cursor visible (`CSI ?25`) */
+  cursorVisible: boolean;
+  /** Alternate screen buffer (`CSI ?47` / `CSI ?1049`) */
+  alternateScreen: boolean;
+  /** X10 mouse (`CSI ?9`) */
+  mouseX10: boolean;
+  /** VT200 mouse — press/release (`CSI ?1000`) */
+  mouseVT200: boolean;
+  /** Hilite mouse (`CSI ?1001`) */
+  mouseHighlight: boolean;
+  /** Cell motion tracking (`CSI ?1002`) */
+  mouseCellMotion: boolean;
+  /** All motion tracking (`CSI ?1003`) */
+  mouseAllMotion: boolean;
+  /** UTF-8 mouse encoding (`CSI ?1005`) */
+  mouseUTF8: boolean;
+  /** SGR mouse extended coordinates (`CSI ?1006`) */
+  mouseSGR: boolean;
+  /** Focus in/out events (`CSI ?1004`) */
+  focusReporting: boolean;
+  /** Bracketed paste (`CSI ?2004`) */
+  bracketedPaste: boolean;
+}
+
+/**
+ * Serialized headless xterm state for warm-reattach (see planning doc).
+ * Filled by the daemon once `SessionRuntime` wires `@xterm/addon-serialize`;
+ * geometry must match `cols` / `rows` on the attach response.
+ */
+export interface TerminalSnapshot {
+  /** Screen state from SerializeAddon (or equivalent), safe to write into a fresh terminal. */
+  snapshotAnsi: string;
+  /** Mode re-entry sequences not covered by `snapshotAnsi` alone. */
+  rehydrateSequences: string;
+  modes: TerminalModes;
   cols: number;
   rows: number;
 }
+
+/** Warm-reattach payload for agent sessions and shell panes. */
+export interface AttachResult {
+  /**
+   * Bounded raw PTY prefix (legacy warm-reattach). Still populated for
+   * compatibility; prefer `snapshot` when the daemon sends it.
+   */
+  replay: string;
+  cols: number;
+  rows: number;
+  snapshot?: TerminalSnapshot;
+}
+
+/** Planning attach extends the session/shell attach shape with session metadata. */
+export type PlanningAttachResult = AttachResult & { session: PlanningSession };
 
 export interface CreateShellParams {
   sessionId: string;

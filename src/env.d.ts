@@ -11,6 +11,7 @@ import type {
   ActiveProjectKey,
   ProjectTabState,
 } from './types';
+import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
 
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY?: string;
@@ -36,10 +37,6 @@ type ActivateCloudResult =
   | { ok: true }
   | { error: 'NOT_GIT_REPO' }
   | null;
-
-/** Replay snapshot returned by the daemon on attach. */
-type AttachResult = { replay: string; cols: number; rows: number };
-type PlanningAttachResult = AttachResult & { session: PlanningSession };
 
 declare global {
   interface Window {
