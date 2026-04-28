@@ -1,0 +1,31 @@
+src/daemon/SessionRuntime.ts
+  04bf42ef954311d6 3,5-6,9,40-42,73,76-77,105-129,131-140
+src/daemon/daemon.ts
+  04bf42ef954311d6 130,148,174,210,272-273,277-321
+src/daemon/terminalSnapshot.ts
+  04bf42ef954311d6 1-93
+src/daemon/terminalSnapshot.test.ts
+  04bf42ef954311d6 1-85
+src/daemon/DaemonCore.ts
+  04bf42ef954311d6 125,202,308,311,313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "dd16d389dce45ec83192748d96c26cb359fe7bd6",
+  "prompts": {
+    "04bf42ef954311d6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1596266d-70d3-4a61-8a86-81a7f24449bc",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 281,
+      "total_deletions": 57,
+      "accepted_lines": 279,
+      "overriden_lines": 0
+    }
+  }
+}
