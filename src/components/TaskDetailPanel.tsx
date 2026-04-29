@@ -26,7 +26,7 @@ import {
 } from '../taskDependencies';
 import AgentModelPicker from './AgentModelPicker';
 import { AGENT_CHIP_STYLES } from './AgentBadge';
-import { applyAttachResultToTerminal, sessionAttachCache } from '../terminal/warmAttach';
+import { applyAttachResultToTerminal, getSessionAttachShared } from '../terminal/warmAttach';
 import Terminal, { type TerminalHandle } from './Terminal';
 
 interface TaskDetailPanelProps {
@@ -255,9 +255,9 @@ export default function TaskDetailPanel({
     if (!session) return;
     const id = session.id;
 
-    // Match SessionTerminalView.AgentPane: share attach cache and snapshot
-    // restore so StrictMode and tab/detail switches do not double-apply or
-    // re-replay raw PTY buffers when a serialized snapshot is available.
+    // Match SessionTerminalView.AgentPane: in-flight attach coalescing and
+    // snapshot restore so StrictMode does not double-apply or re-replay
+    // raw PTY buffers when a serialized snapshot is available.
     let streamReady = false;
     const earlyBuffer: string[] = [];
     let cancelled = false;
@@ -280,25 +280,18 @@ export default function TaskDetailPanel({
       }
     };
 
-    const cached = sessionAttachCache.get(id);
-    if (cached) {
-      applyAttachResultToTerminal(terminalRef.current, cached, markStreamReady);
-    } else {
-      void (async () => {
-        let result: Awaited<ReturnType<typeof window.electronAPI.sessions.attach>> =
-          null;
+    void (async () => {
+      const result = await getSessionAttachShared(id, async () => {
         try {
-          result = await window.electronAPI.sessions.attach(id);
+          return await window.electronAPI.sessions.attach(id);
         } catch (err) {
           console.error('[TaskDetailPanel] attach failed', err);
+          return null;
         }
-        if (result) {
-          sessionAttachCache.set(id, result);
-        }
-        if (cancelled) return;
-        applyAttachResultToTerminal(terminalRef.current, result, markStreamReady);
-      })();
-    }
+      });
+      if (cancelled) return;
+      applyAttachResultToTerminal(terminalRef.current, result, markStreamReady);
+    })();
 
     return () => {
       cancelled = true;

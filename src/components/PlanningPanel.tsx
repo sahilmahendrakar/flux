@@ -8,8 +8,8 @@ import { ExternalLink } from 'lucide-react';
 import { AGENTS, type Agent, type PlanningSession, type Project } from '../types';
 import {
   applyAttachResultToTerminal,
+  getPlanningAttachShared,
   invalidatePlanningAttachCache,
-  planningAttachCache,
 } from '../terminal/warmAttach';
 import Terminal, { type TerminalHandle } from './Terminal';
 
@@ -150,24 +150,18 @@ export function PlanningPanel({
       }
     };
 
-    const cached = planningAttachCache.get(id);
-    if (cached) {
-      applyAttachResultToTerminal(terminalRef.current, cached, markStreamReady);
-    } else {
-      void (async () => {
-        let result: Awaited<ReturnType<typeof planningApi.attach>> = null;
+    void (async () => {
+      const result = await getPlanningAttachShared(id, async () => {
         try {
-          result = await planningApi.attach(id);
+          return await planningApi.attach(id);
         } catch (err) {
           console.error('[PlanningPanel] attach failed', err);
+          return null;
         }
-        if (result) {
-          planningAttachCache.set(id, result);
-        }
-        if (cancelled) return;
-        applyAttachResultToTerminal(terminalRef.current, result, markStreamReady);
-      })();
-    }
+      });
+      if (cancelled) return;
+      applyAttachResultToTerminal(terminalRef.current, result, markStreamReady);
+    })();
 
     return () => {
       cancelled = true;

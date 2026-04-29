@@ -2,24 +2,66 @@ import type { AttachResult } from '../daemon/protocol';
 import type { TerminalHandle } from '../components/Terminal';
 
 /**
- * IPC attach result caches. Module-scoped so React 18 dev StrictMode
- * remounts do not issue duplicate `attach` RPCs when a logical consumer
- * mounts again before the in-flight call resolves.
+ * In-flight attach promise maps. Module-scoped so React 18 dev StrictMode
+ * double mounts coalesce to one `attach` RPC and do not double-apply a
+ * payload. Entries are evicted in `finally` when the promise settles, so
+ * a later remount (after the daemon has advanced) always issues a new attach
+ * and gets a fresh snapshot.
  */
-export const sessionAttachCache = new Map<string, AttachResult>();
-export const shellAttachCache = new Map<string, AttachResult>();
-export const planningAttachCache = new Map<string, AttachResult>();
+const sessionAttachInflight = new Map<string, Promise<AttachResult | null>>();
+const shellAttachInflight = new Map<string, Promise<AttachResult | null>>();
+const planningAttachInflight = new Map<string, Promise<AttachResult | null>>();
+
+function getSharedInflight(
+  map: Map<string, Promise<AttachResult | null>>,
+  id: string,
+  run: () => Promise<AttachResult | null>,
+): Promise<AttachResult | null> {
+  const existing = map.get(id);
+  if (existing) return existing;
+  const p = (async () => {
+    try {
+      return await run();
+    } finally {
+      map.delete(id);
+    }
+  })();
+  map.set(id, p);
+  return p;
+}
+
+/** Deduplicate concurrent session attach RPCs for the same id; do not cache completed results. */
+export function getSessionAttachShared(
+  id: string,
+  run: () => Promise<AttachResult | null>,
+): Promise<AttachResult | null> {
+  return getSharedInflight(sessionAttachInflight, id, run);
+}
+
+export function getShellAttachShared(
+  id: string,
+  run: () => Promise<AttachResult | null>,
+): Promise<AttachResult | null> {
+  return getSharedInflight(shellAttachInflight, id, run);
+}
+
+export function getPlanningAttachShared(
+  id: string,
+  run: () => Promise<AttachResult | null>,
+): Promise<AttachResult | null> {
+  return getSharedInflight(planningAttachInflight, id, run);
+}
 
 export function invalidateSessionAttachCache(id: string): void {
-  sessionAttachCache.delete(id);
+  sessionAttachInflight.delete(id);
 }
 
 export function invalidateShellAttachCache(id: string): void {
-  shellAttachCache.delete(id);
+  shellAttachInflight.delete(id);
 }
 
 export function invalidatePlanningAttachCache(id: string): void {
-  planningAttachCache.delete(id);
+  planningAttachInflight.delete(id);
 }
 
 /**

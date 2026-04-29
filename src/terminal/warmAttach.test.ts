@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { AttachResult, TerminalModes } from '../daemon/protocol';
-import { applyAttachResultToTerminal } from './warmAttach';
+import {
+  applyAttachResultToTerminal,
+  getPlanningAttachShared,
+  getSessionAttachShared,
+  getShellAttachShared,
+} from './warmAttach';
 import type { TerminalHandle } from '../components/Terminal';
 
 const zeroModes: TerminalModes = {
@@ -76,3 +81,75 @@ describe('applyAttachResultToTerminal', () => {
     expect(writes).toEqual([]);
   });
 });
+
+const minimalAttach: AttachResult = { replay: '', cols: 80, rows: 24 };
+
+describe('getSessionAttachShared', () => {
+  it('dedupes concurrent callers to one in-flight run()', async () => {
+    const runA = vi.fn();
+    const runB = vi.fn();
+    const deferred = new Deferred<AttachResult | null>();
+    runA.mockReturnValueOnce(deferred.promise);
+    const p1 = getSessionAttachShared('s1', () => runA());
+    const p2 = getSessionAttachShared('s1', () => runB());
+    expect(runA).toHaveBeenCalledTimes(1);
+    expect(runB).not.toHaveBeenCalled();
+    deferred.resolve(minimalAttach);
+    const [a, b] = await Promise.all([p1, p2]);
+    expect(a).toBe(minimalAttach);
+    expect(b).toBe(minimalAttach);
+  });
+
+  it('issues a new attach after the previous in-flight run settles', async () => {
+    const run = vi.fn();
+    run.mockResolvedValue(minimalAttach);
+    await getSessionAttachShared('s1', () => run());
+    await getSessionAttachShared('s1', () => run());
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it('issues separate attaches for different ids in parallel', async () => {
+    const run = vi.fn();
+    const d1 = new Deferred<AttachResult | null>();
+    const d2 = new Deferred<AttachResult | null>();
+    run
+      .mockReturnValueOnce(d1.promise)
+      .mockReturnValueOnce(d2.promise);
+    const p1 = getSessionAttachShared('a', () => run());
+    const p2 = getSessionAttachShared('b', () => run());
+    d1.resolve(minimalAttach);
+    d2.resolve(minimalAttach);
+    await Promise.all([p1, p2]);
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('getShellAttachShared and getPlanningAttachShared', () => {
+  it('use independent maps (same id does not cross)', async () => {
+    const shellRun = vi.fn();
+    const planRun = vi.fn();
+    const d1 = new Deferred<AttachResult | null>();
+    const d2 = new Deferred<AttachResult | null>();
+    shellRun.mockReturnValueOnce(d1.promise);
+    planRun.mockReturnValueOnce(d2.promise);
+    const ps = getShellAttachShared('x', () => shellRun());
+    const pp = getPlanningAttachShared('x', () => planRun());
+    d1.resolve(minimalAttach);
+    d2.resolve(minimalAttach);
+    await Promise.all([ps, pp]);
+    expect(shellRun).toHaveBeenCalledTimes(1);
+    expect(planRun).toHaveBeenCalledTimes(1);
+  });
+});
+
+class Deferred<T> {
+  promise: Promise<T>;
+  resolve!: (v: T) => void;
+  reject!: (e: unknown) => void;
+  constructor() {
+    this.promise = new Promise((res, rej) => {
+      this.resolve = res;
+      this.reject = rej;
+    });
+  }
+}

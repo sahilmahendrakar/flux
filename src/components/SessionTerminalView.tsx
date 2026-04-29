@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session, Shell } from '../types';
 import {
   applyAttachResultToTerminal,
-  sessionAttachCache,
-  shellAttachCache,
+  getSessionAttachShared,
+  getShellAttachShared,
+  invalidateSessionAttachCache,
+  invalidateShellAttachCache,
 } from '../terminal/warmAttach';
 import Terminal, { type TerminalHandle } from './Terminal';
 
-export { invalidateSessionAttachCache, invalidateShellAttachCache } from '../terminal/warmAttach';
+export { invalidateSessionAttachCache, invalidateShellAttachCache };
 
 function BotIcon({ className }: { className?: string }) {
   return (
@@ -83,25 +85,18 @@ function AgentPane({ session, visible }: { session: Session; visible: boolean })
       }
     };
 
-    const cached = sessionAttachCache.get(id);
-    if (cached) {
-      applyAttachResultToTerminal(terminalRef.current, cached, markStreamReady);
-    } else {
-      void (async () => {
-        let result: Awaited<ReturnType<typeof window.electronAPI.sessions.attach>> =
-          null;
+    void (async () => {
+      const result = await getSessionAttachShared(id, async () => {
         try {
-          result = await window.electronAPI.sessions.attach(id);
+          return await window.electronAPI.sessions.attach(id);
         } catch (err) {
           console.error('[AgentPane] attach failed', err);
+          return null;
         }
-        if (result) {
-          sessionAttachCache.set(id, result);
-        }
-        if (cancelled) return;
-        applyAttachResultToTerminal(terminalRef.current, result, markStreamReady);
-      })();
-    }
+      });
+      if (cancelled) return;
+      applyAttachResultToTerminal(terminalRef.current, result, markStreamReady);
+    })();
 
     return () => {
       cancelled = true;
@@ -170,24 +165,18 @@ function ShellPane({ shell, visible }: { shell: Shell; visible: boolean }) {
       }
     };
 
-    const cached = shellAttachCache.get(id);
-    if (cached) {
-      applyAttachResultToTerminal(terminalRef.current, cached, markStreamReady);
-    } else {
-      void (async () => {
-        let result: Awaited<ReturnType<typeof window.electronAPI.shells.attach>> = null;
+    void (async () => {
+      const result = await getShellAttachShared(id, async () => {
         try {
-          result = await window.electronAPI.shells.attach(id);
+          return await window.electronAPI.shells.attach(id);
         } catch (err) {
           console.error('[ShellPane] attach failed', err);
+          return null;
         }
-        if (result) {
-          shellAttachCache.set(id, result);
-        }
-        if (cancelled) return;
-        applyAttachResultToTerminal(terminalRef.current, result, markStreamReady);
-      })();
-    }
+      });
+      if (cancelled) return;
+      applyAttachResultToTerminal(terminalRef.current, result, markStreamReady);
+    })();
 
     return () => {
       cancelled = true;
