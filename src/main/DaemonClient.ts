@@ -488,6 +488,11 @@ export class DaemonClient {
     return this.request<Session[]>('listSessions');
   }
 
+  /**
+   * Full `AttachResult` from the daemon (legacy `replay` + optional v3
+   * `snapshot`). The RPC/IPC layers pass the object through without
+   * stripping fields; renderer may prefer `snapshot` when present.
+   */
   async attachSession(id: string): Promise<AttachResult | null> {
     await this.ensureRunning();
     return this.request<AttachResult | null>('attachSession', { id });
@@ -527,6 +532,7 @@ export class DaemonClient {
     return this.request<Shell[]>('listShells', { sessionId });
   }
 
+  /** See {@link attachSession} — same attach payload shape. */
   async attachShell(id: string): Promise<AttachResult | null> {
     await this.ensureRunning();
     return this.request<AttachResult | null>('attachShell', { id });
@@ -580,6 +586,7 @@ export class DaemonClient {
     return this.request<PlanningSession | null>('getPlanning', { id });
   }
 
+  /** Attach for planning PTYs: `AttachResult` fields plus `session` metadata. */
   async attachPlanning(id: string): Promise<PlanningAttachResult | null> {
     await this.ensureRunning();
     return this.request<PlanningAttachResult | null>('attachPlanning', { id });

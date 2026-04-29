@@ -1,19 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import type { AttachResult } from '../daemon/protocol';
 import type { Session, Shell } from '../types';
 import Terminal, { type TerminalHandle } from './Terminal';
 
-// Session / shell replay snapshots from the daemon. Module-level so that
-// React 18 StrictMode's dev-only double-mount doesn't double-call attach
-// on the daemon RPC. Superset ran into this exact pattern — see the
-// "React StrictMode Double-Mounts Are Real" note in their blog post.
-const sessionAttachCache = new Map<
-  string,
-  { replay: string; cols: number; rows: number }
->();
-const shellAttachCache = new Map<
-  string,
-  { replay: string; cols: number; rows: number }
->();
+// Session / shell warm-reattach payloads from the daemon (`replay` + optional
+// `snapshot`). Module-level so React 18 StrictMode's dev-only double-mount
+// does not double-call attach on the daemon RPC.
+const sessionAttachCache = new Map<string, AttachResult>();
+const shellAttachCache = new Map<string, AttachResult>();
 
 export function invalidateSessionAttachCache(id: string): void {
   sessionAttachCache.delete(id);

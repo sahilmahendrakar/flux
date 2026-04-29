@@ -1,5 +1,5 @@
-import type { Terminal as XtermTerminal } from '@xterm/xterm';
 import { SerializeAddon } from '@xterm/addon-serialize';
+import type { Terminal } from '@xterm/headless';
 import type { TerminalModes } from './protocol';
 
 /** Narrow view of xterm internals used only for snapshot metadata. */
@@ -17,7 +17,7 @@ interface XtermCore {
   coreMouseService: CoreMouseService;
 }
 
-function getCore(term: XtermTerminal): XtermCore {
+function getCore(term: Terminal): XtermCore {
   return (term as unknown as { _core: XtermCore })._core;
 }
 
@@ -25,7 +25,7 @@ function getCore(term: XtermTerminal): XtermCore {
  * Maps the live headless xterm into the wire `TerminalModes` contract.
  * Mouse highlight (CSI ?1001) is not surfaced separately by xterm.js v6.
  */
-export function readTerminalModes(terminal: XtermTerminal): TerminalModes {
+export function readTerminalModes(terminal: Terminal): TerminalModes {
   const m = terminal.modes;
   const core = getCore(terminal);
   const mouseProto = core.coreMouseService.activeProtocol;
@@ -81,7 +81,7 @@ export function buildRehydrateSequences(modes: TerminalModes): string {
 }
 
 export function captureSerializedSnapshot(
-  terminal: XtermTerminal,
+  terminal: Terminal,
   serializeAddon: InstanceType<typeof SerializeAddon>,
   scrollback: number,
 ): { snapshotAnsi: string; modes: TerminalModes } {
