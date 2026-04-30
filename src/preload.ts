@@ -11,12 +11,9 @@ import type {
   Shell,
   Task,
 } from './types';
+import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
 
 type PlanningStartResult = PlanningSession | { error: string; message?: string };
-
-/** Replay snapshot returned on attach: prefix of terminal output + geometry. */
-type AttachResult = { replay: string; cols: number; rows: number };
-type PlanningAttachResult = AttachResult & { session: PlanningSession };
 
 type DirPickResult =
   | { rootPath: string }
@@ -159,16 +156,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
     get: (taskId: string) =>
       ipcRenderer.invoke('session:get', taskId) as Promise<Session | null>,
     getAll: () => ipcRenderer.invoke('session:getAll') as Promise<Session[]>,
-    /** Warm-reattach: get the daemon's replay buffer for this session. */
+    /** Warm-reattach: daemon attach payload (`replay` and optional `snapshot`). */
     attach: (sessionId: string) =>
       ipcRenderer.invoke('session:attach', sessionId) as Promise<AttachResult | null>,
     write: (sessionId: string, data: string) =>
       ipcRenderer.send('session:write', sessionId, data),
     resize: (sessionId: string, cols: number, rows: number) =>
       ipcRenderer.send('session:resize', sessionId, cols, rows),
-    onData: (sessionId: string, cb: (data: string) => void) => {
+    onData: (
+      sessionId: string,
+      cb: (data: string, streamSeq?: number) => void,
+    ) => {
       const channel = `session:data:${sessionId}`;
-      ipcRenderer.on(channel, (_event, data: string) => cb(data));
+      const handler = (
+        _e: unknown,
+        arg: string | { data: string; seq?: number },
+      ) => {
+        if (typeof arg === 'string') cb(arg);
+        else cb(arg.data, arg.seq);
+      };
+      ipcRenderer.on(channel, handler);
       return () => ipcRenderer.removeAllListeners(channel);
     },
     onExit: (cb: (session: Session) => void) => {
@@ -189,9 +196,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.send('shell:write', shellId, data),
     resize: (shellId: string, cols: number, rows: number) =>
       ipcRenderer.send('shell:resize', shellId, cols, rows),
-    onData: (shellId: string, cb: (data: string) => void) => {
+    onData: (shellId: string, cb: (data: string, streamSeq?: number) => void) => {
       const channel = `shell:data:${shellId}`;
-      ipcRenderer.on(channel, (_event, data: string) => cb(data));
+      const handler = (
+        _e: unknown,
+        arg: string | { data: string; seq?: number },
+      ) => {
+        if (typeof arg === 'string') cb(arg);
+        else cb(arg.data, arg.seq);
+      };
+      ipcRenderer.on(channel, handler);
       return () => ipcRenderer.removeAllListeners(channel);
     },
     onExit: (cb: (shell: Shell) => void) => {
@@ -214,9 +228,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.send('planning:write', sessionId, data),
     resize: (sessionId: string, cols: number, rows: number) =>
       ipcRenderer.send('planning:resize', sessionId, cols, rows),
-    onData: (sessionId: string, cb: (data: string) => void) => {
+    onData: (
+      sessionId: string,
+      cb: (data: string, streamSeq?: number) => void,
+    ) => {
       const channel = `planning:data:${sessionId}`;
-      const handler = (_e: IpcRendererEvent, data: string) => cb(data);
+      const handler = (
+        _e: IpcRendererEvent,
+        arg: string | { data: string; seq?: number },
+      ) => {
+        if (typeof arg === 'string') cb(arg);
+        else cb(arg.data, arg.seq);
+      };
       ipcRenderer.on(channel, handler);
       return () => ipcRenderer.removeAllListeners(channel);
     },

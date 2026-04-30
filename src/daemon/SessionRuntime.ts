@@ -1,8 +1,12 @@
 import * as pty from 'node-pty';
 import type { IPty } from 'node-pty';
+import { SerializeAddon } from '@xterm/addon-serialize';
 import { Terminal as HeadlessTerminal } from '@xterm/headless';
+import type { AttachResult, TerminalSnapshot } from './protocol';
+import { buildRehydrateSequences, captureSerializedSnapshot } from './terminalSnapshot';
 
 const DEFAULT_REPLAY_BYTES = 256 * 1024;
+const HEADLESS_SCROLLBACK = 5000;
 
 export interface SessionRuntimeSpawnSpec {
   command: string;
@@ -14,8 +18,11 @@ export interface SessionRuntimeSpawnSpec {
 }
 
 export interface SessionRuntimeCallbacks {
-  /** Called on every raw PTY chunk. Daemon writes this to the stream socket. */
-  onData: (data: string) => void;
+  /**
+   * Called on every raw PTY chunk. `seq` is monotonic for this runtime;
+   * it pairs with `AttachResult.streamSeq` for warm-attach de-duplication.
+   */
+  onData: (data: string, seq: number) => void;
   /** Called once when the PTY exits. */
   onExit: (info: { exitCode: number; signal?: number }) => void;
 }
@@ -26,19 +33,23 @@ export interface SessionRuntimeCallbacks {
  * free-form shells, and the planning PTY — the only difference between
  * them lives in the registry at the Daemon layer.
  *
- * The replay buffer is what a newly-attached client receives on
- * attach(): the daemon writes `{replay}` into the RPC response and
- * immediately starts streaming new chunks on the stream socket, so the
- * renderer can paint a prefix snapshot and then continue live.
+ * Attach RPC returns `AttachResult`: legacy `replay` plus optional
+ * `snapshot` (serialized headless state) once the daemon implements it.
+ * Live bytes continue on the stream socket after the RPC response.
  */
 export class SessionRuntime {
   readonly pty: IPty;
   readonly headless: HeadlessTerminal;
+  private readonly serializeAddon: SerializeAddon;
+  /** Serializes concurrent `snapshot()` calls so flush + serialize stay ordered. */
+  private snapshotChain: Promise<void> = Promise.resolve();
   private replay: string[] = [];
   private replayBytes = 0;
   private readonly replayCapBytes: number;
   private exited = false;
   private lastExitCode = 0;
+  /** Monotonic: last seq assigned to a PTY chunk (starts at 0, first chunk is 1). */
+  private lastStreamSeq = 0;
   private cols: number;
   private rows: number;
   private cwd: string;
@@ -64,14 +75,17 @@ export class SessionRuntime {
     this.headless = new HeadlessTerminal({
       cols: spec.cols,
       rows: spec.rows,
-      scrollback: 5000,
+      scrollback: HEADLESS_SCROLLBACK,
       allowProposedApi: true,
     });
+    this.serializeAddon = new SerializeAddon();
+    this.headless.loadAddon(this.serializeAddon);
 
     this.pty.onData((chunk) => {
       this.appendReplay(chunk);
       this.headless.write(chunk);
-      callbacks.onData(chunk);
+      this.lastStreamSeq += 1;
+      callbacks.onData(chunk, this.lastStreamSeq);
     });
 
     this.pty.onExit(({ exitCode, signal }) => {
@@ -94,13 +108,43 @@ export class SessionRuntime {
     }
   }
 
-  /** Snapshot of the replay buffer for a newly-attached client. */
-  snapshot(): { replay: string; cols: number; rows: number } {
-    return {
-      replay: this.replay.join(''),
-      cols: this.cols,
-      rows: this.rows,
+  /**
+   * Waits for pending headless parser work, then returns legacy `replay` plus
+   * a serialized xterm snapshot for warm reattach.
+   */
+  snapshot(): Promise<AttachResult> {
+    const run = async (): Promise<AttachResult> => {
+      await this.flushHeadlessWrites();
+      const { snapshotAnsi, modes } = captureSerializedSnapshot(
+        this.headless,
+        this.serializeAddon,
+        HEADLESS_SCROLLBACK,
+      );
+      const snapshot: TerminalSnapshot = {
+        snapshotAnsi,
+        rehydrateSequences: buildRehydrateSequences(modes),
+        modes,
+        cols: this.cols,
+        rows: this.rows,
+      };
+      return {
+        replay: this.replay.join(''),
+        cols: this.cols,
+        rows: this.rows,
+        streamSeq: this.lastStreamSeq,
+        snapshot,
+      };
     };
+    const next = this.snapshotChain.then(run);
+    this.snapshotChain = next.then(() => undefined).catch(() => undefined);
+    return next;
+  }
+
+  /** Ensures all bytes fed into the headless terminal have been parsed. */
+  private flushHeadlessWrites(): Promise<void> {
+    return new Promise((resolve) => {
+      this.headless.write('', () => resolve());
+    });
   }
 
   write(data: string): void {

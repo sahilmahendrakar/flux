@@ -41,6 +41,7 @@ import {
   isTaskBlocked,
   validateBlockedByTaskIds,
 } from './taskDependencies';
+import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
 
 function isPlanningAgent(value: unknown): value is Agent {
   return value === 'claude-code' || value === 'codex' || value === 'cursor';
@@ -970,8 +971,10 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('session:getAll', async () => daemonClient.listSessions());
 
-  ipcMain.handle('session:attach', async (_e, sessionId: string) =>
-    daemonClient.attachSession(sessionId),
+  ipcMain.handle(
+    'session:attach',
+    async (_e, sessionId: string): Promise<AttachResult | null> =>
+      daemonClient.attachSession(sessionId),
   );
 
   ipcMain.on('session:write', (_e, sessionId: string, data: string) => {
@@ -1131,18 +1134,7 @@ app.whenReady().then(async () => {
 
   ipcMain.handle(
     'planning:attach',
-    async (
-      _e,
-      sessionId: string,
-    ): Promise<
-      | {
-          replay: string;
-          cols: number;
-          rows: number;
-          session: PlanningSession;
-        }
-      | null
-    > => {
+    async (_e, sessionId: string): Promise<PlanningAttachResult | null> => {
       const pid = await activeProjectIdForPlanning();
       if (!pid) return null;
       const s = await daemonClient.getPlanning(sessionId);
@@ -1284,8 +1276,10 @@ app.whenReady().then(async () => {
     daemonClient.listShells(sessionId),
   );
 
-  ipcMain.handle('shell:attach', async (_e, shellId: string) =>
-    daemonClient.attachShell(shellId),
+  ipcMain.handle(
+    'shell:attach',
+    async (_e, shellId: string): Promise<AttachResult | null> =>
+      daemonClient.attachShell(shellId),
   );
 
   ipcMain.on('shell:write', (_e, shellId: string, data: string) => {

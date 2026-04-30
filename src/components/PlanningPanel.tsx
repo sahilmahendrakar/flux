@@ -6,6 +6,13 @@ import {
 } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { AGENTS, type Agent, type PlanningSession, type Project } from '../types';
+import {
+  applyAttachResultToTerminal,
+  getPlanningAttachShared,
+  invalidatePlanningAttachCache,
+  type BufferedStreamChunk,
+  writeBufferedStreamAfterSnapshot,
+} from '../terminal/warmAttach';
 import Terminal, { type TerminalHandle } from './Terminal';
 
 export interface PlanningPanelProps {
@@ -95,6 +102,7 @@ export function PlanningPanel({
     if (!planningApi) return;
     return planningApi.onExit((exited) => {
       void onSessionsMutated();
+      invalidatePlanningAttachCache(exited.id);
       if (activeSessionRef.current?.id === exited.id) {
         setNeedsInput(false);
         outputBufferRef.current = '';
@@ -121,45 +129,37 @@ export function PlanningPanel({
     }
     const id = activeSession.id;
 
-    let replayWritten = false;
-    const earlyBuffer: string[] = [];
+    let streamReady = false;
+    const earlyBuffer: BufferedStreamChunk[] = [];
     let cancelled = false;
 
-    const unsub = planningApi.onData(id, (data) => {
+    const unsub = planningApi.onData(id, (data, streamSeq) => {
       if (cancelled) return;
       appendOutputAndDetectNeedsInput(data);
-      if (!replayWritten) {
-        earlyBuffer.push(data);
+      if (!streamReady) {
+        earlyBuffer.push({ data, streamSeq });
       } else {
         terminalRef.current?.write(data);
       }
     });
 
-    const writeReplayAndFlush = (replay: string) => {
-      if (cancelled) return;
-      if (replay.length > 0) {
-        terminalRef.current?.write(replay);
-      }
-      replayWritten = true;
-      if (earlyBuffer.length > 0) {
-        for (const chunk of earlyBuffer) terminalRef.current?.write(chunk);
-        earlyBuffer.length = 0;
-      }
-    };
-
     void (async () => {
-      try {
-        const result = await planningApi.attach(id);
-        if (cancelled) return;
-        if (result) {
-          writeReplayAndFlush(result.replay);
-        } else {
-          writeReplayAndFlush('');
+      const result = await getPlanningAttachShared(id, async () => {
+        try {
+          return await planningApi.attach(id);
+        } catch (err) {
+          console.error('[PlanningPanel] attach failed', err);
+          return null;
         }
-      } catch (err) {
-        console.error('[PlanningPanel] attach failed', err);
-        writeReplayAndFlush('');
-      }
+      });
+      if (cancelled) return;
+      applyAttachResultToTerminal(terminalRef.current, result, () => {
+        if (cancelled) return;
+        terminalRef.current?.fit();
+        streamReady = true;
+        writeBufferedStreamAfterSnapshot(terminalRef.current, earlyBuffer, result?.streamSeq);
+        earlyBuffer.length = 0;
+      });
     })();
 
     return () => {
@@ -212,6 +212,7 @@ export function PlanningPanel({
     setError(null);
     try {
       await planningApi.stop(sessionId);
+      invalidatePlanningAttachCache(sessionId);
       await onSessionsMutated();
       if (activeSessionId === sessionId) {
         onActiveSessionChange(null);

@@ -1,27 +1,17 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session, Shell } from '../types';
+import {
+  applyAttachResultToTerminal,
+  getSessionAttachShared,
+  getShellAttachShared,
+  invalidateSessionAttachCache,
+  invalidateShellAttachCache,
+  type BufferedStreamChunk,
+  writeBufferedStreamAfterSnapshot,
+} from '../terminal/warmAttach';
 import Terminal, { type TerminalHandle } from './Terminal';
 
-// Session / shell replay snapshots from the daemon. Module-level so that
-// React 18 StrictMode's dev-only double-mount doesn't double-call attach
-// on the daemon RPC. Superset ran into this exact pattern — see the
-// "React StrictMode Double-Mounts Are Real" note in their blog post.
-const sessionAttachCache = new Map<
-  string,
-  { replay: string; cols: number; rows: number }
->();
-const shellAttachCache = new Map<
-  string,
-  { replay: string; cols: number; rows: number }
->();
-
-export function invalidateSessionAttachCache(id: string): void {
-  sessionAttachCache.delete(id);
-}
-
-export function invalidateShellAttachCache(id: string): void {
-  shellAttachCache.delete(id);
-}
+export { invalidateSessionAttachCache, invalidateShellAttachCache };
 
 function BotIcon({ className }: { className?: string }) {
   return (
@@ -72,54 +62,39 @@ function AgentPane({ session, visible }: { session: Session; visible: boolean })
     if (!running) return;
     const id = session.id;
 
-    // Buffer live chunks that arrive before the replay write lands, so
-    // we don't tear history. The daemon may already be streaming the
-    // next token into session:data:<id> before we finish writing replay.
-    let replayWritten = false;
-    const earlyBuffer: string[] = [];
+    // Buffer live output until the serialized snapshot (or legacy replay) is
+    // fully applied, so in-flight stream chunks stay ordered and do not
+    // duplicate the attach payload.
+    let streamReady = false;
+    const earlyBuffer: BufferedStreamChunk[] = [];
     let cancelled = false;
 
-    const unsubData = window.electronAPI.sessions.onData(id, (data) => {
+    const unsubData = window.electronAPI.sessions.onData(id, (data, streamSeq) => {
       if (cancelled) return;
-      if (!replayWritten) {
-        earlyBuffer.push(data);
+      if (!streamReady) {
+        earlyBuffer.push({ data, streamSeq });
       } else {
         terminalRef.current?.write(data);
       }
     });
 
-    const writeReplayAndFlush = (replay: string) => {
-      if (cancelled) return;
-      if (replay.length > 0) {
-        terminalRef.current?.write(replay);
-      }
-      replayWritten = true;
-      if (earlyBuffer.length > 0) {
-        for (const chunk of earlyBuffer) terminalRef.current?.write(chunk);
-        earlyBuffer.length = 0;
-      }
-    };
-
-    const cached = sessionAttachCache.get(id);
-    if (cached) {
-      writeReplayAndFlush(cached.replay);
-    } else {
-      void (async () => {
+    void (async () => {
+      const result = await getSessionAttachShared(id, async () => {
         try {
-          const result = await window.electronAPI.sessions.attach(id);
-          if (cancelled) return;
-          if (result) {
-            sessionAttachCache.set(id, result);
-            writeReplayAndFlush(result.replay);
-          } else {
-            writeReplayAndFlush('');
-          }
+          return await window.electronAPI.sessions.attach(id);
         } catch (err) {
           console.error('[AgentPane] attach failed', err);
-          writeReplayAndFlush('');
+          return null;
         }
-      })();
-    }
+      });
+      if (cancelled) return;
+      applyAttachResultToTerminal(terminalRef.current, result, () => {
+        if (cancelled) return;
+        streamReady = true;
+        writeBufferedStreamAfterSnapshot(terminalRef.current, earlyBuffer, result?.streamSeq);
+        earlyBuffer.length = 0;
+      });
+    })();
 
     return () => {
       cancelled = true;
@@ -166,51 +141,36 @@ function ShellPane({ shell, visible }: { shell: Shell; visible: boolean }) {
     if (!running) return;
     const id = shell.id;
 
-    let replayWritten = false;
-    const earlyBuffer: string[] = [];
+    let streamReady = false;
+    const earlyBuffer: BufferedStreamChunk[] = [];
     let cancelled = false;
 
-    const unsubData = window.electronAPI.shells.onData(id, (data) => {
+    const unsubData = window.electronAPI.shells.onData(id, (data, streamSeq) => {
       if (cancelled) return;
-      if (!replayWritten) {
-        earlyBuffer.push(data);
+      if (!streamReady) {
+        earlyBuffer.push({ data, streamSeq });
       } else {
         terminalRef.current?.write(data);
       }
     });
 
-    const writeReplayAndFlush = (replay: string) => {
-      if (cancelled) return;
-      if (replay.length > 0) {
-        terminalRef.current?.write(replay);
-      }
-      replayWritten = true;
-      if (earlyBuffer.length > 0) {
-        for (const chunk of earlyBuffer) terminalRef.current?.write(chunk);
-        earlyBuffer.length = 0;
-      }
-    };
-
-    const cached = shellAttachCache.get(id);
-    if (cached) {
-      writeReplayAndFlush(cached.replay);
-    } else {
-      void (async () => {
+    void (async () => {
+      const result = await getShellAttachShared(id, async () => {
         try {
-          const result = await window.electronAPI.shells.attach(id);
-          if (cancelled) return;
-          if (result) {
-            shellAttachCache.set(id, result);
-            writeReplayAndFlush(result.replay);
-          } else {
-            writeReplayAndFlush('');
-          }
+          return await window.electronAPI.shells.attach(id);
         } catch (err) {
           console.error('[ShellPane] attach failed', err);
-          writeReplayAndFlush('');
+          return null;
         }
-      })();
-    }
+      });
+      if (cancelled) return;
+      applyAttachResultToTerminal(terminalRef.current, result, () => {
+        if (cancelled) return;
+        streamReady = true;
+        writeBufferedStreamAfterSnapshot(terminalRef.current, earlyBuffer, result?.streamSeq);
+        earlyBuffer.length = 0;
+      });
+    })();
 
     return () => {
       cancelled = true;

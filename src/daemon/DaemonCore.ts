@@ -6,9 +6,11 @@ import type {
   Shell,
 } from '../types';
 import type {
+  AttachResult,
   CreateSessionParams,
   CreateSessionResult,
   CreateShellParams,
+  PlanningAttachResult,
   StartPlanningParams,
   StartPlanningResult,
   StreamFrame,
@@ -88,8 +90,8 @@ export class DaemonCore {
           rows: params.rows,
         },
         {
-          onData: (data) => {
-            this.broadcast({ kind: 'data', target: 'session', id, data });
+          onData: (data, seq) => {
+            this.broadcast({ kind: 'data', target: 'session', id, data, seq });
           },
           onExit: ({ exitCode }) => {
             const entry = this.sessions.get(id);
@@ -120,7 +122,7 @@ export class DaemonCore {
     return [...this.sessions.values()].map((e) => ({ ...e.session }));
   }
 
-  attachSession(id: string): { replay: string; cols: number; rows: number } | null {
+  async attachSession(id: string): Promise<AttachResult | null> {
     const entry = this.sessions.get(id);
     if (!entry) return null;
     return entry.runtime.snapshot();
@@ -167,8 +169,8 @@ export class DaemonCore {
         env: { ...process.env, HOME: process.env.HOME ?? os.homedir() },
       },
       {
-        onData: (data) => {
-          this.broadcast({ kind: 'data', target: 'shell', id, data });
+        onData: (data, seq) => {
+          this.broadcast({ kind: 'data', target: 'shell', id, data, seq });
         },
         onExit: ({ exitCode }) => {
           const entry = this.shells.get(id);
@@ -197,7 +199,7 @@ export class DaemonCore {
     return sessionId ? all.filter((s) => s.sessionId === sessionId) : all;
   }
 
-  attachShell(id: string): { replay: string; cols: number; rows: number } | null {
+  async attachShell(id: string): Promise<AttachResult | null> {
     const entry = this.shells.get(id);
     if (!entry) return null;
     return entry.runtime.snapshot();
@@ -255,8 +257,8 @@ export class DaemonCore {
           rows: params.rows,
         },
         {
-          onData: (data) => {
-            this.broadcast({ kind: 'data', target: 'planning', id, data });
+          onData: (data, seq) => {
+            this.broadcast({ kind: 'data', target: 'planning', id, data, seq });
           },
           onExit: ({ exitCode }) => {
             const entry = this.planning.get(id);
@@ -303,13 +305,12 @@ export class DaemonCore {
     return entry ? { ...entry.session } : null;
   }
 
-  attachPlanning(id: string):
-    | { replay: string; cols: number; rows: number; session: PlanningSession }
-    | null {
+  async attachPlanning(id: string): Promise<PlanningAttachResult | null> {
     const entry = this.planning.get(id);
     if (!entry) return null;
+    const snap = await entry.runtime.snapshot();
     return {
-      ...entry.runtime.snapshot(),
+      ...snap,
       session: { ...entry.session },
     };
   }

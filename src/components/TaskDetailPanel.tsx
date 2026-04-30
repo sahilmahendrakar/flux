@@ -26,6 +26,12 @@ import {
 } from '../taskDependencies';
 import AgentModelPicker from './AgentModelPicker';
 import { AGENT_CHIP_STYLES } from './AgentBadge';
+import {
+  applyAttachResultToTerminal,
+  getSessionAttachShared,
+  type BufferedStreamChunk,
+  writeBufferedStreamAfterSnapshot,
+} from '../terminal/warmAttach';
 import Terminal, { type TerminalHandle } from './Terminal';
 
 interface TaskDetailPanelProps {
@@ -254,45 +260,41 @@ export default function TaskDetailPanel({
     if (!session) return;
     const id = session.id;
 
-    // Mirror SessionTerminalView.AgentPane: on (re)mount we need to write
-    // the daemon's replay buffer into the fresh xterm before live chunks,
-    // otherwise closing + reopening this pane shows an empty terminal.
-    // Buffer any early live chunks that arrive before replay lands so we
-    // preserve ordering.
-    let replayWritten = false;
-    const earlyBuffer: string[] = [];
+    // Match SessionTerminalView.AgentPane: in-flight attach coalescing and
+    // snapshot restore so StrictMode does not double-apply or re-replay
+    // raw PTY buffers when a serialized snapshot is available.
+    let streamReady = false;
+    const earlyBuffer: BufferedStreamChunk[] = [];
     let cancelled = false;
 
-    const unsub = window.electronAPI.sessions.onData(id, (data) => {
+    const unsub = window.electronAPI.sessions.onData(id, (data, streamSeq) => {
       if (cancelled) return;
-      if (!replayWritten) {
-        earlyBuffer.push(data);
+      if (!streamReady) {
+        earlyBuffer.push({ data, streamSeq });
       } else {
         terminalRef.current?.write(data);
       }
     });
 
-    const writeReplayAndFlush = (replay: string) => {
-      if (cancelled) return;
-      if (replay.length > 0) {
-        terminalRef.current?.write(replay);
-      }
-      replayWritten = true;
-      if (earlyBuffer.length > 0) {
-        for (const chunk of earlyBuffer) terminalRef.current?.write(chunk);
-        earlyBuffer.length = 0;
-      }
-    };
-
     void (async () => {
-      try {
-        const result = await window.electronAPI.sessions.attach(id);
+      const result = await getSessionAttachShared(id, async () => {
+        try {
+          return await window.electronAPI.sessions.attach(id);
+        } catch (err) {
+          console.error('[TaskDetailPanel] attach failed', err);
+          return null;
+        }
+      });
+      if (cancelled) return;
+      applyAttachResultToTerminal(terminalRef.current, result, () => {
         if (cancelled) return;
-        writeReplayAndFlush(result?.replay ?? '');
-      } catch (err) {
-        console.error('[TaskDetailPanel] attach failed', err);
-        writeReplayAndFlush('');
-      }
+        streamReady = true;
+        writeBufferedStreamAfterSnapshot(terminalRef.current, earlyBuffer, result?.streamSeq);
+        earlyBuffer.length = 0;
+      }, {
+        applyGeometry: false,
+        useSnapshot: false,
+      });
     })();
 
     return () => {
@@ -782,7 +784,7 @@ export default function TaskDetailPanel({
             </div>
           </div>
 
-          <div className="flex min-h-[200px] flex-1 flex-col border-t border-white/[0.06]">
+          <div className="flex min-h-[200px] flex-1 flex-col overflow-hidden border-t border-white/[0.06]">
             <div className="flex items-center justify-between px-4 py-2">
               <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-600">
                 Session
@@ -807,7 +809,7 @@ export default function TaskDetailPanel({
                 </div>
               ) : null}
             </div>
-            <div className="min-h-0 flex-1 px-2 pb-2">
+            <div className="min-h-0 flex-1 overflow-hidden px-2 pb-2">
               {blocked && !sessionRunning && !session ? (
                 <div className="mb-2 rounded-md border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-[12px] text-amber-100/90">
                   Session start is disabled until blocking tasks are done.

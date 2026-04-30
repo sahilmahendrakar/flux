@@ -21,19 +21,18 @@ import {
   WIN_STREAM_PIPE,
   daemonUnixSocketPaths,
   encodeLine,
-} from '../daemon/protocol';
-import type {
-  AttachResult,
-  CreateSessionParams,
-  CreateSessionResult,
-  CreateShellParams,
-  Hello,
-  PingResult,
-  RpcRequest,
-  RpcResponse,
-  StartPlanningParams,
-  StartPlanningResult,
-  StreamFrame,
+  type AttachResult,
+  type CreateSessionParams,
+  type CreateSessionResult,
+  type CreateShellParams,
+  type Hello,
+  type PingResult,
+  type PlanningAttachResult,
+  type RpcRequest,
+  type RpcResponse,
+  type StartPlanningParams,
+  type StartPlanningResult,
+  type StreamFrame,
 } from '../daemon/protocol';
 
 const HANDSHAKE_TIMEOUT_MS = 3000;
@@ -77,7 +76,7 @@ function isPidAlive(pid: number): boolean {
  * Main-process client for the Flux daemon. Handles spawning / reconnecting
  * to the detached daemon process, correlation-id RPC, and fanning stream
  * frames back out to every renderer via existing broadcast channels
- * (`session:data:<id>`, `shell:data:<id>`, `planning:data:<id>`).
+ * (`session:data:<id>`, …) with payload `{ data, seq }` for de-duplication.
  */
 export class DaemonClient {
   private rpc: net.Socket | null = null;
@@ -413,12 +412,13 @@ export class DaemonClient {
 
   private dispatchStreamFrame(frame: StreamFrame): void {
     if (frame.kind === 'data') {
+      const payload = { data: frame.data, seq: frame.seq };
       if (frame.target === 'session') {
-        broadcast(`session:data:${frame.id}`, frame.data);
+        broadcast(`session:data:${frame.id}`, payload);
       } else if (frame.target === 'shell') {
-        broadcast(`shell:data:${frame.id}`, frame.data);
+        broadcast(`shell:data:${frame.id}`, payload);
       } else if (frame.target === 'planning') {
-        broadcast(`planning:data:${frame.id}`, frame.data);
+        broadcast(`planning:data:${frame.id}`, payload);
       }
       return;
     }
@@ -489,6 +489,11 @@ export class DaemonClient {
     return this.request<Session[]>('listSessions');
   }
 
+  /**
+   * Full `AttachResult` from the daemon (legacy `replay` + optional v3
+   * `snapshot`). The RPC/IPC layers pass the object through without
+   * stripping fields; renderer may prefer `snapshot` when present.
+   */
   async attachSession(id: string): Promise<AttachResult | null> {
     await this.ensureRunning();
     return this.request<AttachResult | null>('attachSession', { id });
@@ -528,6 +533,7 @@ export class DaemonClient {
     return this.request<Shell[]>('listShells', { sessionId });
   }
 
+  /** See {@link attachSession} — same attach payload shape. */
   async attachShell(id: string): Promise<AttachResult | null> {
     await this.ensureRunning();
     return this.request<AttachResult | null>('attachShell', { id });
@@ -581,14 +587,10 @@ export class DaemonClient {
     return this.request<PlanningSession | null>('getPlanning', { id });
   }
 
-  async attachPlanning(
-    id: string,
-  ): Promise<(AttachResult & { session: PlanningSession }) | null> {
+  /** Attach for planning PTYs: `AttachResult` fields plus `session` metadata. */
+  async attachPlanning(id: string): Promise<PlanningAttachResult | null> {
     await this.ensureRunning();
-    return this.request<(AttachResult & { session: PlanningSession }) | null>(
-      'attachPlanning',
-      { id },
-    );
+    return this.request<PlanningAttachResult | null>('attachPlanning', { id });
   }
 
   writePlanning(id: string, data: string): void {

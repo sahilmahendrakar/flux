@@ -11,6 +11,7 @@ import type {
   ActiveProjectKey,
   ProjectTabState,
 } from './types';
+import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
 
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY?: string;
@@ -36,10 +37,6 @@ type ActivateCloudResult =
   | { ok: true }
   | { error: 'NOT_GIT_REPO' }
   | null;
-
-/** Replay snapshot returned by the daemon on attach. */
-type AttachResult = { replay: string; cols: number; rows: number };
-type PlanningAttachResult = AttachResult & { session: PlanningSession };
 
 declare global {
   interface Window {
@@ -129,7 +126,10 @@ declare global {
         attach: (sessionId: string) => Promise<AttachResult | null>;
         write: (sessionId: string, data: string) => void;
         resize: (sessionId: string, cols: number, rows: number) => void;
-        onData: (sessionId: string, cb: (data: string) => void) => () => void;
+        onData: (
+          sessionId: string,
+          cb: (data: string, streamSeq?: number) => void,
+        ) => () => void;
         onExit: (cb: (session: Session) => void) => () => void;
       };
       shells: {
@@ -139,7 +139,10 @@ declare global {
         attach: (shellId: string) => Promise<AttachResult | null>;
         write: (shellId: string, data: string) => void;
         resize: (shellId: string, cols: number, rows: number) => void;
-        onData: (shellId: string, cb: (data: string) => void) => () => void;
+        onData: (
+          shellId: string,
+          cb: (data: string, streamSeq?: number) => void,
+        ) => () => void;
         onExit: (cb: (shell: Shell) => void) => () => void;
       };
       planning: {
@@ -150,7 +153,10 @@ declare global {
         attach: (sessionId: string) => Promise<PlanningAttachResult | null>;
         write: (sessionId: string, data: string) => void;
         resize: (sessionId: string, cols: number, rows: number) => void;
-        onData: (sessionId: string, cb: (data: string) => void) => () => void;
+        onData: (
+          sessionId: string,
+          cb: (data: string, streamSeq?: number) => void,
+        ) => () => void;
         onExit: (cb: (session: PlanningSession) => void) => () => void;
       };
       cursorAgent: {
