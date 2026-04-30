@@ -13,6 +13,10 @@ import type {
   TaskSessionStartProgress,
 } from './types';
 import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
+import type {
+  McpBridgeRequest,
+  McpBridgeResponse,
+} from './mcpBridge';
 
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY?: string;
@@ -179,6 +183,11 @@ declare global {
           { content: string } | { error: string }
         >;
         onChanged: (cb: () => void) => () => void;
+      };
+      mcpBridge: {
+        signalReady: () => void;
+        onRequest: (cb: (req: McpBridgeRequest) => void) => () => void;
+        respond: (resp: McpBridgeResponse) => void;
       };
     };
   }

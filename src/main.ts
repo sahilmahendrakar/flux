@@ -6,6 +6,7 @@ import started from 'electron-squirrel-startup';
 import { TaskStore } from './main/TaskStore';
 import { ProjectStore } from './main/ProjectStore';
 import { McpServer } from './main/McpServer';
+import { McpRendererBridge } from './main/McpRendererBridge';
 import { AppStateStore } from './main/AppStateStore';
 import { LocalBindingStore } from './main/LocalBindingStore';
 import { WorktreeService } from './main/WorktreeService';
@@ -194,6 +195,7 @@ const WINDOW_BACKGROUND = '#030712';
 let mainWindow: BrowserWindow | null = null;
 
 let fluxMcpServer: McpServer | null = null;
+let fluxMcpRendererBridge: McpRendererBridge | null = null;
 
 let planningDocsWatcher: ReturnType<typeof createPlanningDocsWatcher> | null = null;
 
@@ -942,6 +944,30 @@ app.whenReady().then(async () => {
     return updated;
   }
 
+  async function runStartSessionForTaskWithLogging(
+    task: Task,
+    source: string,
+    projectTasks?: Task[],
+  ): Promise<void> {
+    try {
+      const started = await startSessionForTask(task, projectTasks);
+      if ('error' in started) {
+        console.error('[task:start] session start failed', {
+          source,
+          taskId: task.id,
+          error: started.error,
+          message: started.message,
+        });
+      }
+    } catch (err) {
+      console.error('[task:start] unexpected session start failure', {
+        source,
+        taskId: task.id,
+        err,
+      });
+    }
+  }
+
   async function startTaskAndSession(id: string, source: string): Promise<Task> {
     const project = projectStore.get();
     if (!project) {
@@ -958,23 +984,7 @@ app.whenReady().then(async () => {
       );
     }
     const updated = await taskStore.update(id, { status: 'in-progress' });
-    try {
-      const started = await startSessionForTask(updated, columnTasks);
-      if ('error' in started) {
-        console.error('[task:start] session start failed', {
-          source,
-          taskId: updated.id,
-          error: started.error,
-          message: started.message,
-        });
-      }
-    } catch (err) {
-      console.error('[task:start] unexpected session start failure', {
-        source,
-        taskId: updated.id,
-        err,
-      });
-    }
+    await runStartSessionForTaskWithLogging(updated, source, columnTasks);
     return updated;
   }
 
@@ -1012,10 +1022,31 @@ app.whenReady().then(async () => {
     daemonClient.resizeSession(sessionId, cols, rows);
   });
 
-  fluxMcpServer = new McpServer(taskStore, projectStore, () => mainWindow, {
-    updateTask: (id, patch) => updateTaskWithTransitionHandling(id, patch, 'mcp:flux__update_task'),
-    startTask: (id) => startTaskAndSession(id, 'mcp:flux__start_task'),
-  });
+  const mcpRendererBridge = new McpRendererBridge(() => mainWindow);
+  mcpRendererBridge.install();
+  fluxMcpRendererBridge = mcpRendererBridge;
+
+  fluxMcpServer = new McpServer(
+    taskStore,
+    projectStore,
+    appStateStore,
+    bindingStore,
+    mcpRendererBridge,
+    () => mainWindow,
+    {
+      updateTask: (id, patch) =>
+        updateTaskWithTransitionHandling(id, patch, 'mcp:flux__update_task'),
+      startTask: (id) => startTaskAndSession(id, 'mcp:flux__start_task'),
+      startSessionForExistingTask: (task) =>
+        runStartSessionForTaskWithLogging(task, 'mcp:flux__start_task'),
+      autoStartIfTransitionedToInProgress: (previous, updated) =>
+        maybeAutoStartSessionOnInProgressTransition(
+          previous,
+          updated,
+          'mcp:flux__update_task',
+        ),
+    },
+  );
   fluxMcpServer.start();
 
   async function activeProjectIdForPlanning(): Promise<string | null> {
@@ -1318,6 +1349,9 @@ app.whenReady().then(async () => {
   });
 
   createWindow();
+  if (mainWindow && fluxMcpRendererBridge) {
+    fluxMcpRendererBridge.attachWindow(mainWindow);
+  }
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -1334,6 +1368,9 @@ app.on('activate', () => {
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+    if (mainWindow && fluxMcpRendererBridge) {
+      fluxMcpRendererBridge.attachWindow(mainWindow);
+    }
   }
 });
 
