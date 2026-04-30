@@ -24,6 +24,8 @@ type Props = {
   labelCatalog: string[];
   onLabelsChange: (next: string[]) => void;
   compact?: boolean;
+  /** Match task detail panel subsection labels (`text-xs` / zinc-500). */
+  variant?: 'default' | 'panel';
 };
 
 function rowsForQuery(
@@ -62,6 +64,7 @@ export function TaskLabelsField({
   labelCatalog,
   onLabelsChange,
   compact = false,
+  variant = 'default',
 }: Props) {
   const baseId = useId();
   const listboxId = `${idPrefix}-${baseId}-listbox`;
@@ -201,7 +204,9 @@ export function TaskLabelsField({
         className={
           compact
             ? 'mb-1.5 block text-[10px] font-medium uppercase tracking-[0.1em] text-zinc-500'
-            : 'mb-2 block text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-500'
+            : variant === 'panel'
+              ? 'mb-1.5 block text-xs text-zinc-500'
+              : 'mb-2 block text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-500'
         }
       >
         Labels
@@ -337,7 +342,7 @@ export function TaskLabelsField({
         </div>
       ) : null}
 
-      {!compact ? (
+      {!compact && variant !== 'panel' ? (
         <p className="mt-1.5 text-[11px] text-zinc-600">
           Pick from the list or type a new name.
         </p>

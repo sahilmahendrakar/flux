@@ -597,6 +597,7 @@ export default function TaskDetailPanel({
                 idPrefix={`task-${task.id}`}
                 labels={task.labels ?? []}
                 labelCatalog={labelCatalog}
+                variant="panel"
                 onLabelsChange={(next) => onUpdate(task.id, { labels: next })}
               />
 
