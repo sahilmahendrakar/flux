@@ -767,58 +767,84 @@ app.whenReady().then(async () => {
     );
     if (existing) return existing;
 
-    let worktreePath = '';
-    let branch = '';
+    const taskId = task.id;
+    const sendTaskStartProgress = (payload: {
+      taskId: string;
+      phase: 'starting' | 'settled';
+      outcome?: SessionStartResult;
+    }) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (win.isDestroyed()) continue;
+        win.webContents.send('session:taskStartProgress', payload);
+      }
+    };
+
+    sendTaskStartProgress({ taskId, phase: 'starting' });
+    let startOutcome: SessionStartResult | undefined;
+    const finish = (r: SessionStartResult): SessionStartResult => {
+      startOutcome = r;
+      return r;
+    };
     try {
-      const created = await worktreeService.create(task.id);
-      worktreePath = created.worktreePath;
-      branch = created.branch;
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error('[session:start] worktree create failed', {
+      let worktreePath = '';
+      let branch = '';
+      try {
+        const created = await worktreeService.create(task.id);
+        worktreePath = created.worktreePath;
+        branch = created.branch;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[session:start] worktree create failed', {
+          taskId: task.id,
+          projectId: project.id,
+          message,
+        });
+        return finish({ error: 'WORKTREE_FAILED', message });
+      }
+
+      const initialPrompt = taskInitialPrompt(task);
+      const { command, args } = agentSpawnSpec(task, initialPrompt);
+      console.log('[session:start] spawn', { taskId: task.id, command, args });
+      const result = await daemonClient.createSession({
+        worktreePath,
+        branch,
         taskId: task.id,
         projectId: project.id,
-        message,
-      });
-      return { error: 'WORKTREE_FAILED', message };
-    }
-
-    const initialPrompt = taskInitialPrompt(task);
-    const { command, args } = agentSpawnSpec(task, initialPrompt);
-    console.log('[session:start] spawn', { taskId: task.id, command, args });
-    const result = await daemonClient.createSession({
-      worktreePath,
-      branch,
-      taskId: task.id,
-      projectId: project.id,
-      agent: task.agent,
-      command,
-      args,
-      cols: 80,
-      rows: 24,
-    });
-    if ('error' in result) {
-      console.error('[session:start] daemon spawn failed', {
-        taskId: task.id,
+        agent: task.agent,
         command,
         args,
-        error: result.error,
-        message: result.message,
+        cols: 80,
+        rows: 24,
       });
-      try {
-        await worktreeService.remove(worktreePath);
-      } catch (removeErr: unknown) {
-        console.error('[session:start] cleanup worktree after spawn failure', removeErr);
+      if ('error' in result) {
+        console.error('[session:start] daemon spawn failed', {
+          taskId: task.id,
+          command,
+          args,
+          error: result.error,
+          message: result.message,
+        });
+        try {
+          await worktreeService.remove(worktreePath);
+        } catch (removeErr: unknown) {
+          console.error('[session:start] cleanup worktree after spawn failure', removeErr);
+        }
+        if (result.error === 'AGENT_NOT_FOUND') {
+          return finish({
+            error: 'AGENT_NOT_FOUND',
+            message: agentNotFoundMessage(task.agent, command),
+          });
+        }
+        return finish({ error: 'AGENT_NOT_FOUND', message: result.message });
       }
-      if (result.error === 'AGENT_NOT_FOUND') {
-        return {
-          error: 'AGENT_NOT_FOUND',
-          message: agentNotFoundMessage(task.agent, command),
-        };
-      }
-      return { error: 'AGENT_NOT_FOUND', message: result.message };
+      return finish(result);
+    } finally {
+      const outcome: SessionStartResult = startOutcome ?? {
+        error: 'INTERNAL',
+        message: 'Session start did not return a result',
+      };
+      sendTaskStartProgress({ taskId, phase: 'settled', outcome });
     }
-    return result;
   }
 
   type TaskUpdatePatch = Partial<

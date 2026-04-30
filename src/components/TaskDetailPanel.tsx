@@ -34,6 +34,8 @@ interface TaskDetailPanelProps {
   task: Task | null;
   /** Full board snapshot for dependencies and session start (same `projectId`). */
   projectTasks: Task[];
+  /** True while main is creating the session (worktree + spawn), even if this panel was not open for `starting`. */
+  taskSessionStartPending?: boolean;
   onSelectTask: (id: string) => void;
   onClose: () => void;
   onUpdate: (id: string, patch: Partial<Task>) => void;
@@ -105,6 +107,7 @@ function useAutosizeTextArea(value: string, minHeightPx = 0) {
 export default function TaskDetailPanel({
   task,
   projectTasks,
+  taskSessionStartPending = false,
   onSelectTask,
   onClose,
   onUpdate,
@@ -119,6 +122,8 @@ export default function TaskDetailPanel({
   const descriptionArea = useAutosizeTextArea(task?.description ?? '', 120);
   const [session, setSession] = useState<Session | null>(null);
   const [sessionLoading, setSessionLoading] = useState(false);
+  /** Attach + snapshot applied; terminal may still be blank until first PTY output. */
+  const [sessionStreamReady, setSessionStreamReady] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [dependencyError, setDependencyError] = useState<string | null>(null);
   const [depSearch, setDepSearch] = useState('');
@@ -132,6 +137,30 @@ export default function TaskDetailPanel({
     setDependencyError(null);
     setDepSearch('');
   }, [task?.id]);
+
+  useEffect(() => {
+    if (!task) return;
+    return window.electronAPI.sessions.onTaskStartProgress((p) => {
+      if (p.taskId !== task.id || p.phase !== 'settled') return;
+      const { outcome: o } = p;
+      if ('error' in o) {
+        if (o.error === 'TASK_BLOCKED') {
+          setSessionError(
+            o.message ?? 'This task is blocked by incomplete work.',
+          );
+        } else {
+          setSessionError(o.message ?? o.error);
+        }
+      } else {
+        setSessionError(null);
+        setSession(o);
+      }
+    });
+  }, [task?.id]);
+
+  useEffect(() => {
+    setSessionStreamReady(false);
+  }, [session?.id]);
 
   useEffect(() => {
     if (!agentSettingsOpen) return;
@@ -224,21 +253,31 @@ export default function TaskDetailPanel({
     [maxDetailWidthForParent, persistDetailWidth],
   );
 
+  const lastSessionFetchTaskIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!task) return;
+    if (!task) {
+      lastSessionFetchTaskIdRef.current = null;
+      return;
+    }
     setSessionError(null);
+    const idChanged = lastSessionFetchTaskIdRef.current !== task.id;
+    if (idChanged) {
+      setSession(null);
+      lastSessionFetchTaskIdRef.current = task.id;
+    }
     let cancelled = false;
-    setSession(null);
     void window.electronAPI.sessions.get(task.id).then((existingSession) => {
       if (cancelled) return;
       if (existingSession && existingSession.status === 'running') {
         setSession(existingSession);
+      } else {
+        setSession(null);
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [task?.id]);
+  }, [task?.id, task?.status]);
 
   useEffect(() => {
     if (!session) return;
@@ -274,6 +313,7 @@ export default function TaskDetailPanel({
       });
     },
     onStreamData: (id, cb) => window.electronAPI.sessions.onData(id, cb),
+    onAttachComplete: () => setSessionStreamReady(true),
   });
 
   useEffect(() => {
@@ -355,6 +395,9 @@ export default function TaskDetailPanel({
 
   const statusLabel = COLUMNS.find((c) => c.id === task.status)?.label ?? task.status;
   const sessionRunning = session?.status === 'running';
+  const startInFlight = sessionLoading || taskSessionStartPending;
+  const showSessionStarting =
+    startInFlight || (sessionRunning && !sessionStreamReady);
   const blocked = isTaskBlocked(task, projectTasks);
   const blockingTasks = getBlockingTasks(task, projectTasks);
   const taskById = new Map(projectTasks.map((t) => [t.id, t]));
@@ -386,10 +429,14 @@ export default function TaskDetailPanel({
     setDependencyError(null);
   };
 
-  const startButtonLabel = sessionLoading ? 'Starting…' : sessionError ? 'Retry' : 'Start session';
+  const startButtonLabel = startInFlight
+    ? 'Starting…'
+    : sessionError
+      ? 'Retry'
+      : 'Start session';
   const startButtonClass = sessionError
     ? 'rounded-md border border-red-500/25 bg-red-500/[0.08] px-3 py-1.5 text-[12px] font-medium text-red-200/90 transition hover:bg-red-500/[0.12]'
-    : sessionLoading
+    : startInFlight
       ? 'cursor-not-allowed rounded-md border border-white/[0.06] bg-white/[0.03] px-3 py-1.5 text-[12px] font-medium text-zinc-600'
       : 'rounded-md border border-emerald-500/25 bg-emerald-500/[0.1] px-3 py-1.5 text-[12px] font-medium text-emerald-100/90 transition hover:bg-emerald-500/[0.14]';
 
@@ -435,7 +482,7 @@ export default function TaskDetailPanel({
                   <button
                     type="button"
                     onClick={handleStartSession}
-                    disabled={sessionLoading || blocked}
+                    disabled={startInFlight || blocked}
                     title={blocked ? 'Blocked by incomplete dependencies' : undefined}
                     className={
                       blocked
@@ -802,12 +849,27 @@ export default function TaskDetailPanel({
                   </p>
                 </div>
               ) : (
-                <Terminal
-                  ref={terminalRef}
-                  sessionId={session?.id ?? null}
-                  onData={handleTerminalData}
-                  hideCursor
-                />
+                <div className="relative h-full min-h-[120px]">
+                  {showSessionStarting ? (
+                    <div
+                      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-md border border-white/[0.06] bg-[#0a0a0c]/95 text-[13px] text-zinc-400"
+                      aria-live="polite"
+                      aria-busy="true"
+                    >
+                      <span
+                        className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-300"
+                        aria-hidden
+                      />
+                      <span className="font-medium text-zinc-300">Starting…</span>
+                    </div>
+                  ) : null}
+                  <Terminal
+                    ref={terminalRef}
+                    sessionId={session?.id ?? null}
+                    onData={handleTerminalData}
+                    hideCursor
+                  />
+                </div>
               )}
             </div>
           </div>

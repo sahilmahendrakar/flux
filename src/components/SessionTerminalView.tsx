@@ -56,6 +56,11 @@ function AgentPane({ session, visible }: { session: Session; visible: boolean })
   const terminalRef = useRef<TerminalHandle | null>(null);
   const running = session.status === 'running';
   const id = session.id;
+  const [attachReady, setAttachReady] = useState(false);
+
+  useEffect(() => {
+    setAttachReady(false);
+  }, [session.id]);
 
   useTerminalPtyStream({
     terminalRef,
@@ -72,6 +77,7 @@ function AgentPane({ session, visible }: { session: Session; visible: boolean })
         }
       }),
     onStreamData: (sid, cb) => window.electronAPI.sessions.onData(sid, cb),
+    onAttachComplete: () => setAttachReady(true),
   });
 
   const handleData = (data: string) => {
@@ -88,14 +94,29 @@ function AgentPane({ session, visible }: { session: Session; visible: boolean })
       style={paneVisibilityStyle(visible)}
     >
       {running ? (
-        <Terminal
-          ref={terminalRef}
-          sessionId={session.id}
-          onData={handleData}
-          onResize={visible && running ? handleResize : undefined}
-          visible={visible}
-          hideCursor
-        />
+        <div className="relative h-full min-h-0">
+          {!attachReady ? (
+            <div
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-md border border-white/[0.06] bg-[#0a0a0c]/95 text-[13px] text-zinc-400"
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <span
+                className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-300"
+                aria-hidden
+              />
+              <span className="font-medium text-zinc-300">Starting…</span>
+            </div>
+          ) : null}
+          <Terminal
+            ref={terminalRef}
+            sessionId={session.id}
+            onData={handleData}
+            onResize={visible && running ? handleResize : undefined}
+            visible={visible}
+            hideCursor
+          />
+        </div>
       ) : (
         <div className="flex h-full items-center justify-center text-[13px] text-zinc-500">
           This session is no longer running.

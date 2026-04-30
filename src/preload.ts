@@ -10,6 +10,7 @@ import type {
   SessionStartResult,
   Shell,
   Task,
+  TaskSessionStartProgress,
 } from './types';
 import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
 
@@ -181,6 +182,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onExit: (cb: (session: Session) => void) => {
       ipcRenderer.on('session:exited', (_event, session: Session) => cb(session));
       return () => ipcRenderer.removeAllListeners('session:exited');
+    },
+    onTaskStartProgress: (cb: (p: TaskSessionStartProgress) => void) => {
+      const ch = 'session:taskStartProgress' as const;
+      const handler = (
+        _e: IpcRendererEvent,
+        p: TaskSessionStartProgress,
+      ) => {
+        cb(p);
+      };
+      ipcRenderer.on(ch, handler);
+      return () => ipcRenderer.removeListener(ch, handler);
     },
   },
   shells: {
