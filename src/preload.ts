@@ -13,6 +13,14 @@ import type {
   TaskSessionStartProgress,
 } from './types';
 import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
+import {
+  MCP_BRIDGE_READY_CHANNEL,
+  MCP_BRIDGE_REQUEST_CHANNEL,
+  MCP_BRIDGE_RESPONSE_CHANNEL,
+  type McpBridgeOp,
+  type McpBridgeRequest,
+  type McpBridgeResponse,
+} from './mcpBridge';
 
 type PlanningStartResult = PlanningSession | { error: string; message?: string };
 
@@ -286,5 +294,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.on('planningDocs:changed', handler);
       return () => ipcRenderer.removeListener('planningDocs:changed', handler);
     },
+  },
+  mcpBridge: {
+    signalReady: () => ipcRenderer.send(MCP_BRIDGE_READY_CHANNEL),
+    onRequest: (cb: (req: McpBridgeRequest) => void) => {
+      const handler = (_e: IpcRendererEvent, req: McpBridgeRequest) => cb(req);
+      ipcRenderer.on(MCP_BRIDGE_REQUEST_CHANNEL, handler);
+      return () =>
+        ipcRenderer.removeListener(MCP_BRIDGE_REQUEST_CHANNEL, handler);
+    },
+    respond: (resp: McpBridgeResponse) => {
+      ipcRenderer.send(MCP_BRIDGE_RESPONSE_CHANNEL, resp);
+    },
+  },
+  debug: {
+    /** Phase 2 manual smoke test for the MCP renderer bridge. Removed in phase 3. */
+    mcpBridgeRequest: (op: McpBridgeOp, payload?: unknown) =>
+      ipcRenderer.invoke('debug:mcpBridge:request', op, payload) as Promise<
+        | { ok: true; data: unknown }
+        | { ok: false; code: string; message: string }
+      >,
   },
 });

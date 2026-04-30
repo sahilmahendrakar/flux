@@ -48,6 +48,7 @@ import { keyForInsert, sortColumn } from './renderer/tasks/orderKey';
 import { normalizeTaskLabels } from './taskLabels';
 import { invalidateSessionAttachCache } from './terminal/warmAttach';
 import { isTaskBlocked } from './taskDependencies';
+import { useMcpRendererBridge } from './renderer/mcp/useMcpRendererBridge';
 
 type ActiveProject = LocalProject | CloudProject;
 
@@ -250,6 +251,8 @@ export default function App() {
     const unsub = provider.subscribe((all) => setTasks(all));
     return () => unsub();
   }, [provider]);
+
+  useMcpRendererBridge({ project, provider, uid, tasksSnapshot: tasks });
 
   useEffect(() => {
     if (!provider?.reloadFromMain) return;

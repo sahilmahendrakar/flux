@@ -6,6 +6,7 @@ import started from 'electron-squirrel-startup';
 import { TaskStore } from './main/TaskStore';
 import { ProjectStore } from './main/ProjectStore';
 import { McpServer } from './main/McpServer';
+import { McpRendererBridge } from './main/McpRendererBridge';
 import { AppStateStore } from './main/AppStateStore';
 import { LocalBindingStore } from './main/LocalBindingStore';
 import { WorktreeService } from './main/WorktreeService';
@@ -42,6 +43,7 @@ import {
   validateBlockedByTaskIds,
 } from './taskDependencies';
 import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
+import type { McpBridgeOp } from './mcpBridge';
 
 function isPlanningAgent(value: unknown): value is Agent {
   return value === 'claude-code' || value === 'codex' || value === 'cursor';
@@ -942,6 +944,30 @@ app.whenReady().then(async () => {
     return updated;
   }
 
+  async function runStartSessionForTaskWithLogging(
+    task: Task,
+    source: string,
+    projectTasks?: Task[],
+  ): Promise<void> {
+    try {
+      const started = await startSessionForTask(task, projectTasks);
+      if ('error' in started) {
+        console.error('[task:start] session start failed', {
+          source,
+          taskId: task.id,
+          error: started.error,
+          message: started.message,
+        });
+      }
+    } catch (err) {
+      console.error('[task:start] unexpected session start failure', {
+        source,
+        taskId: task.id,
+        err,
+      });
+    }
+  }
+
   async function startTaskAndSession(id: string, source: string): Promise<Task> {
     const project = projectStore.get();
     if (!project) {
@@ -958,23 +984,7 @@ app.whenReady().then(async () => {
       );
     }
     const updated = await taskStore.update(id, { status: 'in-progress' });
-    try {
-      const started = await startSessionForTask(updated, columnTasks);
-      if ('error' in started) {
-        console.error('[task:start] session start failed', {
-          source,
-          taskId: updated.id,
-          error: started.error,
-          message: started.message,
-        });
-      }
-    } catch (err) {
-      console.error('[task:start] unexpected session start failure', {
-        source,
-        taskId: updated.id,
-        err,
-      });
-    }
+    await runStartSessionForTaskWithLogging(updated, source, columnTasks);
     return updated;
   }
 
@@ -1012,10 +1022,47 @@ app.whenReady().then(async () => {
     daemonClient.resizeSession(sessionId, cols, rows);
   });
 
-  fluxMcpServer = new McpServer(taskStore, projectStore, () => mainWindow, {
-    updateTask: (id, patch) => updateTaskWithTransitionHandling(id, patch, 'mcp:flux__update_task'),
-    startTask: (id) => startTaskAndSession(id, 'mcp:flux__start_task'),
-  });
+  const mcpRendererBridge = new McpRendererBridge(() => mainWindow);
+  mcpRendererBridge.install();
+
+  // TEMP for phase 2 manual smoke test of the renderer bridge. Removed in phase 3
+  // when McpServer wires up the bridge for cloud-project tools.
+  ipcMain.handle(
+    'debug:mcpBridge:request',
+    async (_e, op: McpBridgeOp, payload?: unknown) => {
+      const activeKey = appStateStore.get().activeProjectKey;
+      if (!activeKey) {
+        return {
+          ok: false as const,
+          code: 'NO_ACTIVE_PROJECT',
+          message: 'No active project',
+        };
+      }
+      return mcpRendererBridge.request(op, activeKey, payload);
+    },
+  );
+
+  fluxMcpServer = new McpServer(
+    taskStore,
+    projectStore,
+    appStateStore,
+    bindingStore,
+    mcpRendererBridge,
+    () => mainWindow,
+    {
+      updateTask: (id, patch) =>
+        updateTaskWithTransitionHandling(id, patch, 'mcp:flux__update_task'),
+      startTask: (id) => startTaskAndSession(id, 'mcp:flux__start_task'),
+      startSessionForExistingTask: (task) =>
+        runStartSessionForTaskWithLogging(task, 'mcp:flux__start_task'),
+      autoStartIfTransitionedToInProgress: (previous, updated) =>
+        maybeAutoStartSessionOnInProgressTransition(
+          previous,
+          updated,
+          'mcp:flux__update_task',
+        ),
+    },
+  );
   fluxMcpServer.start();
 
   async function activeProjectIdForPlanning(): Promise<string | null> {

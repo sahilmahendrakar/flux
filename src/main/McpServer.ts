@@ -8,7 +8,18 @@ import type { BrowserWindow } from 'electron';
 import { z } from 'zod';
 import type { TaskStore } from './TaskStore';
 import type { ProjectStore } from './ProjectStore';
-import type { Task } from '../types';
+import type { AppStateStore } from './AppStateStore';
+import type { LocalBindingStore } from './LocalBindingStore';
+import type { McpRendererBridge, McpBridgeResult } from './McpRendererBridge';
+import type { ActiveProjectKey, Task } from '../types';
+import type {
+  McpBridgeProjectInfoResult,
+  McpBridgeTasksCreatePayload,
+  McpBridgeTasksDeletePayload,
+  McpBridgeTasksUpdatePayload,
+  McpBridgeTasksUpdateResult,
+} from '../mcpBridge';
+import { isTaskBlocked } from '../taskDependencies';
 
 const MCP_PORT = 47432;
 
@@ -40,6 +51,9 @@ export class McpServer {
   constructor(
     private taskStore: TaskStore,
     private projectStore: ProjectStore,
+    private appStateStore: AppStateStore,
+    private bindingStore: LocalBindingStore,
+    private bridge: McpRendererBridge,
     private getMainWindow: () => BrowserWindow | null,
     private taskActions: {
       updateTask: (
@@ -52,6 +66,11 @@ export class McpServer {
         >,
       ) => Promise<Task>;
       startTask: (id: string) => Promise<Task>;
+      startSessionForExistingTask: (task: Task) => Promise<void>;
+      autoStartIfTransitionedToInProgress: (
+        previous: Task,
+        updated: Task,
+      ) => Promise<void>;
     },
   ) {}
 
@@ -81,6 +100,57 @@ export class McpServer {
     return task ?? null;
   }
 
+  /**
+   * Resolve the currently-active project for an MCP tool call. Returns
+   * `local` with concrete handles when a local project is open, `cloud` with
+   * the active key + rootPath for cloud projects (data lives in Firestore via
+   * the renderer bridge), or `none` when no project is open.
+   */
+  private resolveActive():
+    | { kind: 'none' }
+    | {
+        kind: 'local';
+        activeKey: ActiveProjectKey;
+        project: ReturnType<ProjectStore['get']> & object;
+        projectDir: string;
+      }
+    | { kind: 'cloud'; activeKey: ActiveProjectKey; rootPath: string } {
+    const activeKey = this.appStateStore.get().activeProjectKey;
+    if (!activeKey) return { kind: 'none' };
+    if (activeKey.kind === 'local') {
+      const project = this.projectStore.get();
+      const projectDir = this.projectStore.getProjectDir();
+      if (!project || !projectDir) return { kind: 'none' };
+      return { kind: 'local', activeKey, project, projectDir };
+    }
+    const binding = this.bindingStore.get(activeKey.id);
+    if (!binding) return { kind: 'none' };
+    return { kind: 'cloud', activeKey, rootPath: binding.rootPath };
+  }
+
+  /** Translate a bridge error into the MCP tool error envelope. */
+  private bridgeError(
+    result: Extract<McpBridgeResult<unknown>, { ok: false }>,
+  ): ReturnType<typeof jsonToolPayload> {
+    const friendly = (() => {
+      switch (result.code) {
+        case 'AUTH_NOT_READY':
+          return 'Sign in to Flux to use cloud project tools';
+        case 'RENDERER_NOT_READY':
+          return 'Open the Flux app to enable cloud project tools';
+        case 'RENDERER_TIMEOUT':
+          return 'Flux app did not respond in time. Please try again.';
+        case 'PROJECT_KIND_MISMATCH':
+          return 'Active project changed during request. Please retry.';
+        case 'NO_ACTIVE_PROJECT':
+          return 'No project open';
+        default:
+          return result.message;
+      }
+    })();
+    return jsonToolPayload({ error: friendly, code: result.code });
+  }
+
   private registerTools(server: BaseMcpServer): void {
     server.tool(
       'flux__list_tasks',
@@ -88,13 +158,20 @@ export class McpServer {
       {},
       async () => {
         try {
-          const project = this.projectStore.get();
-          const projectDir = this.projectStore.getProjectDir();
-          if (!project || !projectDir) {
+          const active = this.resolveActive();
+          if (active.kind === 'none') {
             return jsonToolPayload({ error: 'No project open' });
           }
-          const tasks = this.taskStore.getAll(project.id);
-          return jsonToolPayload(tasks);
+          if (active.kind === 'local') {
+            const tasks = this.taskStore.getAll(active.project.id);
+            return jsonToolPayload(tasks);
+          }
+          const result = await this.bridge.request<Task[]>(
+            'tasks.list',
+            active.activeKey,
+          );
+          if (!result.ok) return this.bridgeError(result);
+          return jsonToolPayload(result.data);
         } catch (err) {
           return toolError(err);
         }
@@ -124,24 +201,47 @@ export class McpServer {
       },
       async (input) => {
         try {
-          const project = this.projectStore.get();
-          const projectDir = this.projectStore.getProjectDir();
-          if (!project || !projectDir) {
+          const active = this.resolveActive();
+          if (active.kind === 'none') {
             return jsonToolPayload({ error: 'No project open' });
           }
           const agent = input.agent ?? 'claude-code';
-          let task = await this.taskStore.create({
-            title: input.title,
-            agent,
-            projectId: project.id,
-            ...(input.blockedByTaskIds?.length ? { blockedByTaskIds: input.blockedByTaskIds } : {}),
-            ...(input.labels !== undefined ? { labels: input.labels } : {}),
-          });
-          if (input.description != null && input.description !== '') {
-            task = await this.taskStore.update(task.id, { description: input.description });
+          if (active.kind === 'local') {
+            let task = await this.taskStore.create({
+              title: input.title,
+              agent,
+              projectId: active.project.id,
+              ...(input.blockedByTaskIds?.length
+                ? { blockedByTaskIds: input.blockedByTaskIds }
+                : {}),
+              ...(input.labels !== undefined ? { labels: input.labels } : {}),
+            });
+            if (input.description != null && input.description !== '') {
+              task = await this.taskStore.update(task.id, {
+                description: input.description,
+              });
+            }
+            this.notifyTasksChanged();
+            return jsonToolPayload(task);
           }
-          this.notifyTasksChanged();
-          return jsonToolPayload(task);
+          // Cloud: blockedByTaskIds and labels are not yet propagated through
+          // the renderer bridge; tracked as follow-up work.
+          const payload: McpBridgeTasksCreatePayload = {
+            input: {
+              title: input.title,
+              agent,
+              ...(input.description != null && input.description !== ''
+                ? { description: input.description }
+                : {}),
+            },
+          };
+          const result = await this.bridge.request<Task>(
+            'tasks.create',
+            active.activeKey,
+            payload,
+          );
+          if (!result.ok) return this.bridgeError(result);
+          return jsonToolPayload(result.data);
         } catch (err) {
           return toolError(err);
         }
@@ -170,31 +270,52 @@ export class McpServer {
       },
       async (input) => {
         try {
-          const project = this.projectStore.get();
-          const projectDir = this.projectStore.getProjectDir();
-          if (!project || !projectDir) {
+          const active = this.resolveActive();
+          if (active.kind === 'none') {
             return jsonToolPayload({ error: 'No project open' });
           }
-          const existing = this.getTaskInCurrentProject(input.id);
-          if (!existing) {
-            return jsonToolPayload({
-              error: 'Task not found or not part of the current project',
-            });
+          if (active.kind === 'local') {
+            const existing = this.getTaskInCurrentProject(input.id);
+            if (!existing) {
+              return jsonToolPayload({
+                error: 'Task not found or not part of the current project',
+              });
+            }
+            const patch: Partial<
+              Pick<
+                Task,
+                'title' | 'description' | 'status' | 'agent' | 'blockedByTaskIds' | 'labels'
+              >
+            > = {};
+            if (input.title !== undefined) patch.title = input.title;
+            if (input.description !== undefined) patch.description = input.description;
+            if (input.status !== undefined) patch.status = input.status;
+            if (input.agent !== undefined) patch.agent = input.agent;
+            if (input.blockedByTaskIds !== undefined)
+              patch.blockedByTaskIds = input.blockedByTaskIds;
+            if (input.labels !== undefined) patch.labels = input.labels;
+            const updated = await this.taskActions.updateTask(input.id, patch);
+            this.notifyTasksChanged();
+            return jsonToolPayload(updated);
           }
-          const patch: Partial<
-            Pick<
-              Task,
-              'title' | 'description' | 'status' | 'agent' | 'blockedByTaskIds' | 'labels'
-            >
-          > = {};
+          // Cloud: blockedByTaskIds and labels are not yet propagated through
+          // the renderer bridge; tracked as follow-up work.
+          const patch: Partial<Pick<Task, 'title' | 'description' | 'status' | 'agent'>> = {};
           if (input.title !== undefined) patch.title = input.title;
           if (input.description !== undefined) patch.description = input.description;
           if (input.status !== undefined) patch.status = input.status;
           if (input.agent !== undefined) patch.agent = input.agent;
-          if (input.blockedByTaskIds !== undefined) patch.blockedByTaskIds = input.blockedByTaskIds;
-          if (input.labels !== undefined) patch.labels = input.labels;
-          const updated = await this.taskActions.updateTask(input.id, patch);
-          this.notifyTasksChanged();
+          const payload: McpBridgeTasksUpdatePayload = { taskId: input.id, patch };
+          const result = await this.bridge.request<McpBridgeTasksUpdateResult>(
+            'tasks.update',
+            active.activeKey,
+            payload,
+          );
+          if (!result.ok) return this.bridgeError(result);
+          const { previous, updated } = result.data;
+          if (previous) {
+            await this.taskActions.autoStartIfTransitionedToInProgress(previous, updated);
+          }
           return jsonToolPayload(updated);
         } catch (err) {
           return toolError(err);
@@ -210,19 +331,48 @@ export class McpServer {
       },
       async (input) => {
         try {
-          const project = this.projectStore.get();
-          const projectDir = this.projectStore.getProjectDir();
-          if (!project || !projectDir) {
+          const active = this.resolveActive();
+          if (active.kind === 'none') {
             return jsonToolPayload({ error: 'No project open' });
           }
-          const existing = this.getTaskInCurrentProject(input.id);
+          if (active.kind === 'local') {
+            const existing = this.getTaskInCurrentProject(input.id);
+            if (!existing) {
+              return jsonToolPayload({
+                error: 'Task not found or not part of the current project',
+              });
+            }
+            const updated = await this.taskActions.startTask(input.id);
+            this.notifyTasksChanged();
+            return jsonToolPayload(updated);
+          }
+          // Cloud: pull current tasks for blocked-by validation, then transition + start.
+          const listResult = await this.bridge.request<Task[]>(
+            'tasks.list',
+            active.activeKey,
+          );
+          if (!listResult.ok) return this.bridgeError(listResult);
+          const columnTasks = listResult.data;
+          const existing = columnTasks.find((t) => t.id === input.id);
           if (!existing) {
             return jsonToolPayload({
               error: 'Task not found or not part of the current project',
             });
           }
-          const updated = await this.taskActions.startTask(input.id);
-          this.notifyTasksChanged();
+          if (isTaskBlocked(existing, columnTasks)) {
+            return jsonToolPayload({
+              error:
+                'Task is blocked by incomplete dependencies. Finish blocking tasks first.',
+            });
+          }
+          const updateResult = await this.bridge.request<McpBridgeTasksUpdateResult>(
+            'tasks.update',
+            active.activeKey,
+            { taskId: input.id, patch: { status: 'in-progress' } },
+          );
+          if (!updateResult.ok) return this.bridgeError(updateResult);
+          const { updated } = updateResult.data;
+          await this.taskActions.startSessionForExistingTask(updated);
           return jsonToolPayload(updated);
         } catch (err) {
           return toolError(err);
@@ -241,20 +391,29 @@ export class McpServer {
       },
       async (input) => {
         try {
-          const project = this.projectStore.get();
-          const projectDir = this.projectStore.getProjectDir();
-          if (!project || !projectDir) {
+          const active = this.resolveActive();
+          if (active.kind === 'none') {
             return jsonToolPayload({ error: 'No project open' });
           }
-          const existing = this.getTaskInCurrentProject(input.id);
-          if (!existing) {
-            return jsonToolPayload({
-              error: 'Task not found or not part of the current project',
-            });
+          if (active.kind === 'local') {
+            const existing = this.getTaskInCurrentProject(input.id);
+            if (!existing) {
+              return jsonToolPayload({
+                error: 'Task not found or not part of the current project',
+              });
+            }
+            await this.taskStore.delete(input.id);
+            this.notifyTasksChanged();
+            return jsonToolPayload({ ok: true, deletedId: input.id });
           }
-          await this.taskStore.delete(input.id);
-          this.notifyTasksChanged();
-          return jsonToolPayload({ ok: true, deletedId: input.id });
+          const payload: McpBridgeTasksDeletePayload = { taskId: input.id };
+          const result = await this.bridge.request<{ deletedId: string }>(
+            'tasks.delete',
+            active.activeKey,
+            payload,
+          );
+          if (!result.ok) return this.bridgeError(result);
+          return jsonToolPayload({ ok: true, deletedId: result.data.deletedId });
         } catch (err) {
           return toolError(err);
         }
@@ -267,28 +426,40 @@ export class McpServer {
       {},
       async () => {
         try {
-          const project = this.projectStore.get();
-          if (!project) {
+          const active = this.resolveActive();
+          if (active.kind === 'none') {
             return jsonToolPayload({ error: 'No project open' });
           }
-          const tasks = this.taskStore.getAll(project.id);
-          const taskCounts = {
-            backlog: 0,
-            'in-progress': 0,
-            'needs-input': 0,
-            done: 0,
-            total: tasks.length,
-          };
-          for (const t of tasks) {
-            if (t.status === 'backlog') taskCounts.backlog++;
-            else if (t.status === 'in-progress') taskCounts['in-progress']++;
-            else if (t.status === 'needs-input') taskCounts['needs-input']++;
-            else if (t.status === 'done') taskCounts.done++;
+          if (active.kind === 'local') {
+            const tasks = this.taskStore.getAll(active.project.id);
+            const taskCounts = {
+              backlog: 0,
+              'in-progress': 0,
+              'needs-input': 0,
+              done: 0,
+              total: tasks.length,
+            };
+            for (const t of tasks) {
+              if (t.status === 'backlog') taskCounts.backlog++;
+              else if (t.status === 'in-progress') taskCounts['in-progress']++;
+              else if (t.status === 'needs-input') taskCounts['needs-input']++;
+              else if (t.status === 'done') taskCounts.done++;
+            }
+            return jsonToolPayload({
+              name: active.project.name,
+              rootPath: active.project.rootPath,
+              taskCounts,
+            });
           }
+          const result = await this.bridge.request<McpBridgeProjectInfoResult>(
+            'projectInfo',
+            active.activeKey,
+          );
+          if (!result.ok) return this.bridgeError(result);
           return jsonToolPayload({
-            name: project.name,
-            rootPath: project.rootPath,
-            taskCounts,
+            name: result.data.name,
+            rootPath: active.rootPath,
+            taskCounts: result.data.taskCounts,
           });
         } catch (err) {
           return toolError(err);
