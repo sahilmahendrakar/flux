@@ -61,7 +61,13 @@ export class McpServer {
         patch: Partial<
           Pick<
             Task,
-            'title' | 'description' | 'status' | 'agent' | 'blockedByTaskIds' | 'labels'
+            | 'title'
+            | 'description'
+            | 'status'
+            | 'agent'
+            | 'blockedByTaskIds'
+            | 'labels'
+            | 'autoStartOnUnblock'
           >
         >,
       ) => Promise<Task>;
@@ -269,6 +275,12 @@ export class McpServer {
           .array(z.string())
           .optional()
           .describe('Replace feature tags; use [] to clear. Duplicates and casing normalized'),
+        autoStartOnUnblock: z
+          .boolean()
+          .optional()
+          .describe(
+            'If true, auto-start a session when the last dependency completes (in addition to project default for "when unblocked")',
+          ),
       },
       async (input) => {
         try {
@@ -286,7 +298,13 @@ export class McpServer {
             const patch: Partial<
               Pick<
                 Task,
-                'title' | 'description' | 'status' | 'agent' | 'blockedByTaskIds' | 'labels'
+                | 'title'
+                | 'description'
+                | 'status'
+                | 'agent'
+                | 'blockedByTaskIds'
+                | 'labels'
+                | 'autoStartOnUnblock'
               >
             > = {};
             if (input.title !== undefined) patch.title = input.title;
@@ -296,19 +314,28 @@ export class McpServer {
             if (input.blockedByTaskIds !== undefined)
               patch.blockedByTaskIds = input.blockedByTaskIds;
             if (input.labels !== undefined) patch.labels = input.labels;
+            if (input.autoStartOnUnblock !== undefined) {
+              patch.autoStartOnUnblock = input.autoStartOnUnblock;
+            }
             const updated = await this.taskActions.updateTask(input.id, patch);
             this.notifyTasksChanged();
             return jsonToolPayload(updated);
           }
           // Cloud: blockedByTaskIds is not yet propagated through the bridge.
           const patch: Partial<
-            Pick<Task, 'title' | 'description' | 'status' | 'agent' | 'labels'>
+            Pick<
+              Task,
+              'title' | 'description' | 'status' | 'agent' | 'labels' | 'autoStartOnUnblock'
+            >
           > = {};
           if (input.title !== undefined) patch.title = input.title;
           if (input.description !== undefined) patch.description = input.description;
           if (input.status !== undefined) patch.status = input.status;
           if (input.agent !== undefined) patch.agent = input.agent;
           if (input.labels !== undefined) patch.labels = input.labels;
+          if (input.autoStartOnUnblock !== undefined) {
+            patch.autoStartOnUnblock = input.autoStartOnUnblock;
+          }
           const payload: McpBridgeTasksUpdatePayload = { taskId: input.id, patch };
           const result = await this.bridge.request<McpBridgeTasksUpdateResult>(
             'tasks.update',

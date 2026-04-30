@@ -178,6 +178,7 @@ export class TaskStore {
         | 'workspaceCleanedAt'
         | 'blockedByTaskIds'
         | 'labels'
+        | 'autoStartOnUnblock'
       >
     >,
   ): Promise<Task> {
@@ -199,6 +200,13 @@ export class TaskStore {
         updated.labels = n;
       } else {
         delete updated.labels;
+      }
+    }
+    if (patch.autoStartOnUnblock !== undefined) {
+      if (patch.autoStartOnUnblock) {
+        updated.autoStartOnUnblock = true;
+      } else {
+        delete updated.autoStartOnUnblock;
       }
     }
     this.tasks[index] = updated;

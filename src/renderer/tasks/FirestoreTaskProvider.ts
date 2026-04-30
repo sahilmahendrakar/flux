@@ -165,6 +165,13 @@ export class FirestoreTaskProvider implements TaskProvider {
         updates.labels = deleteField();
       }
     }
+    if (patch.autoStartOnUnblock !== undefined) {
+      if (patch.autoStartOnUnblock) {
+        updates.autoStartOnUnblock = true;
+      } else {
+        updates.autoStartOnUnblock = deleteField();
+      }
+    }
     await updateDoc(ref, updates);
     const after = await getDoc(ref);
     return toTask(
@@ -214,7 +221,17 @@ function toTask(
     updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : undefined,
     ...parseBlockedByTaskIdsField(data.blockedByTaskIds),
     ...parseLabelsField(data.labels),
+    ...parseAutoStartOnUnblockField(data.autoStartOnUnblock),
   };
+}
+
+function parseAutoStartOnUnblockField(
+  val: unknown,
+): { autoStartOnUnblock: true } | Record<string, never> {
+  if (val === true) {
+    return { autoStartOnUnblock: true };
+  }
+  return {};
 }
 
 function parseLabelsField(

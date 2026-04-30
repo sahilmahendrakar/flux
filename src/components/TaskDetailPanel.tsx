@@ -81,6 +81,8 @@ interface TaskDetailPanelProps {
   onMarkAsDone?: () => void;
   /** True when dependencies block finishing; shows a disabled Mark as done control. */
   markAsDoneBlocked?: boolean;
+  /** Project “auto-start when unblocked” (from local config / cloud binding). */
+  autoStartWhenUnblockedProject?: boolean;
 }
 
 const TASK_DETAIL_WIDTH_KEY = 'flux.taskDetailPanelWidth';
@@ -169,6 +171,7 @@ export default function TaskDetailPanel({
   onArchiveSession,
   onMarkAsDone,
   markAsDoneBlocked = false,
+  autoStartWhenUnblockedProject = false,
 }: TaskDetailPanelProps) {
   const asideRef = useRef<HTMLElement>(null);
   const [detailWidth, setDetailWidth] = useState(DEFAULT_DETAIL_WIDTH);
@@ -970,6 +973,29 @@ export default function TaskDetailPanel({
                   This task stays blocked until every listed dependency is done. Missing task ids are ignored
                   for blocking logic.
                 </p>
+                {task.status !== 'done' && (task.blockedByTaskIds ?? []).length > 0 ? (
+                  <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={task.autoStartOnUnblock === true}
+                      onChange={(e) =>
+                        onUpdate(task.id, { autoStartOnUnblock: e.target.checked })
+                      }
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/[0.2] bg-[#09090b]"
+                    />
+                    <span className="min-w-0">
+                      <span className="text-[13px] font-medium text-zinc-200">
+                        Auto-start when unblocked
+                      </span>
+                      <span className="mt-0.5 block text-[11px] leading-snug text-zinc-500">
+                        Start a session when the last dependency is completed
+                        {autoStartWhenUnblockedProject
+                          ? ' (this project can also auto-start from settings).'
+                          : ' (or enable the project default in settings).'}
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
                 {(task.blockedByTaskIds ?? []).length === 0 ? (
                   <p className="text-sm text-zinc-600">No dependencies — this task is not waiting on other work.</p>
                 ) : (

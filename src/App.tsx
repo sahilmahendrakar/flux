@@ -49,6 +49,8 @@ import { normalizeTaskLabels } from './taskLabels';
 import { invalidateSessionAttachCache } from './terminal/warmAttach';
 import { isTaskBlocked } from './taskDependencies';
 import { useMcpRendererBridge } from './renderer/mcp/useMcpRendererBridge';
+import { applyUnblockAutostartForCompletedBlocker } from './unblockAutostartApply';
+import type { UnblockAutostartPolicy } from './unblockAutostart';
 
 type ActiveProject = LocalProject | CloudProject;
 
@@ -142,6 +144,11 @@ export default function App() {
   const boardRowRef = useRef<HTMLDivElement>(null);
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
+  const tasksRef = useRef<Task[]>([]);
+  tasksRef.current = tasks;
+  const cloudUnblockTasksPrevRef = useRef<Task[] | null>(null);
+  const cloudUnblockInFlightRef = useRef<Set<string>>(new Set());
+  const [autoStartWhenUnblockedProject, setAutoStartWhenUnblockedProject] = useState(false);
 
   const auth = useAuth();
   const uid = auth.user?.uid ?? null;
@@ -253,6 +260,96 @@ export default function App() {
   }, [provider]);
 
   useMcpRendererBridge({ project, provider, uid, tasksSnapshot: tasks });
+
+  useEffect(() => {
+    if (!project) {
+      setAutoStartWhenUnblockedProject(false);
+      return;
+    }
+    let cancelled = false;
+    void window.electronAPI.project
+      .getAutoStartWhenUnblocked()
+      .then((v) => {
+        if (!cancelled) setAutoStartWhenUnblockedProject(v);
+      })
+      .catch(() => {
+        if (!cancelled) setAutoStartWhenUnblockedProject(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.id]);
+
+  useEffect(() => {
+    if (project?.kind !== 'cloud' || !provider) {
+      cloudUnblockTasksPrevRef.current = null;
+      return;
+    }
+    const prev = cloudUnblockTasksPrevRef.current;
+    cloudUnblockTasksPrevRef.current = tasks;
+    if (prev == null) {
+      return;
+    }
+    const prevById = new Map(prev.map((t) => [t.id, t]));
+    for (const t of tasks) {
+      const was = prevById.get(t.id);
+      if (!was || was.status === 'done' || t.status !== 'done') {
+        continue;
+      }
+      const allAfter = tasks;
+      const allBefore = allAfter.map((x) => (x.id === t.id ? was : x));
+      void (async () => {
+        if (!provider) {
+          return;
+        }
+        let inProg = false;
+        let whenUnb = false;
+        try {
+          [inProg, whenUnb] = await Promise.all([
+            window.electronAPI.project.getAutoStartSessionOnInProgress(),
+            window.electronAPI.project.getAutoStartWhenUnblocked(),
+          ]);
+        } catch {
+          return;
+        }
+        const policy: UnblockAutostartPolicy = {
+          autoStartSessionOnInProgress: inProg,
+          autoStartWhenUnblocked: whenUnb,
+        };
+        await applyUnblockAutostartForCompletedBlocker(was, t, allBefore, allAfter, policy, {
+          inFlight: cloudUnblockInFlightRef.current,
+          source: 'cloud:tasks',
+          logError: (msg, data) => console.error(msg, data),
+          getCurrentList: () => tasksRef.current,
+          startSession: (task, all) => window.electronAPI.sessions.start(task, all),
+          moveBacklogToInProgress: async (id) => {
+            const updated = await provider.update(id, { status: 'in-progress' });
+            if (inProg) {
+              const all = tasksRef.current.map((x) => (x.id === id ? updated : x));
+              const r = await window.electronAPI.sessions.start(updated, all);
+              if (r && typeof r === 'object' && 'error' in r) {
+                console.error('[task:unblock-autostart] session start failed', {
+                  taskId: id,
+                  error: (r as { error: string }).error,
+                });
+              }
+            }
+          },
+          moveBacklogToInProgressThenStartSessionWithoutImplicitInProg: async (id) => {
+            const updated = await provider.update(id, { status: 'in-progress' });
+            const all = tasksRef.current.map((x) => (x.id === id ? updated : x));
+            const r = await window.electronAPI.sessions.start(updated, all);
+            if (r && typeof r === 'object' && 'error' in r) {
+              console.error('[task:unblock-autostart] session start failed', {
+                taskId: id,
+                error: (r as { error: string }).error,
+              });
+            }
+          },
+        });
+      })();
+    }
+  }, [tasks, project?.kind, project?.id, provider]);
 
   useEffect(() => {
     if (!provider?.reloadFromMain) return;
@@ -582,6 +679,14 @@ export default function App() {
               delete next.labels;
             }
           }
+          if (patch.autoStartOnUnblock !== undefined) {
+            if (patch.autoStartOnUnblock) {
+              next = { ...next, autoStartOnUnblock: true };
+            } else {
+              next = { ...next };
+              delete next.autoStartOnUnblock;
+            }
+          }
           return next;
         }),
       );
@@ -602,6 +707,9 @@ export default function App() {
       }
       if (patch.labels !== undefined) {
         persistable.labels = normalizeTaskLabels(patch.labels);
+      }
+      if (patch.autoStartOnUnblock !== undefined) {
+        persistable.autoStartOnUnblock = patch.autoStartOnUnblock;
       }
       if (Object.keys(persistable).length === 0) return;
 
@@ -1378,6 +1486,10 @@ export default function App() {
                       onRequestCleanupTask={requestCleanupTask}
                       cleanupLoadingTaskId={cleanupLoadingTaskId}
                       onCardClick={(id) => setSelectedTaskId(id)}
+                      autoStartWhenUnblockedProject={autoStartWhenUnblockedProject}
+                      onToggleTaskAutoStartOnUnblock={(id, enabled) =>
+                        void handleUpdateTask(id, { autoStartOnUnblock: enabled })
+                      }
                       planPanelOpen={planPanelOpen}
                       onTogglePlanPanel={() => {
                         setActiveTabId('board');
@@ -1402,6 +1514,7 @@ export default function App() {
                       markAsDoneBlocked={Boolean(
                         selectedTask && isTaskBlocked(selectedTask, tasks),
                       )}
+                      autoStartWhenUnblockedProject={autoStartWhenUnblockedProject}
                       remoteRunner={remoteRunnerForSelected}
                       onOpenSessionTab={handleOpenSessionTab}
                       onArchiveSession={(id) => void handleArchiveSession(id)}
@@ -1506,6 +1619,7 @@ export default function App() {
                 currentUid={uid}
                 currentUserDisplayName={displayName}
                 currentUserEmail={userEmail ?? undefined}
+                onAutoStartWhenUnblockedChange={setAutoStartWhenUnblockedProject}
               />
             ) : null}
           </div>

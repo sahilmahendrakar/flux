@@ -7,6 +7,8 @@ interface Props {
   currentUid: string | null;
   currentUserDisplayName?: string;
   currentUserEmail?: string;
+  /** Fires after “auto-start when unblocked” is saved so the board can refresh hints. */
+  onAutoStartWhenUnblockedChange?: (enabled: boolean) => void;
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -17,6 +19,7 @@ export function ProjectSettingsView({
   currentUid,
   currentUserDisplayName,
   currentUserEmail,
+  onAutoStartWhenUnblockedChange,
 }: Props) {
   const teamAvailable = project.kind === 'cloud' && !!currentUid;
   const [category, setCategory] = useState<Category>('project');
@@ -48,7 +51,10 @@ export function ProjectSettingsView({
       </nav>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {category === 'project' ? (
-          <ProjectConfigPane project={project} />
+          <ProjectConfigPane
+            project={project}
+            onAutoStartWhenUnblockedChange={onAutoStartWhenUnblockedChange}
+          />
         ) : teamAvailable && project.kind === 'cloud' && currentUid ? (
           <TeamView
             project={project}
@@ -90,9 +96,10 @@ function CategoryButton({
 
 interface ProjectConfigPaneProps {
   project: LocalProject | CloudProject;
+  onAutoStartWhenUnblockedChange?: (enabled: boolean) => void;
 }
 
-function ProjectConfigPane({ project }: ProjectConfigPaneProps) {
+function ProjectConfigPane({ project, onAutoStartWhenUnblockedChange }: ProjectConfigPaneProps) {
   const [repos, setRepos] = useState<RepoConfig[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -100,6 +107,10 @@ function ProjectConfigPane({ project }: ProjectConfigPaneProps) {
   const [autoStartLoading, setAutoStartLoading] = useState(true);
   const [autoStartSaveState, setAutoStartSaveState] = useState<SaveState>('idle');
   const [autoStartError, setAutoStartError] = useState<string | null>(null);
+  const [whenUnblockedEnabled, setWhenUnblockedEnabled] = useState(false);
+  const [whenUnblockedLoading, setWhenUnblockedLoading] = useState(true);
+  const [whenUnblockedSaveState, setWhenUnblockedSaveState] = useState<SaveState>('idle');
+  const [whenUnblockedError, setWhenUnblockedError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -142,6 +153,50 @@ function ProjectConfigPane({ project }: ProjectConfigPaneProps) {
       cancelled = true;
     };
   }, [project.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setWhenUnblockedLoading(true);
+    setWhenUnblockedError(null);
+    void window.electronAPI.project
+      .getAutoStartWhenUnblocked()
+      .then((enabled) => {
+        if (!cancelled) {
+          setWhenUnblockedEnabled(enabled);
+          setWhenUnblockedSaveState('idle');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setWhenUnblockedError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setWhenUnblockedLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+
+  const handleWhenUnblockedChange = useCallback(async (enabled: boolean) => {
+    setWhenUnblockedEnabled(enabled);
+    setWhenUnblockedSaveState('saving');
+    setWhenUnblockedError(null);
+    const result = await window.electronAPI.project.setAutoStartWhenUnblocked(enabled);
+    if ('error' in result) {
+      setWhenUnblockedSaveState('error');
+      setWhenUnblockedError(result.error);
+      setWhenUnblockedEnabled((prev) => !prev);
+      return;
+    }
+    setWhenUnblockedEnabled(result.enabled);
+    onAutoStartWhenUnblockedChange?.(result.enabled);
+    setWhenUnblockedSaveState('saved');
+    window.setTimeout(() => {
+      setWhenUnblockedSaveState((state) => (state === 'saved' ? 'idle' : state));
+    }, 1500);
+  }, [onAutoStartWhenUnblockedChange]);
 
   const handleAutoStartChange = useCallback(async (enabled: boolean) => {
     setAutoStartEnabled(enabled);
@@ -202,6 +257,41 @@ function ProjectConfigPane({ project }: ProjectConfigPaneProps) {
               <span className="text-emerald-400">Saved</span>
             ) : autoStartError ? (
               <span className="text-red-400">{autoStartError}</span>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-[13px] font-medium text-zinc-200">
+                Auto-start when dependencies unblock
+              </h2>
+              <p className="mt-0.5 text-[12px] leading-snug text-zinc-500">
+                When a task is waiting on other tasks, start a session automatically after the last
+                blocking task is completed. You can also opt in per task from the card or task detail.
+                Uses the same session start path as “In progress” (worktree, agent, model). Pair with
+                the setting above, or use this alone for dependency-driven runs.
+              </p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-[12px] text-zinc-300">
+              <input
+                type="checkbox"
+                checked={whenUnblockedEnabled}
+                disabled={whenUnblockedLoading || whenUnblockedSaveState === 'saving'}
+                onChange={(e) => void handleWhenUnblockedChange(e.target.checked)}
+                className="h-4 w-4 rounded border-white/[0.2] bg-[#09090b]"
+              />
+              Enabled
+            </label>
+          </div>
+          <div className="mt-2 min-h-4 text-[11px]">
+            {whenUnblockedSaveState === 'saving' ? (
+              <span className="text-zinc-500">Saving…</span>
+            ) : whenUnblockedSaveState === 'saved' ? (
+              <span className="text-emerald-400">Saved</span>
+            ) : whenUnblockedError ? (
+              <span className="text-red-400">{whenUnblockedError}</span>
             ) : null}
           </div>
         </section>
