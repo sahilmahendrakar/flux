@@ -38,6 +38,9 @@ export interface TerminalHandle {
 }
 
 const MIN_CONTAINER_PX = 8;
+/** Layout-driven (ResizeObserver / window) refits: debounce so we do not
+ * clear+resize the xterm grid on every frame while a splitter is dragging. */
+const LAYOUT_FIT_DEBOUNCE_MS = 100;
 
 function containerHasUsableSize(el: HTMLElement): boolean {
   return (
@@ -148,7 +151,9 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
     termRef.current = term;
 
     let cancelled = false;
-    let resizeRaf = 0;
+    let immediateRaf = 0;
+    let layoutRaf = 0;
+    let layoutDebounce: ReturnType<typeof setTimeout> | undefined;
 
     const doFit = () => {
       if (cancelled) return;
@@ -161,10 +166,19 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
       }
     };
 
+    /** Imminent refit: after attach, tab focus, or imperative `fit()`. */
     const scheduleResizeFit = (afterFit?: () => void) => {
-      if (resizeRaf) cancelAnimationFrame(resizeRaf);
-      resizeRaf = requestAnimationFrame(() => {
-        resizeRaf = 0;
+      if (layoutDebounce !== undefined) {
+        clearTimeout(layoutDebounce);
+        layoutDebounce = undefined;
+      }
+      if (layoutRaf) {
+        cancelAnimationFrame(layoutRaf);
+        layoutRaf = 0;
+      }
+      if (immediateRaf) cancelAnimationFrame(immediateRaf);
+      immediateRaf = requestAnimationFrame(() => {
+        immediateRaf = 0;
         doFit();
         if (!cancelled) {
           afterFit?.();
@@ -172,6 +186,23 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
       });
     };
     scheduleFitRef.current = scheduleResizeFit;
+
+    const scheduleLayoutFit = () => {
+      if (layoutDebounce !== undefined) clearTimeout(layoutDebounce);
+      if (layoutRaf) {
+        cancelAnimationFrame(layoutRaf);
+        layoutRaf = 0;
+      }
+      layoutDebounce = setTimeout(() => {
+        layoutDebounce = undefined;
+        if (cancelled) return;
+        layoutRaf = requestAnimationFrame(() => {
+          layoutRaf = 0;
+          if (cancelled) return;
+          doFit();
+        });
+      }, LAYOUT_FIT_DEBOUNCE_MS);
+    };
 
     // xterm measures the rendered font to compute cols/rows. If the
     // configured fonts ("JetBrains Mono" etc.) haven't loaded yet the
@@ -211,12 +242,18 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
       onResizeRef.current?.(cols, rows),
     );
 
-    const onWindowResize = () => scheduleResizeFit();
+    const onWindowResize = () => {
+      if (autoFit) scheduleLayoutFit();
+    };
     if (autoFit) {
       window.addEventListener('resize', onWindowResize);
     }
 
-    const ro = autoFit ? new ResizeObserver(() => scheduleResizeFit()) : null;
+    const ro = autoFit
+      ? new ResizeObserver(() => {
+          scheduleLayoutFit();
+        })
+      : null;
     ro?.observe(container);
 
     return () => {
@@ -224,7 +261,18 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
       if (autoFit) {
         window.removeEventListener('resize', onWindowResize);
       }
-      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      if (layoutDebounce !== undefined) {
+        clearTimeout(layoutDebounce);
+        layoutDebounce = undefined;
+      }
+      if (layoutRaf) {
+        cancelAnimationFrame(layoutRaf);
+        layoutRaf = 0;
+      }
+      if (immediateRaf) {
+        cancelAnimationFrame(immediateRaf);
+        immediateRaf = 0;
+      }
       scheduleFitRef.current = null;
       ro?.disconnect();
       d1.dispose();

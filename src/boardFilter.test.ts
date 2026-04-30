@@ -10,9 +10,6 @@ function task(
     id,
     projectId: 'p',
     createdAt: '0',
-    title: over.title,
-    status: over.status,
-    agent: over.agent,
     ...over,
   };
 }
