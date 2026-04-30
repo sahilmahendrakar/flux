@@ -46,6 +46,7 @@ import { LocalTaskProvider } from './renderer/tasks/LocalTaskProvider';
 import { FirestoreTaskProvider } from './renderer/tasks/FirestoreTaskProvider';
 import { keyForInsert, sortColumn } from './renderer/tasks/orderKey';
 import { invalidateSessionAttachCache } from './terminal/warmAttach';
+import { isTaskBlocked } from './taskDependencies';
 
 type ActiveProject = LocalProject | CloudProject;
 
@@ -644,6 +645,54 @@ export default function App() {
         );
       } catch (err) {
         console.error('[tasks.update] drag-end failed', err);
+      }
+    },
+    [provider, tasks],
+  );
+
+  const handleMarkTaskDone = useCallback(
+    async (taskId: string, ui?: { closeDetail?: boolean; goToBoard?: boolean }) => {
+      if (!provider) return;
+      const task = tasks.find((t) => t.id === taskId);
+      if (!task || task.status === 'done') return;
+      if (isTaskBlocked(task, tasks)) return;
+
+      const pending = pendingRef.current.get(taskId);
+      if (pending) {
+        clearTimeout(pending.timer);
+        pendingRef.current.delete(taskId);
+      }
+
+      const destCol = sortColumn(
+        tasks.filter((t) => t.id !== taskId),
+        'done',
+      );
+      let nextOrderKey: string;
+      try {
+        nextOrderKey = keyForInsert(destCol, destCol.length);
+      } catch (err) {
+        console.error('[markTaskDone] keyForInsert failed; using fallback', err);
+        nextOrderKey = String(Date.now());
+      }
+
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? { ...t, status: 'done' as const, orderKey: nextOrderKey }
+            : t,
+        ),
+      );
+      if (ui?.closeDetail) setSelectedTaskId(null);
+      if (ui?.goToBoard) setActiveTabId('board');
+
+      try {
+        const updated = await provider.update(taskId, {
+          status: 'done',
+          orderKey: nextOrderKey,
+        });
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+      } catch (err) {
+        console.error('[tasks.update] mark done failed', err);
       }
     },
     [provider, tasks],
@@ -1259,6 +1308,8 @@ export default function App() {
             */}
             {openTabItems.map((item) => {
               const isActive = activeTabId === item.session.id;
+              const tabTask = tasks.find((t) => t.id === item.session.taskId) ?? null;
+              const tabTaskBlocked = tabTask ? isTaskBlocked(tabTask, tasks) : false;
               return (
                 <div
                   key={item.session.id}
@@ -1270,7 +1321,17 @@ export default function App() {
                     zIndex: isActive ? 1 : 0,
                   }}
                 >
-                  <SessionTerminalView session={item.session} visible={isActive} />
+                  <SessionTerminalView
+                    session={item.session}
+                    visible={isActive}
+                    task={tabTask}
+                    markAsDoneBlocked={tabTaskBlocked}
+                    onMarkAsDone={
+                      tabTask && tabTask.status !== 'done' && !tabTaskBlocked
+                        ? () => void handleMarkTaskDone(item.session.taskId, { goToBoard: true })
+                        : undefined
+                    }
+                  />
                 </div>
               );
             })}
@@ -1306,6 +1367,14 @@ export default function App() {
                       onClose={() => setSelectedTaskId(null)}
                       onUpdate={handleUpdateTask}
                       onDelete={handleDeleteTask}
+                      onMarkAsDone={
+                        selectedTask && selectedTask.status !== 'done' && !isTaskBlocked(selectedTask, tasks)
+                          ? () => void handleMarkTaskDone(selectedTask.id, { closeDetail: true })
+                          : undefined
+                      }
+                      markAsDoneBlocked={Boolean(
+                        selectedTask && isTaskBlocked(selectedTask, tasks),
+                      )}
                       remoteRunner={remoteRunnerForSelected}
                       onOpenSessionTab={handleOpenSessionTab}
                       onArchiveSession={(id) => void handleArchiveSession(id)}

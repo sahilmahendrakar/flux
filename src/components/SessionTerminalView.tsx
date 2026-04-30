@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import type { Session, Shell } from '../types';
+import type { Session, Shell, Task } from '../types';
 import {
   getSessionAttachShared,
   getShellAttachShared,
@@ -36,6 +36,11 @@ function BotIcon({ className }: { className?: string }) {
 interface SessionTerminalViewProps {
   session: Session;
   visible?: boolean;
+  /** Board task for this workspace; used for Mark as done. */
+  task?: Task | null;
+  onMarkAsDone?: () => void;
+  /** Dependency blockers not finished — Mark as done stays visible but disabled. */
+  markAsDoneBlocked?: boolean;
 }
 
 type PaneId = 'agent' | `shell:${string}`;
@@ -236,10 +241,18 @@ function PaneTab({
   );
 }
 
-export function SessionTerminalView({ session, visible = true }: SessionTerminalViewProps) {
+export function SessionTerminalView({
+  session,
+  visible = true,
+  task = null,
+  onMarkAsDone,
+  markAsDoneBlocked = false,
+}: SessionTerminalViewProps) {
   const [shells, setShells] = useState<Shell[]>([]);
   const [activePane, setActivePane] = useState<PaneId>('agent');
   const running = session.status === 'running';
+  const showMarkAsDone = task != null && task.status !== 'done';
+  const markDoneDisabled = showMarkAsDone && (markAsDoneBlocked || !onMarkAsDone);
 
   useEffect(() => {
     let cancelled = false;
@@ -278,40 +291,62 @@ export function SessionTerminalView({ session, visible = true }: SessionTerminal
     [],
   );
 
+  const markDoneBtn =
+    'shrink-0 rounded-lg bg-white/[0.04] px-3 py-1.5 text-[12px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25';
+  const markDoneBtnDisabled =
+    'shrink-0 cursor-not-allowed rounded-lg bg-zinc-800/50 px-3 py-1.5 text-[12px] font-medium text-zinc-500 ring-1 ring-inset ring-white/[0.06]';
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-white/[0.06] bg-[#0a0a0c] px-3 py-1">
-        <PaneTab
-          label="Agent"
-          active={activePane === 'agent'}
-          onClick={() => setActivePane('agent')}
-          icon={<BotIcon className="shrink-0 opacity-80" />}
-        />
-        {shells.map((shell, idx) => (
+      <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.05] bg-[#0a0a0b] pl-1 pr-2.5 py-1">
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-0.5 pl-0.5">
           <PaneTab
-            key={shell.id}
-            label={`Terminal ${idx + 1}`}
-            active={activePane === `shell:${shell.id}`}
-            onClick={() => setActivePane(`shell:${shell.id}`)}
-            onClose={() => void handleCloseShell(shell.id)}
-            status={shell.status}
+            label="Agent"
+            active={activePane === 'agent'}
+            onClick={() => setActivePane('agent')}
+            icon={<BotIcon className="shrink-0 opacity-80" />}
           />
-        ))}
-        <button
-          type="button"
-          onClick={() => void handleOpenShell()}
-          disabled={!running}
-          title={running ? 'Open a new terminal in this worktree' : 'Session is not running'}
-          aria-label="Open a new terminal in this worktree"
-          className={[
-            'ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[16px] leading-none transition',
-            running
-              ? 'text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100'
-              : 'cursor-not-allowed text-zinc-700',
-          ].join(' ')}
-        >
-          +
-        </button>
+          {shells.map((shell, idx) => (
+            <PaneTab
+              key={shell.id}
+              label={`Terminal ${idx + 1}`}
+              active={activePane === `shell:${shell.id}`}
+              onClick={() => setActivePane(`shell:${shell.id}`)}
+              onClose={() => void handleCloseShell(shell.id)}
+              status={shell.status}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() => void handleOpenShell()}
+            disabled={!running}
+            title={running ? 'Open a new terminal in this worktree' : 'Session is not running'}
+            aria-label="Open a new terminal in this worktree"
+            className={[
+              'ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[16px] leading-none transition',
+              running
+                ? 'text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100'
+                : 'cursor-not-allowed text-zinc-700',
+            ].join(' ')}
+          >
+            +
+          </button>
+        </div>
+        {showMarkAsDone ? (
+          <button
+            type="button"
+            onClick={() => onMarkAsDone?.()}
+            disabled={markDoneDisabled}
+            title={
+              markAsDoneBlocked
+                ? 'Finish blocking tasks before marking this task done'
+                : 'Move task to Done and open the board'
+            }
+            className={markDoneDisabled ? markDoneBtnDisabled : markDoneBtn}
+          >
+            Mark as done
+          </button>
+        ) : null}
       </div>
       <div className="relative min-h-0 flex-1">
         <AgentPane
