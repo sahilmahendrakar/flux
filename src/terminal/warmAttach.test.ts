@@ -30,9 +30,11 @@ const zeroModes: TerminalModes = {
 function mockTerm(): {
   term: TerminalHandle;
   writes: string[];
+  resets: string[];
   getLastGeom: () => { cols: number; rows: number } | null;
 } {
   const writes: string[] = [];
+  const resets: string[] = [];
   const geom = { value: null as { cols: number; rows: number } | null };
   const term: TerminalHandle = {
     write: (data: string, callback?: () => void) => {
@@ -42,16 +44,19 @@ function mockTerm(): {
     focus: () => undefined,
     fit: () => undefined,
     scrollToBottom: () => undefined,
+    reset: () => {
+      resets.push('reset');
+    },
     setSnapshotGeometry: (cols, rows) => {
       geom.value = { cols, rows };
     },
   };
-  return { term, writes, getLastGeom: () => geom.value };
+  return { term, writes, resets, getLastGeom: () => geom.value };
 }
 
 describe('applyAttachResultToTerminal', () => {
-  it('writes snapshotAnsi then rehydrateSequences; ignores replay', async () => {
-    const { term, writes, getLastGeom } = mockTerm();
+  it('writes rehydrateSequences before snapshotAnsi; ignores replay', async () => {
+    const { term, writes, resets, getLastGeom } = mockTerm();
     const result: AttachResult = {
       replay: 'REPLAY_DUP',
       cols: 80,
@@ -69,11 +74,12 @@ describe('applyAttachResultToTerminal', () => {
       applyAttachResultToTerminal(term, result, resolve);
     });
     expect(getLastGeom()).toEqual({ cols: 80, rows: 24 });
-    expect(writes).toEqual(['SCREEN', 'MODES']);
+    expect(resets).toEqual(['reset']);
+    expect(writes).toEqual(['MODES', 'SCREEN']);
   });
 
   it('uses legacy replay when snapshot is absent', async () => {
-    const { term, writes, getLastGeom } = mockTerm();
+    const { term, writes, resets, getLastGeom } = mockTerm();
     const result: AttachResult = {
       replay: 'OLD',
       cols: 80,
@@ -84,6 +90,7 @@ describe('applyAttachResultToTerminal', () => {
       applyAttachResultToTerminal(term, result, resolve);
     });
     expect(getLastGeom()).toEqual({ cols: 80, rows: 24 });
+    expect(resets).toEqual(['reset']);
     expect(writes).toEqual(['OLD']);
   });
 
@@ -97,8 +104,8 @@ describe('applyAttachResultToTerminal', () => {
     expect(writes).toEqual([]);
   });
 
-  it('can replay without applying snapshot geometry', async () => {
-    const { term, writes, getLastGeom } = mockTerm();
+  it('can apply snapshot geometry for fixed mirrors without raw replay', async () => {
+    const { term, writes, resets, getLastGeom } = mockTerm();
     const result: AttachResult = {
       replay: 'PANEL_REPLAY',
       cols: 141,
@@ -114,12 +121,13 @@ describe('applyAttachResultToTerminal', () => {
     };
     await new Promise<void>((resolve) => {
       applyAttachResultToTerminal(term, result, resolve, {
-        applyGeometry: false,
-        useSnapshot: false,
+        applyGeometry: true,
+        useSnapshot: true,
       });
     });
-    expect(getLastGeom()).toBeNull();
-    expect(writes).toEqual(['PANEL_REPLAY']);
+    expect(getLastGeom()).toEqual({ cols: 141, rows: 33 });
+    expect(resets).toEqual(['reset']);
+    expect(writes).toEqual(['MODES', 'FULL_TAB_SCREEN']);
   });
 });
 

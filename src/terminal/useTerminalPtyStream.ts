@@ -7,12 +7,12 @@ import {
   writeBufferedStreamAfterSnapshot,
 } from './warmAttach';
 import {
-  getApplyAttachOptionsForGeometryMode,
-  shouldPostOwnerFitAfterAttach,
-  type TerminalGeometryMode,
+  getApplyAttachOptionsForViewPolicy,
+  shouldPostAttachFit,
+  type TerminalViewPolicy,
 } from './terminalGeometryPolicy';
 
-export type { TerminalGeometryMode } from './terminalGeometryPolicy';
+export type { TerminalViewPolicy } from './terminalGeometryPolicy';
 
 export interface UseTerminalPtyStreamOptions {
   /** React ref to the `Terminal` handle. */
@@ -21,8 +21,8 @@ export interface UseTerminalPtyStreamOptions {
   id: string;
   /** When false, the effect is disabled (e.g. session not running). */
   enabled: boolean;
-  /** Owner: fit after attach and forward resize to PTY; mirror: replay at local size, no PTY resize. */
-  geometryMode: TerminalGeometryMode;
+  /** Explicit renderer view policy: geometry ownership, fit behavior, and interaction. */
+  viewPolicy: TerminalViewPolicy;
   /**
    * Returns a promise of warm-attach data; callers usually wrap
    * `getSessionAttachShared` / `getShellAttachShared` / `getPlanningAttachShared` here.
@@ -48,13 +48,13 @@ export interface UseTerminalPtyStreamOptions {
 /**
  * Buffers output until the warm-attach payload is applied, then flushes
  * post-`streamSeq` chunks. Centralizes owner vs mirror attach policy and
- * post-attach `fit()` for owner views.
+ * post-attach `fit()` for container-fit owner views.
  */
 export function useTerminalPtyStream({
   terminalRef,
   id,
   enabled,
-  geometryMode,
+  viewPolicy,
   getAttach,
   onStreamData,
   onDataChunk,
@@ -89,10 +89,10 @@ export function useTerminalPtyStream({
     void (async () => {
       const result = await getAttachRef.current();
       if (cancelled) return;
-      const opts = getApplyAttachOptionsForGeometryMode(geometryMode);
+      const opts = getApplyAttachOptionsForViewPolicy(viewPolicy);
       applyAttachResultToTerminal(terminalRef.current, result, () => {
         if (cancelled) return;
-        if (shouldPostOwnerFitAfterAttach(geometryMode)) {
+        if (shouldPostAttachFit(viewPolicy)) {
           terminalRef.current?.fit();
         }
         streamReady = true;
@@ -110,5 +110,5 @@ export function useTerminalPtyStream({
       cancelled = true;
       unsub();
     };
-  }, [enabled, id, geometryMode, terminalRef]);
+  }, [enabled, id, viewPolicy, terminalRef]);
 }

@@ -7,6 +7,10 @@ import {
 import { ExternalLink } from 'lucide-react';
 import { AGENTS, type Agent, type PlanningSession, type Project } from '../types';
 import { getPlanningAttachShared, invalidatePlanningAttachCache } from '../terminal/warmAttach';
+import {
+  OWNER_TERMINAL_VIEW_POLICY,
+  terminalShouldAutoFit,
+} from '../terminal/terminalGeometryPolicy';
 import { useTerminalPtyStream } from '../terminal/useTerminalPtyStream';
 import Terminal, { type TerminalHandle } from './Terminal';
 
@@ -123,7 +127,7 @@ export function PlanningPanel({
     terminalRef,
     id: activePlanningId ?? '',
     enabled: planningStreamEnabled,
-    geometryMode: 'owner',
+    viewPolicy: OWNER_TERMINAL_VIEW_POLICY,
     getAttach: () => {
       if (!planningApi || !activePlanningId) {
         return Promise.resolve(null);
@@ -387,6 +391,7 @@ export function PlanningPanel({
                 onResize={(cols, rows) =>
                   planningApi.resize(activeSession.id, cols, rows)
                 }
+                autoFit={terminalShouldAutoFit(OWNER_TERMINAL_VIEW_POLICY)}
               />
             </div>
           </div>

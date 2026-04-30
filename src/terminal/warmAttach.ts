@@ -105,12 +105,12 @@ export interface ApplyAttachOptions {
  * Restores a warm-attach payload into a fresh xterm.
  * When `result.snapshot` is set (daemon v3+), use serialized state only; do
  * not also write `replay` or transient PTY history would duplicate
- * scrollback. Order matches `src/daemon/terminalSnapshot.ts`: apply screen
- * (`snapshotAnsi`, modes excluded in serialize) then `rehydrateSequences`
- * for mode flags. Resizes the xterm to snapshot (or attach) geometry
- * first so line wrapping and cursor state match. Invokes `onComplete` after
- * xterm has finished processing the last chunk (or immediately when nothing
- * to write).
+ * scrollback. Order follows Superset's terminal-host restore helper: apply
+ * `rehydrateSequences` before `snapshotAnsi` so DECSET/DECRST mode restores
+ * cannot move the cursor after the serialized screen places it. Resizes the
+ * xterm to snapshot (or attach) geometry first so line wrapping and cursor
+ * state match. Invokes `onComplete` after xterm has finished processing the
+ * last chunk (or immediately when nothing to write).
  */
 export function applyAttachResultToTerminal(
   terminal: TerminalHandle | null,
@@ -143,25 +143,27 @@ export function applyAttachResultToTerminal(
 
   const snap = result?.snapshot;
   if (snap && useSnapshot) {
+    terminal.reset();
     setGeom(snap.cols, snap.rows);
     const a = snap.snapshotAnsi ?? '';
     const b = snap.rehydrateSequences ?? '';
-    const afterFirst = () => {
-      if (b.length > 0) {
-        terminal.write(b, complete);
+    const writeSnapshot = () => {
+      if (a.length > 0) {
+        terminal.write(a, complete);
       } else {
         complete();
       }
     };
-    if (a.length > 0) {
-      terminal.write(a, afterFirst);
+    if (b.length > 0) {
+      terminal.write(b, writeSnapshot);
     } else {
-      afterFirst();
+      writeSnapshot();
     }
     return;
   }
 
   if (result && result.cols > 0 && result.rows > 0) {
+    terminal.reset();
     setGeom(result.cols, result.rows);
   }
   const replay = result?.replay ?? '';

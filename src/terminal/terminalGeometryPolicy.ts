@@ -1,39 +1,65 @@
 import type { ApplyAttachOptions } from './warmAttach';
 
-/**
- * - **owner** — this view is the source of truth for PTY `cols`/`rows`. The
- *   xterm is fitted to the container and `onResize` drives `sessions.resize` /
- *   `shells.resize` / `planning.resize` as wired by the parent.
- * - **mirror** — this view must not change PTY geometry. Warm-attach should not
- *   apply snapshot/attach geometry; replay at local fit (see
- *   `getApplyAttachOptionsForGeometryMode`).
- */
-export type TerminalGeometryMode = 'owner' | 'mirror';
+export type TerminalGeometryOwnership = 'owner' | 'mirror';
+export type TerminalFitMode = 'container' | 'fixedSnapshot';
+export type TerminalInteractionMode = 'interactive' | 'readOnly';
+
+export interface TerminalViewPolicy {
+  geometryOwnership: TerminalGeometryOwnership;
+  fitMode: TerminalFitMode;
+  interactionMode: TerminalInteractionMode;
+}
+
+export const OWNER_TERMINAL_VIEW_POLICY: TerminalViewPolicy = {
+  geometryOwnership: 'owner',
+  fitMode: 'container',
+  interactionMode: 'interactive',
+};
+
+export const MIRROR_TERMINAL_VIEW_POLICY: TerminalViewPolicy = {
+  geometryOwnership: 'mirror',
+  fitMode: 'fixedSnapshot',
+  interactionMode: 'readOnly',
+};
+
+export const INTERACTIVE_MIRROR_TERMINAL_VIEW_POLICY: TerminalViewPolicy = {
+  geometryOwnership: 'mirror',
+  fitMode: 'fixedSnapshot',
+  interactionMode: 'interactive',
+};
 
 /**
- * Returns options for `applyAttachResultToTerminal` given the geometry mode.
- * Mirrors use replay only so a narrow pane does not adopt a full-tab snapshot
- * grid, which would clip the viewport; owners use snapshot + geometry by default.
+ * Renderer attach state always prefers snapshots. Mirrors differ from owners
+ * only in local geometry and PTY resize ownership, not in restore source.
  */
-export function getApplyAttachOptionsForGeometryMode(
-  geometryMode: TerminalGeometryMode,
+export function getApplyAttachOptionsForViewPolicy(
+  policy: TerminalViewPolicy,
 ): ApplyAttachOptions {
-  if (geometryMode === 'mirror') {
+  if (policy.fitMode === 'fixedSnapshot') {
     return {
-      applyGeometry: false,
-      useSnapshot: false,
+      applyGeometry: true,
+      useSnapshot: true,
     };
   }
   return {};
 }
 
 /**
- * After applyAttach completes, owners should `terminal.fit()` so the rendered
- * grid matches the local container and `onResize` updates the real PTY.
- * Mirrors do not need this (they do not own PTY size).
+ * Container-fit owners refit after attach so `onResize` can update the PTY.
+ * Fixed-snapshot mirrors keep the daemon-owned grid and must not refit.
  */
-export function shouldPostOwnerFitAfterAttach(
-  geometryMode: TerminalGeometryMode,
-): boolean {
-  return geometryMode === 'owner';
+export function shouldPostAttachFit(policy: TerminalViewPolicy): boolean {
+  return policy.geometryOwnership === 'owner' && policy.fitMode === 'container';
+}
+
+export function terminalShouldAutoFit(policy: TerminalViewPolicy): boolean {
+  return policy.fitMode === 'container';
+}
+
+export function terminalShouldForwardInput(policy: TerminalViewPolicy): boolean {
+  return policy.interactionMode === 'interactive';
+}
+
+export function terminalOwnsPtyGeometry(policy: TerminalViewPolicy): boolean {
+  return policy.geometryOwnership === 'owner';
 }
