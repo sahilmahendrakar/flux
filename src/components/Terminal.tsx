@@ -19,6 +19,8 @@ export interface TerminalProps {
   // Parents set this to false when the pane/tab is hidden so we can re-focus
   // and repaint when it returns without ever reflowing the xterm container.
   visible?: boolean;
+  // Mirrors use fixed snapshot geometry; owners auto-fit to their container.
+  autoFit?: boolean;
 }
 
 export interface TerminalHandle {
@@ -26,9 +28,10 @@ export interface TerminalHandle {
   focus: () => void;
   fit: () => void;
   scrollToBottom: () => void;
+  reset: () => void;
   /**
    * Resize the xterm grid to the captured warm-attach geometry before writing
-   * `snapshotAnsi` / `replay` so line wrapping/cursor layout match. Does not
+   * `snapshotAnsi` / `replay` so line wrapping/cursor state match. Does not
    * resize the node-pty — parents wire `onResize` only when PTY should track UI.
    */
   setSnapshotGeometry: (cols: number, rows: number) => void;
@@ -43,7 +46,7 @@ function containerHasUsableSize(el: HTMLElement): boolean {
 }
 
 const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
-  { sessionId, onData, onResize, hideCursor = false, visible = true },
+  { sessionId, onData, onResize, hideCursor = false, visible = true, autoFit = true },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,10 +79,16 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
           t.refresh(0, t.rows - 1);
         }
         t.scrollToBottom();
+        scrollContainerToBottom(containerRef.current);
       });
     },
     scrollToBottom: () => {
       termRef.current?.scrollToBottom();
+      scrollContainerToBottom(containerRef.current);
+    },
+    reset: () => {
+      termRef.current?.reset();
+      scrollContainerToBottom(containerRef.current);
     },
     setSnapshotGeometry: (cols: number, rows: number) => {
       const t = termRef.current;
@@ -87,6 +96,7 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
       if (cols <= 0 || rows <= 0) return;
       try {
         t.resize(cols, rows);
+        scrollContainerToBottom(containerRef.current);
       } catch {
         // ignore
       }
@@ -120,7 +130,9 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
       cursorStyle: 'block',
       cursorInactiveStyle: 'none',
       scrollback: 1000,
-      convertEol: true,
+      // Preserve PTY/snapshot cursor semantics exactly; the PTY is responsible
+      // for CRLF translation when terminal output needs it.
+      convertEol: false,
     });
 
     const fitAddon = new FitAddon();
@@ -140,6 +152,7 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
 
     const doFit = () => {
       if (cancelled) return;
+      if (!autoFit) return;
       if (!containerHasUsableSize(container)) return;
       try {
         fitAddon.fit();
@@ -183,6 +196,7 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
             term.refresh(0, term.rows - 1);
           }
           term.scrollToBottom();
+          scrollContainerToBottom(container);
           // Focus here too so a remount (e.g. sessionId change) that doesn't
           // flip the `visible` prop still picks up keystrokes immediately.
           term.focus();
@@ -198,23 +212,27 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
     );
 
     const onWindowResize = () => scheduleResizeFit();
-    window.addEventListener('resize', onWindowResize);
+    if (autoFit) {
+      window.addEventListener('resize', onWindowResize);
+    }
 
-    const ro = new ResizeObserver(() => scheduleResizeFit());
-    ro.observe(container);
+    const ro = autoFit ? new ResizeObserver(() => scheduleResizeFit()) : null;
+    ro?.observe(container);
 
     return () => {
       cancelled = true;
-      window.removeEventListener('resize', onWindowResize);
+      if (autoFit) {
+        window.removeEventListener('resize', onWindowResize);
+      }
       if (resizeRaf) cancelAnimationFrame(resizeRaf);
       scheduleFitRef.current = null;
-      ro.disconnect();
+      ro?.disconnect();
       d1.dispose();
       d2.dispose();
       term.dispose();
       termRef.current = null;
     };
-  }, [sessionId]);
+  }, [sessionId, autoFit]);
 
   // Parents mark the pane/tab hidden by passing visible=false. We don't toggle
   // display on the container (that would reflow xterm and wipe the rendered
@@ -233,15 +251,16 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
         term.refresh(0, term.rows - 1);
       }
       term.scrollToBottom();
+      scrollContainerToBottom(containerRef.current);
       term.focus();
     };
     const scheduleFit = scheduleFitRef.current;
-    if (scheduleFit) {
+    if (scheduleFit && autoFit) {
       scheduleFit(afterFit);
     } else {
       afterFit();
     }
-  }, [visible]);
+  }, [visible, autoFit]);
 
   if (!sessionId) {
     return (
@@ -254,7 +273,10 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
   return (
     <div
       ref={containerRef}
-      className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-md border border-white/[0.06] bg-[#09090b]"
+      className={[
+        'flex h-full min-h-0 w-full min-w-0 flex-col rounded-md border border-white/[0.06] bg-[#09090b]',
+        autoFit ? 'overflow-hidden' : 'overflow-auto',
+      ].join(' ')}
     />
   );
 });
@@ -262,3 +284,10 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
 Terminal.displayName = 'Terminal';
 
 export default Terminal;
+
+function scrollContainerToBottom(container: HTMLElement | null): void {
+  if (!container) return;
+  requestAnimationFrame(() => {
+    container.scrollTop = container.scrollHeight;
+  });
+}

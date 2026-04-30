@@ -6,6 +6,10 @@ import {
   invalidateSessionAttachCache,
   invalidateShellAttachCache,
 } from '../terminal/warmAttach';
+import {
+  OWNER_TERMINAL_VIEW_POLICY,
+  terminalShouldAutoFit,
+} from '../terminal/terminalGeometryPolicy';
 import { useTerminalPtyStream } from '../terminal/useTerminalPtyStream';
 import Terminal, { type TerminalHandle } from './Terminal';
 
@@ -71,7 +75,7 @@ function AgentPane({ session, visible }: { session: Session; visible: boolean })
     terminalRef,
     id,
     enabled: running,
-    geometryMode: 'owner',
+    viewPolicy: OWNER_TERMINAL_VIEW_POLICY,
     getAttach: () =>
       getSessionAttachShared(id, async () => {
         try {
@@ -119,6 +123,7 @@ function AgentPane({ session, visible }: { session: Session; visible: boolean })
             onData={handleData}
             onResize={visible && running ? handleResize : undefined}
             visible={visible}
+            autoFit={terminalShouldAutoFit(OWNER_TERMINAL_VIEW_POLICY)}
             hideCursor
           />
         </div>
@@ -140,7 +145,7 @@ function ShellPane({ shell, visible }: { shell: Shell; visible: boolean }) {
     terminalRef,
     id,
     enabled: running,
-    geometryMode: 'owner',
+    viewPolicy: OWNER_TERMINAL_VIEW_POLICY,
     getAttach: () =>
       getShellAttachShared(id, async () => {
         try {
@@ -173,6 +178,7 @@ function ShellPane({ shell, visible }: { shell: Shell; visible: boolean }) {
           onData={handleData}
           onResize={visible && running ? handleResize : undefined}
           visible={visible}
+          autoFit={terminalShouldAutoFit(OWNER_TERMINAL_VIEW_POLICY)}
         />
       ) : (
         <div className="flex h-full items-center justify-center text-[13px] text-zinc-500">

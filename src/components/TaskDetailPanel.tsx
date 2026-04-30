@@ -32,6 +32,11 @@ import { projectLabelCatalog } from '../taskLabels';
 import AgentModelPicker from './AgentModelPicker';
 import { AGENT_CHIP_STYLES } from './AgentBadge';
 import { getSessionAttachShared } from '../terminal/warmAttach';
+import {
+  INTERACTIVE_MIRROR_TERMINAL_VIEW_POLICY,
+  terminalShouldAutoFit,
+  terminalShouldForwardInput,
+} from '../terminal/terminalGeometryPolicy';
 import { useTerminalPtyStream } from '../terminal/useTerminalPtyStream';
 import TerminalComponent, { type TerminalHandle } from './Terminal';
 import { TaskLabelsField } from './TaskLabelsField';
@@ -334,7 +339,7 @@ export default function TaskDetailPanel({
     terminalRef,
     id: sessionId ?? '',
     enabled: sessionReadyForPty,
-    geometryMode: 'mirror',
+    viewPolicy: INTERACTIVE_MIRROR_TERMINAL_VIEW_POLICY,
     getAttach: () => {
       const id = sessionId;
       if (!id) {
@@ -1032,7 +1037,12 @@ export default function TaskDetailPanel({
                   <TerminalComponent
                     ref={terminalRef}
                     sessionId={session?.id ?? null}
-                    onData={handleTerminalData}
+                    onData={
+                      terminalShouldForwardInput(INTERACTIVE_MIRROR_TERMINAL_VIEW_POLICY)
+                        ? handleTerminalData
+                        : undefined
+                    }
+                    autoFit={terminalShouldAutoFit(INTERACTIVE_MIRROR_TERMINAL_VIEW_POLICY)}
                     hideCursor
                   />
                 </div>
