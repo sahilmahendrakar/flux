@@ -43,7 +43,6 @@ import {
   validateBlockedByTaskIds,
 } from './taskDependencies';
 import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
-import type { McpBridgeOp } from './mcpBridge';
 
 function isPlanningAgent(value: unknown): value is Agent {
   return value === 'claude-code' || value === 'codex' || value === 'cursor';
@@ -196,6 +195,7 @@ const WINDOW_BACKGROUND = '#030712';
 let mainWindow: BrowserWindow | null = null;
 
 let fluxMcpServer: McpServer | null = null;
+let fluxMcpRendererBridge: McpRendererBridge | null = null;
 
 let planningDocsWatcher: ReturnType<typeof createPlanningDocsWatcher> | null = null;
 
@@ -1024,23 +1024,7 @@ app.whenReady().then(async () => {
 
   const mcpRendererBridge = new McpRendererBridge(() => mainWindow);
   mcpRendererBridge.install();
-
-  // TEMP for phase 2 manual smoke test of the renderer bridge. Removed in phase 3
-  // when McpServer wires up the bridge for cloud-project tools.
-  ipcMain.handle(
-    'debug:mcpBridge:request',
-    async (_e, op: McpBridgeOp, payload?: unknown) => {
-      const activeKey = appStateStore.get().activeProjectKey;
-      if (!activeKey) {
-        return {
-          ok: false as const,
-          code: 'NO_ACTIVE_PROJECT',
-          message: 'No active project',
-        };
-      }
-      return mcpRendererBridge.request(op, activeKey, payload);
-    },
-  );
+  fluxMcpRendererBridge = mcpRendererBridge;
 
   fluxMcpServer = new McpServer(
     taskStore,
@@ -1365,6 +1349,9 @@ app.whenReady().then(async () => {
   });
 
   createWindow();
+  if (mainWindow && fluxMcpRendererBridge) {
+    fluxMcpRendererBridge.attachWindow(mainWindow);
+  }
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -1381,6 +1368,9 @@ app.on('activate', () => {
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+    if (mainWindow && fluxMcpRendererBridge) {
+      fluxMcpRendererBridge.attachWindow(mainWindow);
+    }
   }
 });
 

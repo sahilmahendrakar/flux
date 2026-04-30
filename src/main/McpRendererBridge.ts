@@ -35,6 +35,7 @@ export class McpRendererBridge {
   private pending = new Map<string, PendingRequest>();
   private nextId = 0;
   private installed = false;
+  private attachedWebContentsIds = new Set<number>();
 
   constructor(getMainWindow: () => BrowserWindow | null) {
     this.getMainWindow = getMainWindow;
@@ -53,6 +54,43 @@ export class McpRendererBridge {
     ipcMain.on(MCP_BRIDGE_READY_CHANNEL, () => {
       this.markReady();
     });
+  }
+
+  /**
+   * Attach crash + close listeners to a window's webContents so in-flight
+   * requests fail immediately rather than timing out when the renderer
+   * disappears. Idempotent per-webContents.
+   */
+  attachWindow(window: BrowserWindow): void {
+    const wcId = window.webContents.id;
+    if (this.attachedWebContentsIds.has(wcId)) return;
+    this.attachedWebContentsIds.add(wcId);
+
+    window.webContents.on('render-process-gone', (_e, details) => {
+      this.failAllPending(
+        'RENDERER_NOT_READY',
+        `Renderer process gone (${details.reason})`,
+      );
+    });
+    window.on('closed', () => {
+      this.attachedWebContentsIds.delete(wcId);
+      this.failAllPending('RENDERER_NOT_READY', 'Renderer window closed');
+    });
+  }
+
+  private failAllPending(
+    code: McpBridgeErrorCode,
+    message: string,
+  ): void {
+    this.rendererReady = false;
+    const ids = Array.from(this.pending.keys());
+    for (const id of ids) {
+      const p = this.pending.get(id);
+      if (!p) continue;
+      clearTimeout(p.timer);
+      this.pending.delete(id);
+      p.resolve({ id, ok: false, code, message });
+    }
   }
 
   /** Renderer reload/navigate clears readiness; next signalReady flips it back. */

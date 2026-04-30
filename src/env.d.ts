@@ -14,7 +14,6 @@ import type {
 } from './types';
 import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
 import type {
-  McpBridgeOp,
   McpBridgeRequest,
   McpBridgeResponse,
 } from './mcpBridge';
@@ -189,15 +188,6 @@ declare global {
         signalReady: () => void;
         onRequest: (cb: (req: McpBridgeRequest) => void) => () => void;
         respond: (resp: McpBridgeResponse) => void;
-      };
-      debug: {
-        mcpBridgeRequest: (
-          op: McpBridgeOp,
-          payload?: unknown,
-        ) => Promise<
-          | { ok: true; data: unknown }
-          | { ok: false; code: string; message: string }
-        >;
       };
     };
   }

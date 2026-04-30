@@ -17,7 +17,6 @@ import {
   MCP_BRIDGE_READY_CHANNEL,
   MCP_BRIDGE_REQUEST_CHANNEL,
   MCP_BRIDGE_RESPONSE_CHANNEL,
-  type McpBridgeOp,
   type McpBridgeRequest,
   type McpBridgeResponse,
 } from './mcpBridge';
@@ -306,13 +305,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     respond: (resp: McpBridgeResponse) => {
       ipcRenderer.send(MCP_BRIDGE_RESPONSE_CHANNEL, resp);
     },
-  },
-  debug: {
-    /** Phase 2 manual smoke test for the MCP renderer bridge. Removed in phase 3. */
-    mcpBridgeRequest: (op: McpBridgeOp, payload?: unknown) =>
-      ipcRenderer.invoke('debug:mcpBridge:request', op, payload) as Promise<
-        | { ok: true; data: unknown }
-        | { ok: false; code: string; message: string }
-      >,
   },
 });
