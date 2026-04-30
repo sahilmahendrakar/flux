@@ -224,8 +224,9 @@ export class McpServer {
             this.notifyTasksChanged();
             return jsonToolPayload(task);
           }
-          // Cloud: blockedByTaskIds and labels are not yet propagated through
-          // the renderer bridge; tracked as follow-up work.
+          // Cloud: blockedByTaskIds is not yet propagated through the renderer
+          // bridge (it requires a project-wide validation pass that today only
+          // runs in main against the local TaskStore).
           const payload: McpBridgeTasksCreatePayload = {
             input: {
               title: input.title,
@@ -233,6 +234,7 @@ export class McpServer {
               ...(input.description != null && input.description !== ''
                 ? { description: input.description }
                 : {}),
+              ...(input.labels !== undefined ? { labels: input.labels } : {}),
             },
           };
           const result = await this.bridge.request<Task>(
@@ -298,13 +300,15 @@ export class McpServer {
             this.notifyTasksChanged();
             return jsonToolPayload(updated);
           }
-          // Cloud: blockedByTaskIds and labels are not yet propagated through
-          // the renderer bridge; tracked as follow-up work.
-          const patch: Partial<Pick<Task, 'title' | 'description' | 'status' | 'agent'>> = {};
+          // Cloud: blockedByTaskIds is not yet propagated through the bridge.
+          const patch: Partial<
+            Pick<Task, 'title' | 'description' | 'status' | 'agent' | 'labels'>
+          > = {};
           if (input.title !== undefined) patch.title = input.title;
           if (input.description !== undefined) patch.description = input.description;
           if (input.status !== undefined) patch.status = input.status;
           if (input.agent !== undefined) patch.agent = input.agent;
+          if (input.labels !== undefined) patch.labels = input.labels;
           const payload: McpBridgeTasksUpdatePayload = { taskId: input.id, patch };
           const result = await this.bridge.request<McpBridgeTasksUpdateResult>(
             'tasks.update',

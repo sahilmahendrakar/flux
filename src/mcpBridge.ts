@@ -17,6 +17,7 @@ export interface McpBridgeTaskCreateInput {
   status?: TaskStatus;
   description?: string;
   orderKey?: string;
+  labels?: string[];
 }
 
 export interface McpBridgeTaskPatch {
@@ -24,6 +25,7 @@ export interface McpBridgeTaskPatch {
   description?: string;
   status?: TaskStatus;
   agent?: Agent;
+  labels?: string[];
 }
 
 export interface McpBridgeTasksCreatePayload {
