@@ -68,6 +68,10 @@ interface TaskDetailPanelProps {
   remoteRunner?: { displayName?: string } | null;
   onOpenSessionTab: (session: Session) => void;
   onArchiveSession: (sessionId: string) => void;
+  /** When set (and task is not done), "Mark as done" is enabled. Omitted when blocked — use `markAsDoneBlocked`. */
+  onMarkAsDone?: () => void;
+  /** True when dependencies block finishing; shows a disabled Mark as done control. */
+  markAsDoneBlocked?: boolean;
 }
 
 const TASK_DETAIL_WIDTH_KEY = 'flux.taskDetailPanelWidth';
@@ -136,6 +140,8 @@ export default function TaskDetailPanel({
   remoteRunner,
   onOpenSessionTab,
   onArchiveSession,
+  onMarkAsDone,
+  markAsDoneBlocked = false,
 }: TaskDetailPanelProps) {
   const asideRef = useRef<HTMLElement>(null);
   const [detailWidth, setDetailWidth] = useState(DEFAULT_DETAIL_WIDTH);
@@ -458,6 +464,10 @@ export default function TaskDetailPanel({
     'rounded-lg border border-red-500/35 bg-red-500/[0.12] px-4 py-2 text-[13px] font-medium text-red-200/90 transition hover:bg-red-500/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40';
   const startBtnLoading =
     'cursor-wait rounded-lg bg-zinc-800/90 px-4 py-2 text-[13px] font-medium text-zinc-500';
+  const markDoneBtn =
+    'rounded-lg bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25';
+  const markDoneBtnDisabled =
+    'cursor-not-allowed rounded-lg bg-zinc-800/50 px-4 py-2 text-[13px] font-medium text-zinc-500 ring-1 ring-inset ring-white/[0.06]';
 
   const propertySelectClass =
     'w-full min-w-0 max-w-full cursor-pointer appearance-none rounded-lg border-0 bg-white/[0.04] py-1.5 pl-2.5 pr-8 text-[12px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.06] outline-none transition hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/20';
@@ -465,6 +475,9 @@ export default function TaskDetailPanel({
   /** Any local session (running or after exit) — keep embedded terminal for buffer continuity. */
   const hasLocalSession = Boolean(session?.id);
   const sessionIdleAfterRun = hasLocalSession && !sessionRunning;
+
+  const showMarkAsDone = task.status !== 'done';
+  const markDoneDisabled = showMarkAsDone && (markAsDoneBlocked || !onMarkAsDone);
 
   return (
     <>
@@ -506,8 +519,23 @@ export default function TaskDetailPanel({
                 <span className="text-xs text-zinc-500">Created {formatCreatedLabel(task.createdAt)}</span>
               ) : null}
             </div>
-            {!sessionRunning ? (
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {showMarkAsDone ? (
+                <button
+                  type="button"
+                  onClick={() => onMarkAsDone?.()}
+                  disabled={markDoneDisabled}
+                  title={
+                    markAsDoneBlocked
+                      ? 'Finish blocking tasks before marking this task done'
+                      : undefined
+                  }
+                  className={markDoneDisabled ? markDoneBtnDisabled : markDoneBtn}
+                >
+                  Mark as done
+                </button>
+              ) : null}
+              {!sessionRunning ? (
                 <button
                   type="button"
                   onClick={handleStartSession}
@@ -525,11 +553,11 @@ export default function TaskDetailPanel({
                 >
                   {blocked ? 'Blocked' : startButtonLabel}
                 </button>
-                {sessionError && !sessionRunning ? (
-                  <p className="min-w-0 text-xs leading-snug text-red-300/90">{sessionError}</p>
-                ) : null}
-              </div>
-            ) : null}
+              ) : null}
+              {sessionError && !sessionRunning ? (
+                <p className="min-w-0 text-xs leading-snug text-red-300/90">{sessionError}</p>
+              ) : null}
+            </div>
           </div>
           <button
             type="button"
