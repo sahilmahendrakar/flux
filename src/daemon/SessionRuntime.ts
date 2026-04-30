@@ -7,6 +7,13 @@ import { buildRehydrateSequences, captureSerializedSnapshot } from './terminalSn
 
 const DEFAULT_REPLAY_BYTES = 256 * 1024;
 const HEADLESS_SCROLLBACK = 5000;
+/**
+ * Scrollback **lines** passed to `SerializeAddon.serialize` for warm-attach
+ * wire snapshots. `0` means only the current viewport (last `rows` buffer
+ * lines). A large value replays the whole scrollback as ANSI in every attach
+ * and looks like full history replay.
+ */
+const ATTACH_SNAPSHOT_SERIALIZE_SCROLLBACK = 0;
 
 export interface SessionRuntimeSpawnSpec {
   command: string;
@@ -118,7 +125,7 @@ export class SessionRuntime {
       const { snapshotAnsi, modes } = captureSerializedSnapshot(
         this.headless,
         this.serializeAddon,
-        HEADLESS_SCROLLBACK,
+        ATTACH_SNAPSHOT_SERIALIZE_SCROLLBACK,
       );
       const snapshot: TerminalSnapshot = {
         snapshotAnsi,

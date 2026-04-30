@@ -83,6 +83,18 @@ describe('terminalSnapshot', () => {
     expect(t.rows).toBe(8);
   });
 
+  it('serialize scrollback 0 includes only viewport, not full scrollback history', async () => {
+    const { t, s } = mkTerm(4, 200);
+    const block = Array.from({ length: 40 }, (_, i) => `row${i}`).join('\n');
+    await new Promise<void>((r) => t.write(`${block}\n`, r));
+    await flush(t);
+    const withHistory = captureSerializedSnapshot(t, s, 200).snapshotAnsi;
+    const viewportOnly = captureSerializedSnapshot(t, s, 0).snapshotAnsi;
+    expect(withHistory.length).toBeGreaterThan(viewportOnly.length);
+    expect(viewportOnly).not.toContain('row0');
+    expect(withHistory).toContain('row0');
+  });
+
   it('serialized line layout differs with terminal width (geometry-sensitive warm restore)', async () => {
     const longLine = 'A'.repeat(30);
     const t20 = new HeadlessTerminal({ cols: 20, rows: 5, scrollback: 50, allowProposedApi: true });
