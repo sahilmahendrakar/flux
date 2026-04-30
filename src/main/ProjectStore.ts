@@ -24,6 +24,7 @@ interface ConfigFile {
   planningAgent: Agent;
   defaultTaskAgent: Agent;
   autoStartSessionOnInProgress: boolean;
+  autoStartWhenUnblocked: boolean;
   repos: RepoConfig[];
 }
 
@@ -47,6 +48,7 @@ function configToLocalProject(c: ConfigFile): LocalProject {
     planningAgent: c.planningAgent ?? DEFAULT_AGENT,
     defaultTaskAgent: c.defaultTaskAgent ?? DEFAULT_AGENT,
     autoStartSessionOnInProgress: c.autoStartSessionOnInProgress === true,
+    autoStartWhenUnblocked: c.autoStartWhenUnblocked === true,
     repos: c.repos,
   };
 }
@@ -108,6 +110,7 @@ function parseConfig(raw: string): ConfigFile | null {
         ? p.defaultTaskAgent
         : DEFAULT_AGENT,
     autoStartSessionOnInProgress: p.autoStartSessionOnInProgress === true,
+    autoStartWhenUnblocked: p.autoStartWhenUnblocked === true,
     repos,
   };
 }
@@ -312,6 +315,33 @@ export class ProjectStore {
     return next.autoStartSessionOnInProgress;
   }
 
+  async getAutoStartWhenUnblockedAt(projectDir: string): Promise<boolean> {
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    return parsed.autoStartWhenUnblocked === true;
+  }
+
+  async setAutoStartWhenUnblockedAt(
+    projectDir: string,
+    enabled: boolean,
+  ): Promise<boolean> {
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    const next: ConfigFile = {
+      ...parsed,
+      autoStartWhenUnblocked: enabled === true,
+    };
+    await atomicWriteFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
+    if (this.projectDir === projectDir && this.project) {
+      this.project = configToLocalProject(next);
+    }
+    return next.autoStartWhenUnblocked;
+  }
+
   private async mutateConfig(
     fn: (c: ConfigFile) => ConfigFile,
   ): Promise<void> {
@@ -374,6 +404,7 @@ export class ProjectStore {
         planningAgent: DEFAULT_AGENT,
         defaultTaskAgent: DEFAULT_AGENT,
         autoStartSessionOnInProgress: false,
+        autoStartWhenUnblocked: false,
         repos: [{ rootPath: resolvedRoot, baseBranch: DEFAULT_BASE_BRANCH }],
       };
     } else {

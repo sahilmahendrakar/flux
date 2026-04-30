@@ -42,6 +42,8 @@ import {
   isTaskBlocked,
   validateBlockedByTaskIds,
 } from './taskDependencies';
+import { applyUnblockAutostartForCompletedBlocker } from './unblockAutostartApply';
+import type { UnblockAutostartPolicy } from './unblockAutostart';
 import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
 
 function isPlanningAgent(value: unknown): value is Agent {
@@ -515,6 +517,21 @@ app.whenReady().then(async () => {
       }
     },
   );
+  ipcMain.handle('project:getAutoStartWhenUnblocked', async () =>
+    projectStore.getAutoStartWhenUnblockedAt(activeProjectDir()),
+  );
+  ipcMain.handle(
+    'project:setAutoStartWhenUnblocked',
+    async (_e, enabled: boolean): Promise<{ ok: true; enabled: boolean } | { error: string }> => {
+      try {
+        const next = await projectStore.setAutoStartWhenUnblockedAt(activeProjectDir(), enabled);
+        return { ok: true, enabled: next };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+  );
 
   // ---- Projects (multi-project API) ----
   ipcMain.handle('projects:listLocal', () => projectStore.listDiscovered());
@@ -703,6 +720,13 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('cursor:listAgentModels', async () => listCursorAgentModels());
 
+  function broadcastLocalTasksChanged(): void {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed()) continue;
+      win.webContents.send('tasks:changed');
+    }
+  }
+
   async function resolveProjectForStart(): Promise<Project> {
     const activeKey = appStateStore.get().activeProjectKey;
     if (!activeKey) throw new Error('No project open');
@@ -736,7 +760,7 @@ app.whenReady().then(async () => {
       projectTasks.length > 0 &&
       projectTasks.every((t) => t.projectId === project.id) &&
       projectTasks.some((t) => t.id === task.id);
-    const allProjectTasks = passedOk ? projectTasks : fromStore;
+    let allProjectTasks = passedOk ? projectTasks : fromStore;
     if (
       allProjectTasks.length === 0 &&
       (task.blockedByTaskIds?.length ?? 0) > 0
@@ -749,7 +773,7 @@ app.whenReady().then(async () => {
         blockers: [],
       };
     }
-    const merged = allProjectTasks.find((t) => t.id === task.id) ?? task;
+    let merged = allProjectTasks.find((t) => t.id === task.id) ?? task;
     if (isTaskBlocked(merged, allProjectTasks)) {
       const info = getTaskBlockedStartInfo(merged, allProjectTasks);
       const titles = info.blockers.map((b) => b.title).join(', ');
@@ -761,6 +785,24 @@ app.whenReady().then(async () => {
         blockerIds: info.blockerIds,
         blockers: info.blockers,
       };
+    }
+
+    // Local tasks.json: a started session should match the "In progress" column.
+    if (
+      project.kind === 'local' &&
+      fromStore.some((t) => t.id === task.id)
+    ) {
+      const row = fromStore.find((t) => t.id === task.id) ?? merged;
+      if (row.status !== 'done' && row.status !== 'in-progress') {
+        await taskStore.update(task.id, { status: 'in-progress' });
+        const all = taskStore.getAll(project.id);
+        allProjectTasks = all;
+        const nextMerged = all.find((t) => t.id === task.id);
+        if (nextMerged) {
+          merged = nextMerged;
+        }
+        broadcastLocalTasksChanged();
+      }
     }
 
     // Dedup against the daemon's live registry.
@@ -804,15 +846,15 @@ app.whenReady().then(async () => {
         return finish({ error: 'WORKTREE_FAILED', message });
       }
 
-      const initialPrompt = taskInitialPrompt(task);
-      const { command, args } = agentSpawnSpec(task, initialPrompt);
+      const initialPrompt = taskInitialPrompt(merged);
+      const { command, args } = agentSpawnSpec(merged, initialPrompt);
       console.log('[session:start] spawn', { taskId: task.id, command, args });
       const result = await daemonClient.createSession({
         worktreePath,
         branch,
         taskId: task.id,
         projectId: project.id,
-        agent: task.agent,
+        agent: merged.agent,
         command,
         args,
         cols: 80,
@@ -862,14 +904,19 @@ app.whenReady().then(async () => {
       | 'workspaceCleanedAt'
       | 'blockedByTaskIds'
       | 'labels'
+      | 'autoStartOnUnblock'
     >
   >;
+
+  const unblockAutostartInFlight = new Set<string>();
 
   async function maybeAutoStartSessionOnInProgressTransition(
     previous: Task,
     updated: Task,
     source: string,
+    options?: { skipInProgressAutostart?: boolean },
   ): Promise<void> {
+    if (options?.skipInProgressAutostart) return;
     const becameInProgress =
       previous.status !== 'in-progress' && updated.status === 'in-progress';
     if (!becameInProgress) return;
@@ -917,10 +964,82 @@ app.whenReady().then(async () => {
     }
   }
 
+  async function processDependentsUnblockedAfterBlockerDone(
+    previous: Task,
+    completed: Task,
+    source: string,
+  ): Promise<void> {
+    if (completed.status !== 'done' || previous.status === 'done') {
+      return;
+    }
+    const project = projectStore.get();
+    if (!project) {
+      return;
+    }
+    const allAfter = taskStore.getAll(project.id);
+    const allBefore = allAfter.map((t) => (t.id === completed.id ? previous : t));
+    let inProg = false;
+    let whenUnb = false;
+    try {
+      const projectDir = activeProjectDir();
+      inProg = await projectStore.getAutoStartSessionOnInProgressAt(projectDir);
+      whenUnb = await projectStore.getAutoStartWhenUnblockedAt(projectDir);
+    } catch (err) {
+      console.error('[task:unblock-autostart] failed to read settings', { source, err });
+      return;
+    }
+    const policy: UnblockAutostartPolicy = {
+      autoStartSessionOnInProgress: inProg,
+      autoStartWhenUnblocked: whenUnb,
+    };
+    await applyUnblockAutostartForCompletedBlocker(previous, completed, allBefore, allAfter, policy, {
+      inFlight: unblockAutostartInFlight,
+      source: `unblock:${source}`,
+      logError: (msg, data) => console.error(msg, data),
+      getCurrentList: () => {
+        const p = projectStore.get();
+        return p ? taskStore.getAll(p.id) : [];
+      },
+      startSession: (task, all) => startSessionForTask(task, all),
+      moveBacklogToInProgress: async (id) => {
+        await updateTaskWithTransitionHandling(
+          id,
+          { status: 'in-progress' },
+          `unblock-backlog:${source}`,
+        );
+      },
+      moveBacklogToInProgressThenStartSessionWithoutImplicitInProg: async (id) => {
+        await updateTaskWithTransitionHandling(
+          id,
+          { status: 'in-progress' },
+          `unblock-backlog:${source}`,
+          { skipInProgressAutostart: true },
+        );
+        const p = projectStore.get();
+        if (!p) return;
+        const all = taskStore.getAll(p.id);
+        const fresh = all.find((t) => t.id === id);
+        if (fresh) {
+          const s = await startSessionForTask(fresh, all);
+          if (s && typeof s === 'object' && 'error' in s) {
+            console.error('[task:unblock-autostart] session start failed (after backlog skip)', {
+              source: `unblock-backlog:${source}`,
+              taskId: fresh.id,
+              error: (s as { error: string }).error,
+              message: (s as { message?: string }).message,
+            });
+          }
+        }
+      },
+    });
+    broadcastLocalTasksChanged();
+  }
+
   async function updateTaskWithTransitionHandling(
     id: string,
     patch: TaskUpdatePatch,
     source: string,
+    options?: { skipInProgressAutostart?: boolean },
   ): Promise<Task> {
     const project = projectStore.get();
     if (!project) {
@@ -940,7 +1059,10 @@ app.whenReady().then(async () => {
       patchToApply = { ...patch, blockedByTaskIds: v.normalized };
     }
     const updated = await taskStore.update(id, patchToApply);
-    await maybeAutoStartSessionOnInProgressTransition(previous, updated, source);
+    await maybeAutoStartSessionOnInProgressTransition(previous, updated, source, options);
+    if (updated.status === 'done' && previous.status !== 'done') {
+      await processDependentsUnblockedAfterBlockerDone(previous, updated, source);
+    }
     return updated;
   }
 

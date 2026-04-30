@@ -21,6 +21,8 @@ interface Props {
   onRequestCleanupTask?: (id: string) => void;
   cleanupLoading?: boolean;
   onCardClick: (id: string) => void;
+  autoStartWhenUnblockedProject: boolean;
+  onToggleTaskAutoStartOnUnblock: (taskId: string, enabled: boolean) => void;
 }
 
 export default function TaskCard({
@@ -31,6 +33,8 @@ export default function TaskCard({
   onRequestCleanupTask,
   cleanupLoading = false,
   onCardClick,
+  autoStartWhenUnblockedProject,
+  onToggleTaskAutoStartOnUnblock,
 }: Props) {
   const isNeedsInput = task.status === 'needs-input';
   const isDone = task.status === 'done';
@@ -38,6 +42,8 @@ export default function TaskCard({
   const agentBadgeTitle = modelSummaryForTask(task);
   const blocked = isTaskBlocked(task, allTasks);
   const blocksCount = getBlockedTasks(task.id, allTasks).length;
+  const perTaskUnblockAuto = task.autoStartOnUnblock === true;
+  const projectUnblockAuto = autoStartWhenUnblockedProject;
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -101,10 +107,35 @@ export default function TaskCard({
               <div className="mt-3 flex items-center justify-between gap-2">
                 <AgentBadge agent={task.agent} title={agentBadgeTitle} />
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                  {blocked ? (
-                    <span className="rounded border border-amber-500/25 bg-amber-500/[0.08] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-200/90">
-                      Blocked
-                    </span>
+                  {blocked && !isDone ? (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleTaskAutoStartOnUnblock(task.id, !perTaskUnblockAuto);
+                      }}
+                      title={
+                        perTaskUnblockAuto
+                          ? 'Per-task auto-start when unblocked is on — click to turn off'
+                          : projectUnblockAuto
+                            ? 'This project auto-starts when unblocked — click to add a per-task override (on)'
+                            : 'Click to auto-start a session when the last dependency completes (this task)'
+                      }
+                      className={`rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide transition ${
+                        perTaskUnblockAuto
+                          ? 'border-emerald-500/35 bg-emerald-500/[0.1] text-emerald-200/90 hover:border-emerald-400/45'
+                          : projectUnblockAuto
+                            ? 'border-sky-500/30 bg-sky-500/[0.08] text-sky-200/90 hover:border-sky-400/40'
+                            : 'border-amber-500/25 bg-amber-500/[0.08] text-amber-200/90 hover:border-amber-400/35'
+                      }`}
+                    >
+                      {perTaskUnblockAuto
+                        ? 'Auto (task)'
+                        : projectUnblockAuto
+                          ? 'Auto (project)'
+                          : 'Blocked'}
+                    </button>
                   ) : null}
                   {blocksCount > 0 ? (
                     <span

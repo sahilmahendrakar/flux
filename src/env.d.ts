@@ -66,6 +66,10 @@ declare global {
         setAutoStartSessionOnInProgress: (
           enabled: boolean,
         ) => Promise<{ ok: true; enabled: boolean } | { error: string }>;
+        getAutoStartWhenUnblocked: () => Promise<boolean>;
+        setAutoStartWhenUnblocked: (
+          enabled: boolean,
+        ) => Promise<{ ok: true; enabled: boolean } | { error: string }>;
       };
       projects: {
         listLocal: () => Promise<LocalProject[]>;
@@ -121,6 +125,7 @@ declare global {
             | 'workspaceCleanedAt'
             | 'blockedByTaskIds'
             | 'labels'
+            | 'autoStartOnUnblock'
           >
         >,
       ) => Promise<Task>;

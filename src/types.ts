@@ -47,6 +47,8 @@ export interface LocalProject {
   defaultTaskAgent: Agent;
   /** Auto-start a task session when status transitions into in-progress. */
   autoStartSessionOnInProgress: boolean;
+  /** When on, a task in backlog (or in progress without a running session) may auto-start once its last blocker is completed. */
+  autoStartWhenUnblocked: boolean;
   repos: RepoConfig[];
 }
 
@@ -102,6 +104,8 @@ export interface Task {
   updatedBy?: string;
   /** Task ids in the same project that must be `done` before this task is unblocked. */
   blockedByTaskIds?: string[];
+  /** If true, auto-start a session for this task when the last dependency completes, even if project “when unblocked” is off. */
+  autoStartOnUnblock?: boolean;
 }
 
 export type SessionStatus = 'idle' | 'running' | 'stopped' | 'error';

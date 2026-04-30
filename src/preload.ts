@@ -70,6 +70,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('project:setAutoStartSessionOnInProgress', enabled) as Promise<
         { ok: true; enabled: boolean } | { error: string }
       >,
+    getAutoStartWhenUnblocked: () =>
+      ipcRenderer.invoke('project:getAutoStartWhenUnblocked') as Promise<boolean>,
+    setAutoStartWhenUnblocked: (enabled: boolean) =>
+      ipcRenderer.invoke('project:setAutoStartWhenUnblocked', enabled) as Promise<
+        { ok: true; enabled: boolean } | { error: string }
+      >,
   },
   projects: {
     listLocal: () =>
@@ -146,6 +152,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
           | 'workspaceCleanedAt'
           | 'blockedByTaskIds'
           | 'labels'
+          | 'autoStartOnUnblock'
         >
       >,
     ) => ipcRenderer.invoke('tasks:update', id, patch) as Promise<Task>,

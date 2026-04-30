@@ -26,6 +26,7 @@ export interface McpBridgeTaskPatch {
   status?: TaskStatus;
   agent?: Agent;
   labels?: string[];
+  autoStartOnUnblock?: boolean;
 }
 
 export interface McpBridgeTasksCreatePayload {

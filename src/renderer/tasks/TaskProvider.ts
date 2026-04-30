@@ -13,6 +13,7 @@ export type TaskPatch = Partial<
     | 'workspaceCleanedAt'
     | 'blockedByTaskIds'
     | 'labels'
+    | 'autoStartOnUnblock'
   >
 > & { workspaceCleanedAt?: string | null };
 

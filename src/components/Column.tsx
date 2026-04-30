@@ -13,6 +13,8 @@ interface Props {
   onRequestCleanupTask?: (id: string) => void;
   cleanupLoadingTaskId?: string | null;
   onCardClick: (id: string) => void;
+  autoStartWhenUnblockedProject: boolean;
+  onToggleTaskAutoStartOnUnblock: (taskId: string, enabled: boolean) => void;
   emptyState?: ReactNode;
 }
 
@@ -26,6 +28,8 @@ export default function Column({
   onRequestCleanupTask,
   cleanupLoadingTaskId,
   onCardClick,
+  autoStartWhenUnblockedProject,
+  onToggleTaskAutoStartOnUnblock,
   emptyState,
 }: Props) {
   const isNeedsInput = id === 'needs-input';
@@ -87,6 +91,8 @@ export default function Column({
                 onRequestCleanupTask={onRequestCleanupTask}
                 cleanupLoading={cleanupLoadingTaskId === task.id}
                 onCardClick={onCardClick}
+                autoStartWhenUnblockedProject={autoStartWhenUnblockedProject}
+                onToggleTaskAutoStartOnUnblock={onToggleTaskAutoStartOnUnblock}
               />
             ))}
             {provided.placeholder}

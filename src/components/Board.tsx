@@ -21,6 +21,8 @@ interface Props {
   onRequestCleanupTask: (id: string) => void;
   cleanupLoadingTaskId: string | null;
   onCardClick: (id: string) => void;
+  autoStartWhenUnblockedProject: boolean;
+  onToggleTaskAutoStartOnUnblock: (taskId: string, enabled: boolean) => void;
   planPanelOpen: boolean;
   onTogglePlanPanel: () => void;
 }
@@ -33,6 +35,8 @@ export default function Board({
   onRequestCleanupTask,
   cleanupLoadingTaskId,
   onCardClick,
+  autoStartWhenUnblockedProject,
+  onToggleTaskAutoStartOnUnblock,
   planPanelOpen,
   onTogglePlanPanel,
 }: Props) {
@@ -144,6 +148,8 @@ export default function Board({
               onRequestCleanupTask={col.id === 'done' ? onRequestCleanupTask : undefined}
               cleanupLoadingTaskId={col.id === 'done' ? cleanupLoadingTaskId : null}
               onCardClick={onCardClick}
+              autoStartWhenUnblockedProject={autoStartWhenUnblockedProject}
+              onToggleTaskAutoStartOnUnblock={onToggleTaskAutoStartOnUnblock}
               emptyState={
                 col.id === 'backlog' && projectIsEmpty
                   ? 'No tasks yet. Create one to get started.'
