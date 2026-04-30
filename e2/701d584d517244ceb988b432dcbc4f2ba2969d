@@ -1,0 +1,35 @@
+src/components/TaskDetailPanel.tsx
+  02e975111e10d9d5 29-30,255-265,267,275-277
+src/terminal/useTerminalPtyStream.ts
+  02e975111e10d9d5 1-108
+src/terminal/terminalGeometryPolicy.ts
+  02e975111e10d9d5 1-39
+src/terminal/warmAttach.ts
+  02e975111e10d9d5 98
+src/components/SessionTerminalView.tsx
+  02e975111e10d9d5 9,58-66,73-75,95,111-119,126-128,148
+src/components/PlanningPanel.tsx
+  02e975111e10d9d5 9-10,117-129,131,133,139-147
+src/terminal/terminalGeometryPolicy.test.ts
+  02e975111e10d9d5 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "e2701d584d517244ceb988b432dcbc4f2ba2969d",
+  "prompts": {
+    "02e975111e10d9d5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4c49293d-b3d7-4b44-9b7f-4224908a8a5a",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 246,
+      "total_deletions": 181,
+      "accepted_lines": 241,
+      "overriden_lines": 0
+    }
+  }
+}
