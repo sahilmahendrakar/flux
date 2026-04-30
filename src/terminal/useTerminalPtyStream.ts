@@ -41,6 +41,8 @@ export interface UseTerminalPtyStreamOptions {
    * heuristics even while the attach snapshot is not yet applied).
    */
   onDataChunk?: (data: string) => void;
+  /** Optional: after warm-attach snapshot is applied and stream is unblocked. */
+  onAttachComplete?: () => void;
 }
 
 /**
@@ -56,6 +58,7 @@ export function useTerminalPtyStream({
   getAttach,
   onStreamData,
   onDataChunk,
+  onAttachComplete,
 }: UseTerminalPtyStreamOptions): void {
   const getAttachRef = useRef(getAttach);
   getAttachRef.current = getAttach;
@@ -63,6 +66,8 @@ export function useTerminalPtyStream({
   onStreamDataRef.current = onStreamData;
   const onDataChunkRef = useRef(onDataChunk);
   onDataChunkRef.current = onDataChunk;
+  const onAttachCompleteRef = useRef(onAttachComplete);
+  onAttachCompleteRef.current = onAttachComplete;
 
   useEffect(() => {
     if (!enabled) return;
@@ -97,6 +102,7 @@ export function useTerminalPtyStream({
           result?.streamSeq,
         );
         earlyBuffer.length = 0;
+        onAttachCompleteRef.current?.();
       }, opts);
     })();
 

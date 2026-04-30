@@ -104,7 +104,11 @@ export interface Task {
 
 export type SessionStatus = 'idle' | 'running' | 'stopped' | 'error';
 
-export type SessionStartErrorCode = 'AGENT_NOT_FOUND' | 'WORKTREE_FAILED' | 'TASK_BLOCKED';
+export type SessionStartErrorCode =
+  | 'AGENT_NOT_FOUND'
+  | 'WORKTREE_FAILED'
+  | 'TASK_BLOCKED'
+  | 'INTERNAL';
 
 export type SessionStartResult =
   | Session
@@ -114,6 +118,11 @@ export type SessionStartResult =
       blockerIds?: string[];
       blockers?: { id: string; title: string }[];
     };
+
+/** Main→renderer: worktree + daemon spawn in progress for a task session. */
+export type TaskSessionStartProgress =
+  | { taskId: string; phase: 'starting' }
+  | { taskId: string; phase: 'settled'; outcome: SessionStartResult };
 
 export interface Session {
   id: string;

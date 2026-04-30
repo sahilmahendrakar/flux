@@ -10,6 +10,7 @@ import type {
   PlanningSession,
   ActiveProjectKey,
   ProjectTabState,
+  TaskSessionStartProgress,
 } from './types';
 import type { AttachResult, PlanningAttachResult } from './daemon/protocol';
 
@@ -131,6 +132,7 @@ declare global {
           cb: (data: string, streamSeq?: number) => void,
         ) => () => void;
         onExit: (cb: (session: Session) => void) => () => void;
+        onTaskStartProgress: (cb: (p: TaskSessionStartProgress) => void) => () => void;
       };
       shells: {
         open: (sessionId: string) => Promise<Shell>;

@@ -98,6 +98,10 @@ export default function App() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeTabId, setActiveTabId] = useState<string>('board');
   const [sessions, setSessions] = useState<Session[]>([]);
+  /** Task ids whose session is being created in main (worktree + spawn); see `onTaskStartProgress` */
+  const [sessionStartPendingTaskIds, setSessionStartPendingTaskIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [openTabIds, setOpenTabIds] = useState<Set<string>>(() => new Set());
   const [settingsTabOpen, setSettingsTabOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
@@ -376,6 +380,42 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    setSessionStartPendingTaskIds(new Set());
+  }, [project?.id]);
+
+  useEffect(() => {
+    if (!project) return;
+    return window.electronAPI.sessions.onTaskStartProgress((p) => {
+      if (p.phase === 'starting') {
+        setSessionStartPendingTaskIds((prev) => {
+          const next = new Set(prev);
+          next.add(p.taskId);
+          return next;
+        });
+        return;
+      }
+      setSessionStartPendingTaskIds((prev) => {
+        if (!prev.has(p.taskId)) return prev;
+        const next = new Set(prev);
+        next.delete(p.taskId);
+        return next;
+      });
+      if ('error' in p.outcome) return;
+      const s = p.outcome;
+      if (s.projectId !== project.id) return;
+      setSessions((prev) => {
+        const i = prev.findIndex((x) => x.id === s.id);
+        if (i >= 0) {
+          const next = prev.slice();
+          next[i] = s;
+          return next;
+        }
+        return [...prev, s];
+      });
+    });
+  }, [project?.id]);
+
+  useEffect(() => {
     if (!project) return;
     void refreshPlanningSessions();
   }, [project?.id, refreshPlanningSessions]);
@@ -415,6 +455,7 @@ export default function App() {
   useEffect(() => {
     if (!project) {
       setSessions([]);
+      setSessionStartPendingTaskIds(new Set());
       setOpenTabIds(new Set());
       setActiveTabId('board');
       setPlanningSessions([]);
@@ -1258,6 +1299,9 @@ export default function App() {
                     <TaskDetailPanel
                       task={selectedTask}
                       projectTasks={tasks}
+                      taskSessionStartPending={Boolean(
+                        selectedTask && sessionStartPendingTaskIds.has(selectedTask.id),
+                      )}
                       onSelectTask={(id) => setSelectedTaskId(id)}
                       onClose={() => setSelectedTaskId(null)}
                       onUpdate={handleUpdateTask}
