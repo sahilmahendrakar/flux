@@ -84,6 +84,9 @@ export class FirestoreTaskProvider implements TaskProvider {
       updatedBy: this.uid,
       ...(input.orderKey !== undefined ? { orderKey: input.orderKey } : {}),
       ...(createLabels.length > 0 ? { labels: createLabels } : {}),
+      ...(input.assigneeId !== undefined && input.assigneeId !== ''
+        ? { assigneeId: input.assigneeId }
+        : {}),
     };
     const ref = await addDoc(col, data);
     let normalizedDeps: string[] | undefined;
@@ -130,6 +133,9 @@ export class FirestoreTaskProvider implements TaskProvider {
       ...(input.orderKey !== undefined ? { orderKey: input.orderKey } : {}),
       ...(createLabels.length > 0 ? { labels: createLabels } : {}),
       ...(normalizedDeps ? { blockedByTaskIds: normalizedDeps } : {}),
+      ...(input.assigneeId !== undefined && input.assigneeId !== ''
+        ? { assigneeId: input.assigneeId }
+        : {}),
     };
   }
 
@@ -170,6 +176,13 @@ export class FirestoreTaskProvider implements TaskProvider {
         updates.autoStartOnUnblock = true;
       } else {
         updates.autoStartOnUnblock = deleteField();
+      }
+    }
+    if (patch.assigneeId !== undefined) {
+      if (patch.assigneeId === null) {
+        updates.assigneeId = deleteField();
+      } else {
+        updates.assigneeId = patch.assigneeId;
       }
     }
     await updateDoc(ref, updates);
@@ -219,10 +232,20 @@ function toTask(
     createdBy: typeof data.createdBy === 'string' ? data.createdBy : undefined,
     updatedAt: tsToIso(data.updatedAt),
     updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : undefined,
+    ...parseAssigneeIdField(data.assigneeId),
     ...parseBlockedByTaskIdsField(data.blockedByTaskIds),
     ...parseLabelsField(data.labels),
     ...parseAutoStartOnUnblockField(data.autoStartOnUnblock),
   };
+}
+
+function parseAssigneeIdField(
+  val: unknown,
+): { assigneeId: string } | Record<string, never> {
+  if (typeof val !== 'string' || val.trim() === '') {
+    return {};
+  }
+  return { assigneeId: val.trim() };
 }
 
 function parseAutoStartOnUnblockField(

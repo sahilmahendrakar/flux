@@ -17,6 +17,8 @@ export interface ProjectMember {
   displayName: string;
   email: string;
   joinedAt: string;
+  /** Profile image URL from Auth at join time (optional for legacy docs). */
+  photoURL?: string;
 }
 
 export function subscribeToProjectMembers(
@@ -51,6 +53,10 @@ function toMember(d: QueryDocumentSnapshot<DocumentData>): ProjectMember {
     email: typeof data.email === 'string' ? data.email : '',
     joinedAt:
       data.joinedAt instanceof Timestamp ? data.joinedAt.toDate().toISOString() : '',
+    photoURL:
+      typeof data.photoURL === 'string' && data.photoURL.trim() !== ''
+        ? data.photoURL.trim()
+        : undefined,
   };
 }
 

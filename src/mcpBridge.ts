@@ -19,6 +19,7 @@ export interface McpBridgeTaskCreateInput {
   orderKey?: string;
   blockedByTaskIds?: string[];
   labels?: string[];
+  assigneeId?: string;
 }
 
 export interface McpBridgeTaskPatch {
@@ -29,6 +30,7 @@ export interface McpBridgeTaskPatch {
   blockedByTaskIds?: string[];
   labels?: string[];
   autoStartOnUnblock?: boolean;
+  assigneeId?: string | null;
 }
 
 export interface McpBridgeTasksCreatePayload {

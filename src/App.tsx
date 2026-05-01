@@ -78,6 +78,30 @@ function isWorkspaceSessionTabId(tabId: string): boolean {
   return true;
 }
 
+/** Apply debounced cloud patches onto a server task for optimistic UI (`null` clears optional fields). */
+function mergeServerTaskWithPendingPatch(task: Task, patch: TaskPatch | undefined): Task {
+  if (!patch) return task;
+  const { assigneeId, workspaceCleanedAt, ...rest } = patch;
+  let next: Task = { ...task, ...rest };
+  if (assigneeId !== undefined) {
+    if (assigneeId === null) {
+      next = { ...next };
+      delete next.assigneeId;
+    } else {
+      next = { ...next, assigneeId };
+    }
+  }
+  if (workspaceCleanedAt !== undefined) {
+    if (workspaceCleanedAt === null) {
+      next = { ...next };
+      delete next.workspaceCleanedAt;
+    } else {
+      next = { ...next, workspaceCleanedAt };
+    }
+  }
+  return next;
+}
+
 const PLANNING_PANEL_WIDTH_KEY = 'flux.planningPanelWidth';
 const DEFAULT_PLANNING_PANEL_WIDTH = 288;
 const MIN_PLANNING_PANEL_WIDTH = 260;
@@ -675,7 +699,7 @@ export default function App() {
         const newer = pendingRef.current.get(id);
         setTasks((prev) =>
           prev.map((t) =>
-            t.id === id ? { ...updated, ...(newer?.patch ?? {}) } : t,
+            t.id === id ? mergeServerTaskWithPendingPatch(updated, newer?.patch) : t,
           ),
         );
       } catch (err) {
@@ -790,7 +814,7 @@ export default function App() {
         setTasks((prev) =>
           prev.map((t) =>
             t.id === draggableId
-              ? { ...updated, ...(pending?.patch ?? {}) }
+              ? mergeServerTaskWithPendingPatch(updated, pending?.patch)
               : t,
           ),
         );

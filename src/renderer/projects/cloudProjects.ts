@@ -82,6 +82,7 @@ export async function createCloudProject(
   name: string,
   displayName?: string,
   email?: string,
+  photoURL?: string,
 ): Promise<CloudProjectSummary> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error('Project name required.');
@@ -95,11 +96,13 @@ export async function createCloudProject(
     createdAt: serverTimestamp(),
   });
   // Also write a members/{uid} doc with display metadata.
+  const ownerPhoto = photoURL?.trim();
   await setDoc(doc(db, 'projects', ref.id, 'members', uid), {
     role: 'owner',
     joinedAt: serverTimestamp(),
     displayName: displayName ?? '',
     email: email ?? '',
+    ...(ownerPhoto ? { photoURL: ownerPhoto } : {}),
   });
   return {
     id: ref.id,
@@ -129,6 +132,7 @@ export async function acceptInvite(
   uid: string,
   email: string,
   displayName?: string,
+  photoURL?: string,
 ): Promise<void> {
   const db = getFirebaseFirestore();
   const projectRef = doc(db, 'projects', projectId);
@@ -151,11 +155,13 @@ export async function acceptInvite(
 
   if (!alreadyMember) {
     await setDoc(projectRef, { memberIds: arrayUnion(uid) }, { merge: true });
+    const inviteePhoto = photoURL?.trim();
     await setDoc(doc(db, 'projects', projectId, 'members', uid), {
       role: 'member',
       joinedAt: serverTimestamp(),
       displayName: displayName ?? '',
       email,
+      ...(inviteePhoto ? { photoURL: inviteePhoto } : {}),
     });
   }
   await deleteDoc(doc(db, 'projects', projectId, 'invites', email.toLowerCase()));

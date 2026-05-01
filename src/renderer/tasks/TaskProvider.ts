@@ -15,7 +15,11 @@ export type TaskPatch = Partial<
     | 'labels'
     | 'autoStartOnUnblock'
   >
-> & { workspaceCleanedAt?: string | null };
+> & {
+    workspaceCleanedAt?: string | null;
+    /** Cloud-only; pass `null` to clear assignee in Firestore. */
+    assigneeId?: string | null;
+  };
 
 export type TaskCreateInput = {
   title: string;
@@ -24,6 +28,7 @@ export type TaskCreateInput = {
   orderKey?: string;
   blockedByTaskIds?: string[];
   labels?: string[];
+  assigneeId?: string;
 };
 
 /**
