@@ -2,6 +2,7 @@
 import type {
   Task,
   Agent,
+  CloudProjectLocalBinding,
   LocalProject,
   RepoConfig,
   Session,
@@ -57,6 +58,9 @@ declare global {
         setPlanningAgent: (
           agent: Agent,
         ) => Promise<{ ok: true } | { error: string }>;
+        setDefaultTaskAgent: (
+          agent: Agent,
+        ) => Promise<{ ok: true } | { error: string }>;
         getRepos: () => Promise<RepoConfig[]>;
         updateRepo: (payload: {
           rootPath: string;
@@ -82,7 +86,7 @@ declare global {
         setTabs: (key: ActiveProjectKey, tabs: ProjectTabState) => Promise<void>;
         getLocalBinding: (
           cloudProjectId: string,
-        ) => Promise<{ rootPath: string; lastOpenedAt: string } | null>;
+        ) => Promise<CloudProjectLocalBinding | null>;
         pickDirectoryForCloud: (cloudProjectId: string) => Promise<DirPickResult>;
         activateCloud: (payload: {
           id: string;

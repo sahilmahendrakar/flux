@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type {
   ActiveProjectKey,
   Agent,
+  CloudProjectLocalBinding,
   LocalProject,
   PlanningSession,
   ProjectTabState,
@@ -55,6 +56,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('project:setPlanningAgent', agent) as Promise<
         { ok: true } | { error: string }
       >,
+    setDefaultTaskAgent: (agent: Agent) =>
+      ipcRenderer.invoke('project:setDefaultTaskAgent', agent) as Promise<
+        { ok: true } | { error: string }
+      >,
     getRepos: () =>
       ipcRenderer.invoke('project:getRepos') as Promise<RepoConfig[]>,
     updateRepo: (payload: {
@@ -98,7 +103,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('projects:setTabs', key, tabs) as Promise<void>,
     getLocalBinding: (cloudProjectId: string) =>
       ipcRenderer.invoke('projects:getLocalBinding', cloudProjectId) as Promise<
-        { rootPath: string; lastOpenedAt: string } | null
+        CloudProjectLocalBinding | null
       >,
     pickDirectoryForCloud: (cloudProjectId: string) =>
       ipcRenderer.invoke(

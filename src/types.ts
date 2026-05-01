@@ -58,6 +58,19 @@ export interface LocalProject {
  * Cloud projects in the projects list (not yet activated) don't carry rootPath
  * — see `CloudProjectSummary` in renderer code.
  */
+/**
+ * Per-machine record in `localBindings.json`. Optional fields are per-user prefs
+ * for that cloud project (not synced).
+ */
+export interface CloudProjectLocalBinding {
+  rootPath: string;
+  lastOpenedAt: string;
+  planningAgent?: Agent;
+  defaultTaskAgent?: Agent;
+  autoStartSessionOnInProgress?: boolean;
+  autoStartWhenUnblocked?: boolean;
+}
+
 export interface CloudProject {
   id: string;
   kind: 'cloud';
@@ -66,6 +79,10 @@ export interface CloudProject {
   memberIds: string[];
   createdAt: string;
   rootPath: string;
+  planningAgent?: Agent;
+  defaultTaskAgent?: Agent;
+  autoStartSessionOnInProgress?: boolean;
+  autoStartWhenUnblocked?: boolean;
 }
 
 export type Project = LocalProject | CloudProject;
@@ -102,6 +119,11 @@ export interface Task {
   updatedAt?: string;
   /** Cloud-only: uid of the user who last updated the task. */
   updatedBy?: string;
+  /**
+   * Cloud-only: uid of the human assignee (multi-user board). Omitted when
+   * unassigned. MCP tools may pass assigneeEmail, which resolves to this id.
+   */
+  assigneeId?: string | null;
   /** Task ids in the same project that must be `done` before this task is unblocked. */
   blockedByTaskIds?: string[];
   /** If true, auto-start a session for this task when the last dependency completes, even if project “when unblocked” is off. */

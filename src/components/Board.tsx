@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { Task, TaskStatus, COLUMNS, Agent } from '../types';
 import { projectLabelCatalog } from '../taskLabels';
+import type { ProjectMember } from '../renderer/projects/members';
 import {
   applyBoardFilters,
   boardFiltersAreActive,
@@ -16,7 +17,9 @@ import { BoardFilterBar } from './BoardFilterBar';
 interface Props {
   allTasks: Task[];
   onDragEnd: (result: DropResult) => void;
-  onCreateTask: (title: string, agent: Agent, labels?: string[]) => void;
+  onCreateTask: (title: string, agent: Agent, labels?: string[], assigneeId?: string) => void;
+  /** Initial agent selection in the new-task modal. */
+  defaultTaskAgent: Agent;
   onDeleteTask: (id: string) => void;
   onRequestCleanupTask: (id: string) => void;
   cleanupLoadingTaskId: string | null;
@@ -25,12 +28,15 @@ interface Props {
   onToggleTaskAutoStartOnUnblock: (taskId: string, enabled: boolean) => void;
   planPanelOpen: boolean;
   onTogglePlanPanel: () => void;
+  /** Cloud-only: team members for the assignee picker. */
+  projectMembers?: ProjectMember[];
 }
 
 export default function Board({
   allTasks,
   onDragEnd,
   onCreateTask,
+  defaultTaskAgent,
   onDeleteTask,
   onRequestCleanupTask,
   cleanupLoadingTaskId,
@@ -39,11 +45,19 @@ export default function Board({
   onToggleTaskAutoStartOnUnblock,
   planPanelOpen,
   onTogglePlanPanel,
+  projectMembers,
 }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [boardFilter, setBoardFilter] = useState<BoardFilterState>(
     () => ({ ...DEFAULT_BOARD_FILTER }),
   );
+
+  const membersMap = useMemo(() => {
+    if (!projectMembers) return undefined;
+    return new Map<string, ProjectMember>(
+      projectMembers.map((member) => [member.uid, member]),
+    );
+  }, [projectMembers]);
 
   const labelCatalog = useMemo(
     () => projectLabelCatalog(allTasks),
@@ -150,6 +164,7 @@ export default function Board({
               onCardClick={onCardClick}
               autoStartWhenUnblockedProject={autoStartWhenUnblockedProject}
               onToggleTaskAutoStartOnUnblock={onToggleTaskAutoStartOnUnblock}
+              membersMap={membersMap}
               emptyState={
                 col.id === 'backlog' && projectIsEmpty
                   ? 'No tasks yet. Create one to get started.'
@@ -166,9 +181,11 @@ export default function Board({
       {modalOpen ? (
         <NewTaskModal
           labelCatalog={labelCatalog}
+          defaultAgent={defaultTaskAgent}
+          projectMembers={projectMembers}
           onClose={() => setModalOpen(false)}
-          onCreate={(title, agent, labels) => {
-            onCreateTask(title, agent, labels);
+          onCreate={(title, agent, labels, assigneeId) => {
+            onCreateTask(title, agent, labels, assigneeId);
             setModalOpen(false);
           }}
         />

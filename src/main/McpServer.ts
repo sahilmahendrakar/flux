@@ -13,6 +13,7 @@ import type { LocalBindingStore } from './LocalBindingStore';
 import type { McpRendererBridge, McpBridgeResult } from './McpRendererBridge';
 import type { ActiveProjectKey, Task } from '../types';
 import type {
+  McpBridgeMember,
   McpBridgeProjectInfoResult,
   McpBridgeTasksCreatePayload,
   McpBridgeTasksDeletePayload,
@@ -157,6 +158,30 @@ export class McpServer {
     return jsonToolPayload({ error: friendly, code: result.code });
   }
 
+  /**
+   * Resolve an email address to a member UID by requesting the members list
+   * from the renderer. Returns the UID string on success, or a tool error
+   * payload if the email is not found or the bridge call fails.
+   */
+  private async resolveEmailToId(
+    email: string,
+    activeKey: ActiveProjectKey,
+  ): Promise<string | ReturnType<typeof jsonToolPayload>> {
+    const result = await this.bridge.request<McpBridgeMember[]>(
+      'members.list',
+      activeKey,
+    );
+    if (!result.ok) return this.bridgeError(result);
+    const normalised = email.toLowerCase();
+    const match = result.data.find((m) => m.email.toLowerCase() === normalised);
+    if (!match) {
+      return jsonToolPayload({
+        error: `No member with email '${email}' found in this project`,
+      });
+    }
+    return match.uid;
+  }
+
   private registerTools(server: BaseMcpServer): void {
     server.tool(
       'flux__list_tasks',
@@ -204,6 +229,11 @@ export class McpServer {
           .describe(
             'Optional feature tags / labels; trimmed, empty dropped, case-insensitive duplicates merged',
           ),
+        assigneeEmail: z
+          .string()
+          .email()
+          .optional()
+          .describe('Email of the team member to assign this task to (cloud projects only)'),
       },
       async (input) => {
         try {
@@ -211,7 +241,11 @@ export class McpServer {
           if (active.kind === 'none') {
             return jsonToolPayload({ error: 'No project open' });
           }
-          const agent = input.agent ?? 'claude-code';
+          const agent =
+            input.agent ??
+            (active.kind === 'local'
+              ? active.project.defaultTaskAgent
+              : this.bindingStore.getPrefs(active.activeKey.id).defaultTaskAgent);
           if (active.kind === 'local') {
             let task = await this.taskStore.create({
               title: input.title,
@@ -230,9 +264,15 @@ export class McpServer {
             this.notifyTasksChanged();
             return jsonToolPayload(task);
           }
-          // Cloud: blockedByTaskIds is not yet propagated through the renderer
-          // bridge (it requires a project-wide validation pass that today only
-          // runs in main against the local TaskStore).
+          let assigneeId: string | undefined;
+          if (input.assigneeEmail != null) {
+            const resolved = await this.resolveEmailToId(
+              input.assigneeEmail,
+              active.activeKey,
+            );
+            if (typeof resolved !== 'string') return resolved;
+            assigneeId = resolved;
+          }
           const payload: McpBridgeTasksCreatePayload = {
             input: {
               title: input.title,
@@ -240,7 +280,11 @@ export class McpServer {
               ...(input.description != null && input.description !== ''
                 ? { description: input.description }
                 : {}),
+              ...(input.blockedByTaskIds?.length
+                ? { blockedByTaskIds: input.blockedByTaskIds }
+                : {}),
               ...(input.labels !== undefined ? { labels: input.labels } : {}),
+              ...(assigneeId !== undefined ? { assigneeId } : {}),
             },
           };
           const result = await this.bridge.request<Task>(
@@ -281,6 +325,12 @@ export class McpServer {
           .describe(
             'If true, auto-start a session when the last dependency completes (in addition to project default for "when unblocked")',
           ),
+        assigneeEmail: z
+          .string()
+          .email()
+          .nullable()
+          .optional()
+          .describe('Email to assign, or null to unassign (cloud only)'),
       },
       async (input) => {
         try {
@@ -321,21 +371,43 @@ export class McpServer {
             this.notifyTasksChanged();
             return jsonToolPayload(updated);
           }
-          // Cloud: blockedByTaskIds is not yet propagated through the bridge.
+          let assigneeId: string | null | undefined;
+          if (input.assigneeEmail !== undefined) {
+            if (input.assigneeEmail === null) {
+              assigneeId = null;
+            } else {
+              const resolved = await this.resolveEmailToId(
+                input.assigneeEmail,
+                active.activeKey,
+              );
+              if (typeof resolved !== 'string') return resolved;
+              assigneeId = resolved;
+            }
+          }
           const patch: Partial<
             Pick<
               Task,
-              'title' | 'description' | 'status' | 'agent' | 'labels' | 'autoStartOnUnblock'
+              | 'title'
+              | 'description'
+              | 'status'
+              | 'agent'
+              | 'blockedByTaskIds'
+              | 'labels'
+              | 'autoStartOnUnblock'
             >
-          > = {};
+          > & { assigneeId?: string | null } = {};
           if (input.title !== undefined) patch.title = input.title;
           if (input.description !== undefined) patch.description = input.description;
           if (input.status !== undefined) patch.status = input.status;
           if (input.agent !== undefined) patch.agent = input.agent;
+          if (input.blockedByTaskIds !== undefined) {
+            patch.blockedByTaskIds = input.blockedByTaskIds;
+          }
           if (input.labels !== undefined) patch.labels = input.labels;
           if (input.autoStartOnUnblock !== undefined) {
             patch.autoStartOnUnblock = input.autoStartOnUnblock;
           }
+          if (assigneeId !== undefined) patch.assigneeId = assigneeId;
           const payload: McpBridgeTasksUpdatePayload = { taskId: input.id, patch };
           const result = await this.bridge.request<McpBridgeTasksUpdateResult>(
             'tasks.update',
@@ -445,6 +517,34 @@ export class McpServer {
           );
           if (!result.ok) return this.bridgeError(result);
           return jsonToolPayload({ ok: true, deletedId: result.data.deletedId });
+        } catch (err) {
+          return toolError(err);
+        }
+      },
+    );
+
+    server.tool(
+      'flux__list_members',
+      'List members of the current cloud project (uid, email, displayName, role owner|member, optional photoURL). Sorted with owners first, then by display name. For local projects returns members: [] with a note; use emails for assigneeEmail when creating or updating tasks.',
+      {},
+      async () => {
+        try {
+          const active = this.resolveActive();
+          if (active.kind === 'none') {
+            return jsonToolPayload({ error: 'No project open' });
+          }
+          if (active.kind === 'local') {
+            return jsonToolPayload({
+              members: [] as McpBridgeMember[],
+              note: 'Team member listing is only available for cloud projects.',
+            });
+          }
+          const result = await this.bridge.request<McpBridgeMember[]>(
+            'members.list',
+            active.activeKey,
+          );
+          if (!result.ok) return this.bridgeError(result);
+          return jsonToolPayload(result.data);
         } catch (err) {
           return toolError(err);
         }

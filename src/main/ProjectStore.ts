@@ -156,10 +156,11 @@ You have access to the following Flux tools for task management:
 - \`flux__update_task\` — update an existing task's title, description, status, agent, \`blockedByTaskIds\`, and/or \`labels\` (any column transition; passing \`blockedByTaskIds: []\` clears dependencies; \`labels: []\` clears tags)
 - \`flux__delete_task\` — permanently remove a task from the board for this project; **only** after the user clearly asked to delete it, then call with \`confirm: true\`. If intent is ambiguous, ask once before deleting
 - \`flux__get_project_info\` — returns project \`name\`, canonical \`rootPath\` (read application code here), and \`taskCounts\`; call early after the user engages so task and planning work targets the correct repo
+- \`flux__list_members\` — cloud projects only: team roster (\`email\`, \`displayName\`, \`role\`) for assignee lookup; local projects return an empty list with a note
 
 Board relationship: new tasks land in **Backlog**. \`flux__start_task\` is the usual way to mark work as actively in flight (\`in-progress\`). Use \`flux__update_task\` for other status changes (e.g. **Needs input**, **Done**) or edits to title/description/agent.
 
-**Task dependencies:** \`blockedByTaskIds\` means “this task is blocked until these prerequisite tasks are addressed.” Use \`flux__list_tasks\` to get ids. Only reference tasks in the current project; invalid or cyclic graphs are rejected. **Team (cloud) projects:** \`blockedByTaskIds\` is currently local-only; if you pass it on a team project the field is silently dropped.
+**Task dependencies:** \`blockedByTaskIds\` means “this task is blocked until these prerequisite tasks are addressed.” Use \`flux__list_tasks\` to get ids. Only reference tasks in the current project; invalid or cyclic graphs are rejected (local and cloud).
 
 **Team (cloud) projects:** the Flux task tools route through the running Flux app for cloud projects. The app must be **open and signed in** for tools to work; if you see \`Sign in to Flux to use cloud project tools\` or \`Open the Flux app to enable cloud project tools\`, ask the user to bring Flux to the foreground and try again.
 
@@ -236,6 +237,17 @@ export class ProjectStore {
       throw new Error('ProjectStore: invalid planning agent');
     }
     await this.mutateConfig((c) => ({ ...c, planningAgent: agent }));
+  }
+
+  /** Updates `defaultTaskAgent` in config.json and the in-memory active project. */
+  async setDefaultTaskAgent(agent: Agent): Promise<void> {
+    if (!this.projectDir || !this.project) {
+      throw new Error('ProjectStore: no active local project');
+    }
+    if (agent !== 'claude-code' && agent !== 'codex' && agent !== 'cursor') {
+      throw new Error('ProjectStore: invalid default task agent');
+    }
+    await this.mutateConfig((c) => ({ ...c, defaultTaskAgent: agent }));
   }
 
   /**

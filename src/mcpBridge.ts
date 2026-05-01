@@ -9,7 +9,17 @@ export type McpBridgeOp =
   | 'tasks.create'
   | 'tasks.update'
   | 'tasks.delete'
-  | 'projectInfo';
+  | 'projectInfo'
+  | 'members.list';
+
+/** One project member row for `members.list` / `flux__list_members` (cloud). */
+export interface McpBridgeMember {
+  uid: string;
+  email: string;
+  displayName: string;
+  role: 'owner' | 'member';
+  photoURL?: string;
+}
 
 export interface McpBridgeTaskCreateInput {
   title: string;
@@ -17,7 +27,9 @@ export interface McpBridgeTaskCreateInput {
   status?: TaskStatus;
   description?: string;
   orderKey?: string;
+  blockedByTaskIds?: string[];
   labels?: string[];
+  assigneeId?: string;
 }
 
 export interface McpBridgeTaskPatch {
@@ -25,8 +37,10 @@ export interface McpBridgeTaskPatch {
   description?: string;
   status?: TaskStatus;
   agent?: Agent;
+  blockedByTaskIds?: string[];
   labels?: string[];
   autoStartOnUnblock?: boolean;
+  assigneeId?: string | null;
 }
 
 export interface McpBridgeTasksCreatePayload {

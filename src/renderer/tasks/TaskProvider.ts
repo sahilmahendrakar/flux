@@ -14,6 +14,7 @@ export type TaskPatch = Partial<
     | 'blockedByTaskIds'
     | 'labels'
     | 'autoStartOnUnblock'
+    | 'assigneeId'
   >
 > & { workspaceCleanedAt?: string | null };
 
@@ -24,6 +25,7 @@ export type TaskCreateInput = {
   orderKey?: string;
   blockedByTaskIds?: string[];
   labels?: string[];
+  assigneeId?: string;
 };
 
 /**
