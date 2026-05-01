@@ -115,6 +115,8 @@ export interface Task {
   workspaceCleanedAt?: string;
   /** Cloud-only: uid of the user who created the task. */
   createdBy?: string;
+  /** Cloud-only: uid of the human assignee. */
+  assigneeId?: string;
   /** Cloud-only. */
   updatedAt?: string;
   /** Cloud-only: uid of the user who last updated the task. */
