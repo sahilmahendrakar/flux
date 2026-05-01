@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "61314eb461d89b2f7a54e39a812c1f897576c373",
+  "prompts": {
+    "22da6c7dacf35194": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "99977832-54f1-45a8-9100-54671284012a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 7109,
+      "total_deletions": 0,
+      "accepted_lines": 6981,
+      "overriden_lines": 53
+    }
+  }
+}
