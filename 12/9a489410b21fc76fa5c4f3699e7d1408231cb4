@@ -1,0 +1,27 @@
+src/renderer/mcp/useMcpRendererBridge.ts
+  86c40c15b849ba5a 1-2,27-28,143-157
+src/App.tsx
+  86c40c15b849ba5a 52,292-298,663-671,688,690,697-711,716,770-772,777,810-812,834-850,855
+src/cloudInProgressAutostartApply.ts
+  86c40c15b849ba5a 1-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "129a489410b21fc76fa5c4f3699e7d1408231cb4",
+  "prompts": {
+    "86c40c15b849ba5a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "f0b04a10-2c83-446a-8d09-870cf3b84679",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 150,
+      "total_deletions": 7,
+      "accepted_lines": 150,
+      "overriden_lines": 0
+    }
+  }
+}
