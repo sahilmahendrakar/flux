@@ -1,0 +1,23 @@
+src/types.ts
+  670ad086729b7c63 118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "1eb01d1d99065fe00e05a9492f0f8ac7713b0746",
+  "prompts": {
+    "670ad086729b7c63": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7b016ef4-d1c0-4521-b080-4f8d44f49e5b",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 5,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
