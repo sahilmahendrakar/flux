@@ -20,6 +20,8 @@ export interface RunnerEntry {
   status: RunnerStatus;
   lastSeen: string;
   displayName?: string;
+  /** Written by heartbeat; viewer can show avatar if members list is stale. */
+  photoURL?: string;
 }
 
 /**
@@ -75,6 +77,7 @@ function toRunnerEntry(
     status,
     lastSeen: tsToIso(data.lastSeen) ?? new Date().toISOString(),
     displayName: typeof data.displayName === 'string' ? data.displayName : undefined,
+    photoURL: typeof data.photoURL === 'string' ? data.photoURL : undefined,
   };
 }
 
@@ -89,6 +92,7 @@ export async function writeRunner(
   uid: string,
   status: RunnerStatus,
   displayName?: string,
+  photoURL?: string,
 ): Promise<void> {
   const db = getFirebaseFirestore();
   const ref = doc(db, 'projects', projectId, 'tasks', taskId, 'runners', uid);
@@ -100,6 +104,7 @@ export async function writeRunner(
       lastSeen: serverTimestamp(),
       updatedAt: serverTimestamp(),
       ...(displayName ? { displayName } : {}),
+      ...(photoURL ? { photoURL } : {}),
     },
     { merge: true },
   );

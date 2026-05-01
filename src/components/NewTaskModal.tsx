@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { UserCircle2 } from 'lucide-react';
 import { Agent, AGENTS } from '../types';
 import { TaskLabelsField } from './TaskLabelsField';
 import type { ProjectMember } from '../renderer/projects/members';
+import { ProjectMemberAvatar } from './ProjectMemberAvatar';
 
 interface Props {
   onClose: () => void;
@@ -69,10 +71,6 @@ export default function NewTaskModal({
   const selectedMember = assigneeId
     ? projectMembers?.find((m) => m.uid === assigneeId)
     : undefined;
-
-  function memberInitial(m: ProjectMember): string {
-    return (m.displayName || m.email || '?').slice(0, 1).toUpperCase();
-  }
 
   function memberLabel(m: ProjectMember): string {
     return m.displayName || m.email || m.uid;
@@ -151,13 +149,18 @@ export default function NewTaskModal({
               >
                 {selectedMember ? (
                   <>
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-500/[0.12] text-[10px] font-medium text-sky-300">
-                      {memberInitial(selectedMember)}
-                    </span>
+                    <ProjectMemberAvatar member={selectedMember} size="xs" />
                     <span className="text-zinc-100">{memberLabel(selectedMember)}</span>
                   </>
                 ) : (
-                  <span className="text-zinc-500">Unassigned</span>
+                  <>
+                    <UserCircle2
+                      className="h-5 w-5 shrink-0 text-zinc-500"
+                      strokeWidth={1.5}
+                      aria-hidden
+                    />
+                    <span className="text-zinc-500">Unassigned</span>
+                  </>
                 )}
                 <svg
                   className="ml-auto h-3.5 w-3.5 shrink-0 text-zinc-600"
@@ -177,10 +180,11 @@ export default function NewTaskModal({
                       setAssigneeId(undefined);
                       setAssigneeDropdownOpen(false);
                     }}
-                    className={`flex w-full items-center px-3 py-1.5 text-[13px] transition hover:bg-white/[0.04] ${
+                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-[13px] transition hover:bg-white/[0.04] ${
                       !assigneeId ? 'text-zinc-300' : 'text-zinc-500'
                     }`}
                   >
+                    <UserCircle2 className="h-5 w-5 shrink-0" strokeWidth={1.5} aria-hidden />
                     Unassigned
                   </button>
                   {(projectMembers ?? []).map((m) => (
@@ -195,9 +199,7 @@ export default function NewTaskModal({
                         assigneeId === m.uid ? 'text-zinc-100' : 'text-zinc-400'
                       }`}
                     >
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-500/[0.12] text-[10px] font-medium text-sky-300">
-                        {memberInitial(m)}
-                      </span>
+                      <ProjectMemberAvatar member={m} size="xs" />
                       {memberLabel(m)}
                     </button>
                   ))}

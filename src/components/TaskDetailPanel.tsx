@@ -42,6 +42,7 @@ import {
 import { useTerminalPtyStream } from '../terminal/useTerminalPtyStream';
 import TerminalComponent, { type TerminalHandle } from './Terminal';
 import { TaskLabelsField } from './TaskLabelsField';
+import { ProjectMemberAvatar } from './ProjectMemberAvatar';
 
 /** Prose for markdown description read mode (aligned with PlanningDocsView, panel density). */
 const MD_READ_CLASS = [
@@ -75,7 +76,7 @@ interface TaskDetailPanelProps {
   onUpdate: (id: string, patch: Partial<Task>) => void;
   onDelete: (id: string) => void;
   /** Present when a teammate (not the current user) is running an agent on this task. */
-  remoteRunner?: { displayName?: string } | null;
+  remoteRunner?: { uid: string; displayName?: string; photoURL?: string } | null;
   onOpenSessionTab: (session: Session) => void;
   onArchiveSession: (sessionId: string) => void;
   /** When set (and task is not done), "Mark as done" is enabled. Omitted when blocked — use `markAsDoneBlocked`. */
@@ -150,10 +151,6 @@ function formatCreatedLabel(iso: string): string {
 
 function projectMemberLabel(m: ProjectMember): string {
   return m.displayName || m.email || m.uid;
-}
-
-function projectMemberInitial(m: ProjectMember): string {
-  return (m.displayName || m.email || '?').slice(0, 1).toUpperCase();
 }
 
 function useAutosizeTextArea(value: string, minHeightPx = 0) {
@@ -946,9 +943,7 @@ export default function TaskDetailPanel({
                     >
                       {task.assigneeId && selectedAssigneeMember ? (
                         <>
-                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sky-500/[0.12] text-[11px] font-medium text-sky-200/90">
-                            {projectMemberInitial(selectedAssigneeMember)}
-                          </div>
+                          <ProjectMemberAvatar member={selectedAssigneeMember} size="sm" />
                           <span className="min-w-0 flex-1 truncate">
                             {projectMemberLabel(selectedAssigneeMember)}
                           </span>
@@ -1016,9 +1011,7 @@ export default function TaskDetailPanel({
                                 setAssigneeMenuOpen(false);
                               }}
                             >
-                              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sky-500/[0.12] text-[11px] font-medium text-sky-200/90">
-                                {projectMemberInitial(m)}
-                              </div>
+                              <ProjectMemberAvatar member={m} size="sm" />
                               <span className="min-w-0 flex-1 truncate">{projectMemberLabel(m)}</span>
                             </button>
                           );
@@ -1296,9 +1289,17 @@ export default function TaskDetailPanel({
             <div className="min-h-0 flex-1 overflow-hidden px-3 pb-3">
               {remoteRunner && !session ? (
                 <div className="flex h-full min-h-[7rem] flex-col items-center justify-center gap-2 rounded-xl border border-white/[0.05] bg-white/[0.02] px-4 py-6 text-center">
-                  <div className="flex items-center gap-2 text-sm text-zinc-200">
-                    <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-                    <span className="font-medium">
+                  <div className="flex items-center gap-2.5 text-sm text-zinc-200">
+                    <ProjectMemberAvatar
+                      member={{
+                        uid: remoteRunner.uid,
+                        displayName: remoteRunner.displayName,
+                        photoURL: remoteRunner.photoURL,
+                      }}
+                      size="sm"
+                    />
+                    <span className="inline-flex h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-400" />
+                    <span className="min-w-0 font-medium">
                       {remoteRunner.displayName ?? 'A teammate'} is running an agent
                     </span>
                   </div>

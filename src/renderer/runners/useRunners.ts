@@ -68,8 +68,9 @@ export function useAgentHeartbeat(opts: {
   projectId: string | null;
   uid: string | null;
   displayName?: string;
+  photoURL?: string;
 }): void {
-  const { projectId, uid, displayName } = opts;
+  const { projectId, uid, displayName, photoURL } = opts;
 
   useEffect(() => {
     if (!projectId || !uid) return;
@@ -95,7 +96,7 @@ export function useAgentHeartbeat(opts: {
       for (const taskId of activeTaskIds) {
         running.add(taskId);
         try {
-          await writeRunner(projectId, taskId, uid, 'running', displayName);
+          await writeRunner(projectId, taskId, uid, 'running', displayName, photoURL);
         } catch (err) {
           console.error('[heartbeat] writeRunner(running) failed', err);
         }
@@ -105,7 +106,7 @@ export function useAgentHeartbeat(opts: {
         if (activeTaskIds.has(taskId)) continue;
         running.delete(taskId);
         try {
-          await writeRunner(projectId, taskId, uid, 'idle', displayName);
+          await writeRunner(projectId, taskId, uid, 'idle', displayName, photoURL);
         } catch (err) {
           console.error('[heartbeat] writeRunner(idle) failed', err);
         }
@@ -118,5 +119,5 @@ export function useAgentHeartbeat(opts: {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [projectId, uid, displayName]);
+  }, [projectId, uid, displayName, photoURL]);
 }
