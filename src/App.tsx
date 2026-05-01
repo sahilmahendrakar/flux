@@ -1750,6 +1750,7 @@ export default function App() {
                     currentUserDisplayName={displayName}
                     currentUserEmail={userEmail ?? undefined}
                     onAutoStartWhenUnblockedChange={setAutoStartWhenUnblockedProject}
+                    onProjectAgentPrefsRefresh={refreshPlanningRelatedProjectState}
                   />
                 </div>
               </div>
