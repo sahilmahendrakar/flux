@@ -36,6 +36,7 @@ import { SessionTerminalView } from './components/SessionTerminalView';
 import ConfirmDialog from './components/ConfirmDialog';
 import { useAuth } from './renderer/auth/useAuth';
 import { useCloudProjects } from './renderer/projects/useCloudProjects';
+import { useMembers } from './renderer/projects/useMembers';
 import { useInvites } from './renderer/invites/useInvites';
 import {
   useAgentHeartbeat,
@@ -56,6 +57,7 @@ import {
   defaultTaskAgentForProject,
   hydrateCloudProject,
 } from './cloudBindingPrefs';
+import { mergeMemberPhotoURL } from './renderer/projects/cloudProjects';
 
 type ActiveProject = LocalProject | CloudProject;
 
@@ -77,6 +79,30 @@ function isWorkspaceSessionTabId(tabId: string): boolean {
   if (STATIC_TAB_IDS.has(tabId)) return false;
   if (tabId.startsWith(PLAN_TAB_PREFIX)) return false;
   return true;
+}
+
+/** Apply debounced cloud patches onto a server task for optimistic UI (`null` clears optional fields). */
+function mergeServerTaskWithPendingPatch(task: Task, patch: TaskPatch | undefined): Task {
+  if (!patch) return task;
+  const { assigneeId, workspaceCleanedAt, ...rest } = patch;
+  let next: Task = { ...task, ...rest };
+  if (assigneeId !== undefined) {
+    if (assigneeId === null || assigneeId === '') {
+      next = { ...next };
+      delete next.assigneeId;
+    } else {
+      next = { ...next, assigneeId };
+    }
+  }
+  if (workspaceCleanedAt !== undefined) {
+    if (workspaceCleanedAt === null) {
+      next = { ...next };
+      delete next.workspaceCleanedAt;
+    } else {
+      next = { ...next, workspaceCleanedAt };
+    }
+  }
+  return next;
 }
 
 const PLANNING_PANEL_WIDTH_KEY = 'flux.planningPanelWidth';
@@ -151,20 +177,42 @@ export default function App() {
   sessionsRef.current = sessions;
   const tasksRef = useRef<Task[]>([]);
   tasksRef.current = tasks;
+  const uidRef = useRef<string | null>(null);
   const cloudUnblockTasksPrevRef = useRef<Task[] | null>(null);
   const cloudUnblockInFlightRef = useRef<Set<string>>(new Set());
+  const memberPhotoRefreshKeyRef = useRef('');
   const [autoStartWhenUnblockedProject, setAutoStartWhenUnblockedProject] = useState(false);
 
   const auth = useAuth();
   const uid = auth.user?.uid ?? null;
+  uidRef.current = uid;
   const userEmail = auth.user?.email ?? null;
   const displayName = auth.user?.displayName ?? undefined;
   const cloudProjectsState = useCloudProjects(uid);
   const invitesState = useInvites(userEmail);
 
+  useEffect(() => {
+    if (!uid || !auth.user || cloudProjectsState.status !== 'ready') return;
+    const ids = cloudProjectsState.projects
+      .map((p) => p.id)
+      .slice()
+      .sort()
+      .join(',');
+    const key = `${auth.user.photoURL ?? ''}|${ids}`;
+    if (key === memberPhotoRefreshKeyRef.current) return;
+    memberPhotoRefreshKeyRef.current = key;
+    void mergeMemberPhotoURL(
+      uid,
+      auth.user.photoURL ?? null,
+      cloudProjectsState.projects.map((p) => p.id),
+    ).catch((err) => console.error('[mergeMemberPhotoURL] failed', err));
+  }, [uid, auth.user, cloudProjectsState.status, cloudProjectsState.projects]);
+
   const cloudProjectId = project?.kind === 'cloud' ? project.id : null;
   const runners = useRunners(cloudProjectId);
+  const membersState = useMembers(cloudProjectId);
   useAgentHeartbeat({ projectId: cloudProjectId, uid, displayName });
+  const projectMembers = cloudProjectId ? membersState.members : undefined;
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
 
@@ -359,7 +407,10 @@ export default function App() {
           getCurrentList: () => tasksRef.current,
           startSession: (task, all) => window.electronAPI.sessions.start(task, all),
           moveBacklogToInProgress: async (id) => {
-            const updated = await provider.update(id, { status: 'in-progress' });
+            const task = tasksRef.current.find((x) => x.id === id);
+            const patch: TaskPatch = { status: 'in-progress' };
+            if (uidRef.current && !task?.assigneeId) patch.assigneeId = uidRef.current;
+            const updated = await provider.update(id, patch);
             if (inProg) {
               const all = tasksRef.current.map((x) => (x.id === id ? updated : x));
               const r = await window.electronAPI.sessions.start(updated, all);
@@ -372,7 +423,10 @@ export default function App() {
             }
           },
           moveBacklogToInProgressThenStartSessionWithoutImplicitInProg: async (id) => {
-            const updated = await provider.update(id, { status: 'in-progress' });
+            const task = tasksRef.current.find((x) => x.id === id);
+            const patch: TaskPatch = { status: 'in-progress' };
+            if (uidRef.current && !task?.assigneeId) patch.assigneeId = uidRef.current;
+            const updated = await provider.update(id, patch);
             const all = tasksRef.current.map((x) => (x.id === id ? updated : x));
             const r = await window.electronAPI.sessions.start(updated, all);
             if (r && typeof r === 'object' && 'error' in r) {
@@ -691,7 +745,7 @@ export default function App() {
         const newer = pendingRef.current.get(id);
         setTasks((prev) =>
           prev.map((t) =>
-            t.id === id ? { ...updated, ...(newer?.patch ?? {}) } : t,
+            t.id === id ? mergeServerTaskWithPendingPatch(updated, newer?.patch) : t,
           ),
         );
         if (project?.kind === 'cloud') {
@@ -763,6 +817,9 @@ export default function App() {
       if (patch.autoStartOnUnblock !== undefined) {
         persistable.autoStartOnUnblock = patch.autoStartOnUnblock;
       }
+      if (patch.assigneeId !== undefined) {
+        persistable.assigneeId = patch.assigneeId;
+      }
       if (Object.keys(persistable).length === 0) return;
 
       const existing = pendingRef.current.get(id);
@@ -827,7 +884,7 @@ export default function App() {
         setTasks((prev) =>
           prev.map((t) =>
             t.id === draggableId
-              ? { ...updated, ...(pending?.patch ?? {}) }
+              ? mergeServerTaskWithPendingPatch(updated, pending?.patch)
               : t,
           ),
         );
@@ -904,7 +961,7 @@ export default function App() {
   );
 
   const handleCreateTask = useCallback(
-    async (title: string, agent: Agent, labelInput?: string[]) => {
+    async (title: string, agent: Agent, labelInput?: string[], assigneeId?: string) => {
       if (!provider) return;
       try {
         // Append to the bottom of the backlog column.
@@ -921,6 +978,7 @@ export default function App() {
           agent,
           orderKey,
           ...(labels.length > 0 ? { labels } : {}),
+          ...(assigneeId ? { assigneeId } : {}),
         });
         setTasks((prev) => {
           if (prev.some((t) => t.id === task.id)) return prev;
@@ -1647,6 +1705,7 @@ export default function App() {
                           setActiveTabId('board');
                           setPlanPanelOpen((v) => !v);
                         }}
+                        projectMembers={projectMembers}
                       />
                       <TaskDetailPanel
                         task={selectedTask}
@@ -1654,6 +1713,9 @@ export default function App() {
                         taskSessionStartPending={Boolean(
                           selectedTask && sessionStartPendingTaskIds.has(selectedTask.id),
                         )}
+                        implicitSessionAssigneeUid={
+                          project.kind === 'cloud' ? uid : undefined
+                        }
                         onSelectTask={(id) => setSelectedTaskId(id)}
                         onClose={() => setSelectedTaskId(null)}
                         onUpdate={handleUpdateTask}
@@ -1670,6 +1732,7 @@ export default function App() {
                         remoteRunner={remoteRunnerForSelected}
                         onOpenSessionTab={handleOpenSessionTab}
                         onArchiveSession={(id) => void handleArchiveSession(id)}
+                        projectMembers={projectMembers}
                       />
                     </div>
                     <div
