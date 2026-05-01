@@ -6,6 +6,7 @@ import type {
   Task,
 } from '../../types';
 import type {
+  McpBridgeMembersListResult,
   McpBridgeProjectInfoResult,
   McpBridgeRequest,
   McpBridgeResponse,
@@ -14,6 +15,7 @@ import type {
   McpBridgeTasksUpdatePayload,
   McpBridgeTasksUpdateResult,
 } from '../../mcpBridge';
+import type { ProjectMember } from '../projects/members';
 import type { TaskProvider } from '../tasks/TaskProvider';
 
 type ActiveProject = LocalProject | CloudProject;
@@ -23,6 +25,7 @@ export interface McpBridgeContext {
   provider: TaskProvider | null;
   uid: string | null;
   tasksSnapshot: Task[];
+  membersSnapshot: ProjectMember[];
 }
 
 /**
@@ -66,7 +69,7 @@ async function handleRequest(
   req: McpBridgeRequest,
   ctx: McpBridgeContext,
 ): Promise<McpBridgeResponse> {
-  const { project, provider, uid, tasksSnapshot } = ctx;
+  const { project, provider, uid, tasksSnapshot, membersSnapshot } = ctx;
   if (!project) {
     return {
       id: req.id,
@@ -152,6 +155,10 @@ async function handleRequest(
         }
         await provider.delete(payload.taskId);
         return { id: req.id, ok: true, data: { deletedId: payload.taskId } };
+      }
+      case 'members.list': {
+        const result: McpBridgeMembersListResult = { members: membersSnapshot };
+        return { id: req.id, ok: true, data: result };
       }
       case 'projectInfo': {
         const taskCounts = {

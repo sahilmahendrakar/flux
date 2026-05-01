@@ -49,6 +49,7 @@ import { normalizeTaskLabels } from './taskLabels';
 import { invalidateSessionAttachCache } from './terminal/warmAttach';
 import { isTaskBlocked } from './taskDependencies';
 import { useMcpRendererBridge } from './renderer/mcp/useMcpRendererBridge';
+import { useMembers } from './renderer/projects/useMembers';
 import { applyUnblockAutostartForCompletedBlocker } from './unblockAutostartApply';
 import type { UnblockAutostartPolicy } from './unblockAutostart';
 import {
@@ -57,6 +58,21 @@ import {
 } from './cloudBindingPrefs';
 
 type ActiveProject = LocalProject | CloudProject;
+
+/** Reconcile optimistic UI: `TaskPatch.assigneeId` may be `null` to clear, but `Task` omits or uses `string`. */
+function mergeTaskWithPendingPatch(task: Task, pending?: TaskPatch): Task {
+  if (!pending || Object.keys(pending).length === 0) return task;
+  const { assigneeId, ...rest } = pending;
+  const merged: Task = { ...task, ...rest };
+  if (assigneeId !== undefined) {
+    if (assigneeId === null || assigneeId === '') {
+      delete merged.assigneeId;
+    } else {
+      merged.assigneeId = assigneeId;
+    }
+  }
+  return merged;
+}
 
 const UPDATE_DEBOUNCE_MS = 300;
 const STATIC_TAB_IDS = new Set(['board', 'plan', 'docs', 'settings']);
@@ -288,7 +304,8 @@ export default function App() {
     return () => unsub();
   }, [provider]);
 
-  useMcpRendererBridge({ project, provider, uid, tasksSnapshot: tasks });
+  const { members } = useMembers(project?.kind === 'cloud' ? project.id : null);
+  useMcpRendererBridge({ project, provider, uid, tasksSnapshot: tasks, membersSnapshot: members });
 
   useEffect(() => {
     if (!project) {
@@ -675,7 +692,7 @@ export default function App() {
         const newer = pendingRef.current.get(id);
         setTasks((prev) =>
           prev.map((t) =>
-            t.id === id ? { ...updated, ...(newer?.patch ?? {}) } : t,
+            t.id === id ? mergeTaskWithPendingPatch(updated, newer?.patch) : t,
           ),
         );
       } catch (err) {
@@ -790,7 +807,7 @@ export default function App() {
         setTasks((prev) =>
           prev.map((t) =>
             t.id === draggableId
-              ? { ...updated, ...(pending?.patch ?? {}) }
+              ? mergeTaskWithPendingPatch(updated, pending?.patch)
               : t,
           ),
         );

@@ -84,6 +84,9 @@ export class FirestoreTaskProvider implements TaskProvider {
       updatedBy: this.uid,
       ...(input.orderKey !== undefined ? { orderKey: input.orderKey } : {}),
       ...(createLabels.length > 0 ? { labels: createLabels } : {}),
+      ...(input.assigneeId != null && input.assigneeId !== ''
+        ? { assigneeId: input.assigneeId }
+        : {}),
     };
     const ref = await addDoc(col, data);
     let normalizedDeps: string[] | undefined;
@@ -130,6 +133,9 @@ export class FirestoreTaskProvider implements TaskProvider {
       ...(input.orderKey !== undefined ? { orderKey: input.orderKey } : {}),
       ...(createLabels.length > 0 ? { labels: createLabels } : {}),
       ...(normalizedDeps ? { blockedByTaskIds: normalizedDeps } : {}),
+      ...(input.assigneeId != null && input.assigneeId !== ''
+        ? { assigneeId: input.assigneeId }
+        : {}),
     };
   }
 
@@ -170,6 +176,13 @@ export class FirestoreTaskProvider implements TaskProvider {
         updates.autoStartOnUnblock = true;
       } else {
         updates.autoStartOnUnblock = deleteField();
+      }
+    }
+    if (patch.assigneeId !== undefined) {
+      if (patch.assigneeId === null || patch.assigneeId === '') {
+        updates.assigneeId = deleteField();
+      } else {
+        updates.assigneeId = patch.assigneeId;
       }
     }
     await updateDoc(ref, updates);
@@ -222,7 +235,17 @@ function toTask(
     ...parseBlockedByTaskIdsField(data.blockedByTaskIds),
     ...parseLabelsField(data.labels),
     ...parseAutoStartOnUnblockField(data.autoStartOnUnblock),
+    ...parseAssigneeIdField(data.assigneeId),
   };
+}
+
+function parseAssigneeIdField(
+  val: unknown,
+): { assigneeId: string } | Record<string, never> {
+  if (typeof val === 'string' && val.length > 0) {
+    return { assigneeId: val };
+  }
+  return {};
 }
 
 function parseAutoStartOnUnblockField(

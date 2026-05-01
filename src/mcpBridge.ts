@@ -9,7 +9,8 @@ export type McpBridgeOp =
   | 'tasks.create'
   | 'tasks.update'
   | 'tasks.delete'
-  | 'projectInfo';
+  | 'projectInfo'
+  | 'members.list';
 
 export interface McpBridgeTaskCreateInput {
   title: string;
@@ -19,6 +20,7 @@ export interface McpBridgeTaskCreateInput {
   orderKey?: string;
   blockedByTaskIds?: string[];
   labels?: string[];
+  assigneeId?: string;
 }
 
 export interface McpBridgeTaskPatch {
@@ -29,6 +31,19 @@ export interface McpBridgeTaskPatch {
   blockedByTaskIds?: string[];
   labels?: string[];
   autoStartOnUnblock?: boolean;
+  assigneeId?: string | null;
+}
+
+export interface McpBridgeMember {
+  uid: string;
+  role: 'owner' | 'member';
+  displayName: string;
+  email: string;
+  joinedAt: string;
+}
+
+export interface McpBridgeMembersListResult {
+  members: McpBridgeMember[];
 }
 
 export interface McpBridgeTasksCreatePayload {
