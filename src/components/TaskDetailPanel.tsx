@@ -679,7 +679,7 @@ export default function TaskDetailPanel({
         type="button"
         tabIndex={-1}
         aria-label="Close task details"
-        className="absolute inset-0 z-10 bg-black/30 backdrop-blur-[2px]"
+        className="absolute inset-0 z-10 bg-black/30"
         onClick={onClose}
       />
       <aside

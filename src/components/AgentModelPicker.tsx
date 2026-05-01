@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Plus } from 'lucide-react';
 import type { AgentModelUiKind } from '../agentModelUi';
 import {
@@ -34,6 +35,12 @@ export default function AgentModelPicker({
   const [addError, setAddError] = useState<string | null>(null);
   const [extrasGen, setExtrasGen] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number }>({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
 
   const choices = useMemo(
     () => choicesForPicker(kind, modelId),
@@ -52,11 +59,21 @@ export default function AgentModelPicker({
     setAddError(null);
   }, []);
 
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: globalThis.PointerEvent) => {
       const root = rootRef.current;
-      if (root && !root.contains(e.target as Node)) {
+      const dropdown = dropdownRef.current;
+      const target = e.target as Node;
+      if (root && !root.contains(target) && (!dropdown || !dropdown.contains(target))) {
         closeAll();
       }
     };
