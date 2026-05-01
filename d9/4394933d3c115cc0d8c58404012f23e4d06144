@@ -1,0 +1,37 @@
+src/components/ProjectsListView.tsx
+  d3980c43b8d3604b 147,181
+src/mcpBridge.ts
+  d3980c43b8d3604b 22,33
+src/types.ts
+  d3980c43b8d3604b 122-123
+src/renderer/tasks/TaskProvider.ts
+  d3980c43b8d3604b 18-22,31
+src/renderer/tasks/FirestoreTaskProvider.ts
+  d3980c43b8d3604b 87-89,136-138,181-187,235,242-250
+src/renderer/projects/cloudProjects.ts
+  d3980c43b8d3604b 85,99,105,135,158,164
+src/App.tsx
+  d3980c43b8d3604b 81-104,702,817
+src/renderer/projects/members.ts
+  d3980c43b8d3604b 20-21,56-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "d94394933d3c115cc0d8c58404012f23e4d06144",
+  "prompts": {
+    "d3980c43b8d3604b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1cd7cf0d-c9c7-4018-9919-af7e80ec7503",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 97,
+      "total_deletions": 27,
+      "accepted_lines": 77,
+      "overriden_lines": 0
+    }
+  }
+}
