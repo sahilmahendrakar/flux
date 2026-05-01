@@ -1,0 +1,23 @@
+src/renderer/tasks/LocalTaskProvider.ts
+  ee84c2c959f519cb 68-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "769f15f900fea604509c890a9d1e3a43ea9dfe1f",
+  "prompts": {
+    "ee84c2c959f519cb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "81ba56ae-2e4e-4da7-9882-852edf2d2503",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 1,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
