@@ -42,6 +42,8 @@ import {
   useAgentHeartbeat,
   useRunners,
 } from './renderer/runners/useRunners';
+import type { RunnerEntry } from './renderer/runners/runners';
+import type { ProjectMember } from './renderer/projects/members';
 import type { TaskPatch, TaskProvider } from './renderer/tasks/TaskProvider';
 import { LocalTaskProvider } from './renderer/tasks/LocalTaskProvider';
 import { FirestoreTaskProvider } from './renderer/tasks/FirestoreTaskProvider';
@@ -194,6 +196,7 @@ export default function App() {
   uidRef.current = uid;
   const userEmail = auth.user?.email ?? null;
   const displayName = auth.user?.displayName ?? undefined;
+  const userPhotoURL = auth.user?.photoURL ?? undefined;
   const cloudProjectsState = useCloudProjects(uid);
   const invitesState = useInvites(userEmail);
 
@@ -217,7 +220,12 @@ export default function App() {
   const cloudProjectId = project?.kind === 'cloud' ? project.id : null;
   const runners = useRunners(cloudProjectId);
   const membersState = useMembers(cloudProjectId);
-  useAgentHeartbeat({ projectId: cloudProjectId, uid, displayName });
+  useAgentHeartbeat({
+    projectId: cloudProjectId,
+    uid,
+    displayName,
+    photoURL: userPhotoURL,
+  });
   const projectMembers = cloudProjectId ? membersState.members : undefined;
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
@@ -1600,10 +1608,13 @@ export default function App() {
     ];
   }, [tasks]);
 
-  const remoteRunnerForSelected =
-    selectedTask && cloudProjectId
-      ? findRemoteRunner(runners.byTask.get(selectedTask.id), uid)
-      : null;
+  const remoteRunnerForSelected = useMemo(
+    () =>
+      selectedTask && cloudProjectId
+        ? findRemoteRunner(runners.byTask.get(selectedTask.id), uid, projectMembers)
+        : null,
+    [selectedTask, cloudProjectId, runners.byTask, uid, projectMembers],
+  );
 
   if (activationLoading || auth.status === 'loading') {
     return (
@@ -1962,9 +1973,10 @@ export default function App() {
 }
 
 function findRemoteRunner(
-  byUid: Map<string, { uid: string; status: string; lastSeen: string; displayName?: string }> | undefined,
+  byUid: Map<string, RunnerEntry> | undefined,
   selfUid: string | null,
-): { displayName?: string } | null {
+  projectMembers?: ProjectMember[],
+): { uid: string; displayName?: string; photoURL?: string } | null {
   if (!byUid) return null;
   const STALE_MS = 2 * 60 * 1000;
   const now = Date.now();
@@ -1973,7 +1985,12 @@ function findRemoteRunner(
     if (selfUid && entry.uid === selfUid) continue;
     const seen = Date.parse(entry.lastSeen);
     if (Number.isFinite(seen) && now - seen > STALE_MS) continue;
-    return { displayName: entry.displayName };
+    const member = projectMembers?.find((m) => m.uid === entry.uid);
+    return {
+      uid: entry.uid,
+      displayName: entry.displayName ?? member?.displayName,
+      photoURL: entry.photoURL ?? member?.photoURL,
+    };
   }
   return null;
 }
