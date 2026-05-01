@@ -1,0 +1,84 @@
+src/renderer/mcp/useMcpRendererBridge.ts
+  9da881739404be43 158,160-161,163-165
+  7720e8ff238b42d7 159,162
+src/main/McpServer.ts
+  9da881739404be43 161-184,232-236,267-275,287,328-333,374-386,398,410
+src/App.tsx
+  d3980c43b8d3604b 89
+src/types.ts
+  681de4ac6b629032 122
+src/main/TaskStore.ts
+  47d7df1fe7b95142 183,193,196,213-219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "c44f24e5e60bef3075ab61b0f015e564dcd3d1c4",
+  "prompts": {
+    "47d7df1fe7b95142": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "661ca0ae-ec87-402e-9f24-7cadae812f11",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    },
+    "681de4ac6b629032": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dc7c0451-d2ff-4d97-b66c-3a1545fba958",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    },
+    "7720e8ff238b42d7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "caa0fdd5-51b7-4b90-a6a0-dfe1994177eb",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 33,
+      "overriden_lines": 0
+    },
+    "9da881739404be43": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e4d1262-eb2f-4498-9a41-fe1eda1d4cfb",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 66,
+      "overriden_lines": 0
+    },
+    "d3980c43b8d3604b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1cd7cf0d-c9c7-4018-9919-af7e80ec7503",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 26,
+      "overriden_lines": 0
+    }
+  }
+}
