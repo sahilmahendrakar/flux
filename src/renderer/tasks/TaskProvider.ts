@@ -24,6 +24,7 @@ export type TaskCreateInput = {
   orderKey?: string;
   blockedByTaskIds?: string[];
   labels?: string[];
+  assigneeId?: string;
 };
 
 /**

@@ -36,6 +36,7 @@ import { SessionTerminalView } from './components/SessionTerminalView';
 import ConfirmDialog from './components/ConfirmDialog';
 import { useAuth } from './renderer/auth/useAuth';
 import { useCloudProjects } from './renderer/projects/useCloudProjects';
+import { useMembers } from './renderer/projects/useMembers';
 import { useInvites } from './renderer/invites/useInvites';
 import {
   useAgentHeartbeat,
@@ -164,6 +165,8 @@ export default function App() {
   const cloudProjectId = project?.kind === 'cloud' ? project.id : null;
   const runners = useRunners(cloudProjectId);
   useAgentHeartbeat({ projectId: cloudProjectId, uid, displayName });
+  const membersState = useMembers(cloudProjectId);
+  const projectMembers = cloudProjectId ? membersState.members : undefined;
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
 
@@ -850,7 +853,7 @@ export default function App() {
   );
 
   const handleCreateTask = useCallback(
-    async (title: string, agent: Agent, labelInput?: string[]) => {
+    async (title: string, agent: Agent, labelInput?: string[], assigneeId?: string) => {
       if (!provider) return;
       try {
         // Append to the bottom of the backlog column.
@@ -867,6 +870,7 @@ export default function App() {
           agent,
           orderKey,
           ...(labels.length > 0 ? { labels } : {}),
+          ...(assigneeId ? { assigneeId } : {}),
         });
         setTasks((prev) => {
           if (prev.some((t) => t.id === task.id)) return prev;
@@ -1517,6 +1521,7 @@ export default function App() {
                         setActiveTabId('board');
                         setPlanPanelOpen((v) => !v);
                       }}
+                      projectMembers={projectMembers}
                     />
                     <TaskDetailPanel
                       task={selectedTask}
