@@ -1,0 +1,47 @@
+src/types.ts
+  ae1c49d13cec2b34 52-56,77-79,94-96
+src/preload.ts
+  ae1c49d13cec2b34 84-89
+src/components/ProjectSettingsView.tsx
+  ae1c49d13cec2b34 124-127,213-237,313-330,411-445
+src/main/ProjectStore.ts
+  ae1c49d13cec2b34 28,53,116-118,362-388,452
+src/main/LocalBindingStore.ts
+  ae1c49d13cec2b34 49-54,113,130-133,152-156
+src/renderer/mcp/useMcpRendererBridge.ts
+  ae1c49d13cec2b34 3,30,33-35,161-202,204-223
+src/components/TaskCard.tsx
+  ae1c49d13cec2b34 4,220-226,228-240
+src/cloudTaskDoneFollowUp.ts
+  ae1c49d13cec2b34 1-124
+src/cloudBindingPrefs.ts
+  ae1c49d13cec2b34 17,39-41
+src/mcpBridge.ts
+  ae1c49d13cec2b34 107-108
+src/App.tsx
+  ae1c49d13cec2b34 54,190-191,387-389,779-812,831-907,909-917,923,1031-1032,1046-1129,1135,1176-1227,1229-1238,1243
+src/main.ts
+  ae1c49d13cec2b34 613-644,1179-1209
+src/env.d.ts
+  ae1c49d13cec2b34 77-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "ef592fa8dce0c8650e04ad55dcd990244c426363",
+  "prompts": {
+    "ae1c49d13cec2b34": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b35232b2-b021-4a94-8b6f-695e1e49bfd6",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 926,
+      "total_deletions": 321,
+      "accepted_lines": 712,
+      "overriden_lines": 0
+    }
+  }
+}
