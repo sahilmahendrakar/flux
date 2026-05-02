@@ -610,6 +610,38 @@ app.whenReady().then(async () => {
       }
     },
   );
+  ipcMain.handle('project:getAutoCleanupWorkspaceWhenDone', async () => {
+    const key = appStateStore.get().activeProjectKey;
+    if (key?.kind === 'cloud') {
+      return bindingStore.getPrefs(key.id).autoCleanupWorkspaceWhenDone;
+    }
+    return projectStore.getAutoCleanupWorkspaceWhenDoneAt(activeProjectDir());
+  });
+  ipcMain.handle(
+    'project:setAutoCleanupWorkspaceWhenDone',
+    async (_e, enabled: boolean): Promise<{ ok: true; enabled: boolean } | { error: string }> => {
+      try {
+        const key = appStateStore.get().activeProjectKey;
+        if (key?.kind === 'cloud') {
+          await bindingStore.setPrefs(key.id, {
+            autoCleanupWorkspaceWhenDone: enabled === true,
+          });
+          return {
+            ok: true,
+            enabled: bindingStore.getPrefs(key.id).autoCleanupWorkspaceWhenDone,
+          };
+        }
+        const next = await projectStore.setAutoCleanupWorkspaceWhenDoneAt(
+          activeProjectDir(),
+          enabled,
+        );
+        return { ok: true, enabled: next };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+  );
 
   // ---- Projects (multi-project API) ----
   ipcMain.handle('projects:listLocal', () => projectStore.listDiscovered());
@@ -1143,6 +1175,37 @@ app.whenReady().then(async () => {
     await maybeAutoStartSessionOnInProgressTransition(previous, updated, source, options);
     if (updated.status === 'done' && previous.status !== 'done') {
       await processDependentsUnblockedAfterBlockerDone(previous, updated, source);
+    }
+    if (updated.status === 'done' && previous.status !== 'done' && !updated.workspaceCleanedAt) {
+      let autoCleanup = false;
+      try {
+        autoCleanup = await projectStore.getAutoCleanupWorkspaceWhenDoneAt(activeProjectDir());
+      } catch (err) {
+        console.error('[task:auto-cleanup-workspace-on-done] failed to read setting', {
+          source,
+          taskId: updated.id,
+          err,
+        });
+      }
+      if (autoCleanup) {
+        const errors = await teardownEphemeralResourcesForTask(
+          daemonClient,
+          worktreeService,
+          id,
+        );
+        if (errors.length > 0) {
+          console.error('[task:auto-cleanup-workspace-on-done] teardown', {
+            source,
+            taskId: id,
+            errors,
+          });
+        }
+        const cleaned = await taskStore.update(id, {
+          workspaceCleanedAt: new Date().toISOString(),
+        });
+        broadcastLocalTasksChanged();
+        return cleaned;
+      }
     }
     return updated;
   }

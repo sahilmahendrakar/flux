@@ -1,5 +1,6 @@
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import { maybeCloudAutoStartSessionOnInProgressTransition } from '../../cloudInProgressAutostartApply';
+import { runCloudDoneTransitionFollowUp } from '../../cloudTaskDoneFollowUp';
 import type {
   ActiveProjectKey,
   CloudProject,
@@ -26,8 +27,12 @@ export interface McpBridgeContext {
   provider: TaskProvider | null;
   uid: string | null;
   tasksSnapshot: Task[];
+  tasksRef: MutableRefObject<Task[]>;
   /** Dedupes cloud auto-start with board/detail/unblock paths (same Set as App). */
   cloudAutostartInFlightRef: MutableRefObject<Set<string>>;
+  cloudInlineDoneFollowUpTaskIdsRef: MutableRefObject<Set<string>>;
+  setCleanupLoadingTaskId?: (taskId: string | null) => void;
+  stripLocalSessionStateForTask?: (taskId: string) => void;
 }
 
 /**
@@ -153,25 +158,70 @@ async function handleRequest(
             patch = { ...patch, assigneeId: uid };
           }
         }
-        const updated = await provider.update(payload.taskId, patch);
-        if (project.kind === 'cloud' && previous) {
-          const allTasksForSession = tasksSnapshot.map((t) =>
-            t.id === payload.taskId ? updated : t,
-          );
-          await maybeCloudAutoStartSessionOnInProgressTransition(
-            previous,
-            updated,
-            allTasksForSession,
-            {
-              source: 'cloud:mcpBridge',
-              inFlight: ctx.cloudAutostartInFlightRef.current,
-              logError: (msg, data) => console.error(msg, data),
-              actorUid: uid,
-            },
-          );
+        const lockDone =
+          project.kind === 'cloud' &&
+          previous &&
+          previous.status !== 'done' &&
+          patch.status === 'done';
+        if (lockDone) {
+          ctx.cloudInlineDoneFollowUpTaskIdsRef.current.add(payload.taskId);
         }
-        const result: McpBridgeTasksUpdateResult = { previous, updated };
-        return { id: req.id, ok: true, data: result };
+        try {
+          const updated = await provider.update(payload.taskId, patch);
+          if (project.kind === 'cloud' && previous) {
+            const allTasksForSession = tasksSnapshot.map((t) =>
+              t.id === payload.taskId ? updated : t,
+            );
+            await maybeCloudAutoStartSessionOnInProgressTransition(
+              previous,
+              updated,
+              allTasksForSession,
+              {
+                source: 'cloud:mcpBridge',
+                inFlight: ctx.cloudAutostartInFlightRef.current,
+                logError: (msg, data) => console.error(msg, data),
+                actorUid: uid,
+              },
+            );
+          }
+          let outUpdated = updated;
+          let workspaceCleanedAfterDone = false;
+          if (
+            project.kind === 'cloud' &&
+            previous &&
+            previous.status !== 'done' &&
+            updated.status === 'done'
+          ) {
+            const allAfter = tasksSnapshot.map((t) =>
+              t.id === payload.taskId ? updated : t,
+            );
+            const follow = await runCloudDoneTransitionFollowUp({
+              previous,
+              updated,
+              allAfter,
+              provider,
+              actorUid: uid,
+              unblockInFlight: ctx.cloudAutostartInFlightRef.current,
+              getTasks: () => ctx.tasksRef.current,
+              setCleanupLoadingTaskId: ctx.setCleanupLoadingTaskId,
+              onStripSessions: ctx.stripLocalSessionStateForTask,
+            });
+            outUpdated = follow.task;
+            if (follow.workspaceCleaned) {
+              workspaceCleanedAfterDone = true;
+            }
+          }
+          const result: McpBridgeTasksUpdateResult = {
+            previous,
+            updated: outUpdated,
+            ...(workspaceCleanedAfterDone ? { workspaceCleanedAfterDone: true } : {}),
+          };
+          return { id: req.id, ok: true, data: result };
+        } finally {
+          if (lockDone) {
+            ctx.cloudInlineDoneFollowUpTaskIdsRef.current.delete(payload.taskId);
+          }
+        }
       }
       case 'tasks.delete': {
         const payload = req.payload as McpBridgeTasksDeletePayload;

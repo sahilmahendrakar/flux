@@ -46,6 +46,12 @@ function parseBindingEntry(_id: string, value: unknown): LocalBinding | null {
   if (typeof v.autoStartWhenUnblocked === 'boolean') {
     binding.autoStartWhenUnblocked = v.autoStartWhenUnblocked;
   }
+  if (typeof v.autoCleanupWorkspaceWhenDone === 'boolean') {
+    binding.autoCleanupWorkspaceWhenDone = v.autoCleanupWorkspaceWhenDone;
+  }
+  if (typeof v.autoDeleteTaskWhenDone === 'boolean') {
+    binding.autoDeleteTaskWhenDone = v.autoDeleteTaskWhenDone;
+  }
   return binding;
 }
 
@@ -104,6 +110,7 @@ export class LocalBindingStore {
       defaultTaskAgent: Agent;
       autoStartSessionOnInProgress: boolean;
       autoStartWhenUnblocked: boolean;
+      autoCleanupWorkspaceWhenDone: boolean;
     }>,
   ): Promise<void> {
     const existing = this.bindings[projectId];
@@ -119,6 +126,10 @@ export class LocalBindingStore {
     }
     if (prefs.autoStartWhenUnblocked !== undefined) {
       existing.autoStartWhenUnblocked = prefs.autoStartWhenUnblocked;
+    }
+    if (prefs.autoCleanupWorkspaceWhenDone !== undefined) {
+      existing.autoCleanupWorkspaceWhenDone = prefs.autoCleanupWorkspaceWhenDone;
+      delete existing.autoDeleteTaskWhenDone;
     }
     await this.save();
   }
@@ -137,6 +148,11 @@ export class LocalBindingStore {
       }
       if (prev.autoStartWhenUnblocked !== undefined) {
         binding.autoStartWhenUnblocked = prev.autoStartWhenUnblocked;
+      }
+      if (prev.autoCleanupWorkspaceWhenDone !== undefined) {
+        binding.autoCleanupWorkspaceWhenDone = prev.autoCleanupWorkspaceWhenDone;
+      } else if (prev.autoDeleteTaskWhenDone !== undefined) {
+        binding.autoDeleteTaskWhenDone = prev.autoDeleteTaskWhenDone;
       }
     }
     this.bindings[projectId] = binding;

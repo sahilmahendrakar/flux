@@ -1,6 +1,6 @@
 import { Draggable } from '@hello-pangea/dnd';
 import { broom } from '@lucide/lab';
-import { Icon } from 'lucide-react';
+import { Icon, Loader2 } from 'lucide-react';
 import { Task } from '../types';
 import { getBlockedTasks, isTaskBlocked } from '../taskDependencies';
 import { modelSummaryForTask } from '../agentModelUi';
@@ -173,17 +173,27 @@ export default function TaskCard({
                           e.stopPropagation();
                           onRequestCleanupTask(task.id);
                         }}
-                        className="-m-0.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded text-zinc-500 transition hover:bg-white/[0.05] hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-35"
-                        aria-label="Clean up workspace for this task"
-                        title="Clean up workspace"
+                        className="-m-0.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded text-zinc-500 transition hover:bg-white/[0.05] hover:text-zinc-300 disabled:cursor-not-allowed disabled:opacity-100"
+                        aria-label={
+                          cleanupLoading
+                            ? 'Cleaning up workspace…'
+                            : 'Clean up workspace for this task'
+                        }
+                        title={cleanupLoading ? 'Cleaning up…' : 'Clean up workspace'}
                       >
-                        <Icon
-                          iconNode={broom}
-                          size={14}
-                          strokeWidth={1.75}
-                          className={cleanupLoading ? 'animate-pulse opacity-50' : ''}
-                          aria-hidden
-                        />
+                        {cleanupLoading ? (
+                          <Loader2
+                            className="h-3.5 w-3.5 shrink-0 animate-spin text-zinc-400"
+                            aria-hidden
+                          />
+                        ) : (
+                          <Icon
+                            iconNode={broom}
+                            size={14}
+                            strokeWidth={1.75}
+                            aria-hidden
+                          />
+                        )}
                       </button>
                     )
                   ) : null}

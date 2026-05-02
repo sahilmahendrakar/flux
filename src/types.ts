@@ -49,6 +49,11 @@ export interface LocalProject {
   autoStartSessionOnInProgress: boolean;
   /** When on, a task in backlog (or in progress without a running session) may auto-start once its last blocker is completed. */
   autoStartWhenUnblocked: boolean;
+  /**
+   * When on, completing a task (status → done) runs workspace cleanup (same as the broom on
+   * the Done card): worktrees removed and agent sessions stopped; the task stays in Done.
+   */
+  autoCleanupWorkspaceWhenDone: boolean;
   repos: RepoConfig[];
 }
 
@@ -69,6 +74,9 @@ export interface CloudProjectLocalBinding {
   defaultTaskAgent?: Agent;
   autoStartSessionOnInProgress?: boolean;
   autoStartWhenUnblocked?: boolean;
+  autoCleanupWorkspaceWhenDone?: boolean;
+  /** @deprecated Read `autoCleanupWorkspaceWhenDone`; kept for localBindings migration. */
+  autoDeleteTaskWhenDone?: boolean;
 }
 
 export interface CloudProject {
@@ -83,6 +91,9 @@ export interface CloudProject {
   defaultTaskAgent?: Agent;
   autoStartSessionOnInProgress?: boolean;
   autoStartWhenUnblocked?: boolean;
+  autoCleanupWorkspaceWhenDone?: boolean;
+  /** @deprecated */
+  autoDeleteTaskWhenDone?: boolean;
 }
 
 export type Project = LocalProject | CloudProject;

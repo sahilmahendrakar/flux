@@ -53,6 +53,7 @@ import { invalidateSessionAttachCache } from './terminal/warmAttach';
 import { isTaskBlocked } from './taskDependencies';
 import { useMcpRendererBridge } from './renderer/mcp/useMcpRendererBridge';
 import { maybeCloudAutoStartSessionOnInProgressTransition } from './cloudInProgressAutostartApply';
+import { runCloudDoneTransitionFollowUp } from './cloudTaskDoneFollowUp';
 import { applyUnblockAutostartForCompletedBlocker } from './unblockAutostartApply';
 import type { UnblockAutostartPolicy } from './unblockAutostart';
 import {
@@ -188,6 +189,8 @@ export default function App() {
   const uidRef = useRef<string | null>(null);
   const cloudUnblockTasksPrevRef = useRef<Task[] | null>(null);
   const cloudUnblockInFlightRef = useRef<Set<string>>(new Set());
+  /** Skips duplicate unblock handling in the cloud snapshot effect while we finalize Done inline. */
+  const cloudInlineDoneFollowUpTaskIdsRef = useRef<Set<string>>(new Set());
   const memberPhotoRefreshKeyRef = useRef('');
   const [autoStartWhenUnblockedProject, setAutoStartWhenUnblockedProject] = useState(false);
 
@@ -354,14 +357,6 @@ export default function App() {
     return () => unsub();
   }, [provider]);
 
-  useMcpRendererBridge({
-    project,
-    provider,
-    uid,
-    tasksSnapshot: tasks,
-    cloudAutostartInFlightRef: cloudUnblockInFlightRef,
-  });
-
   useEffect(() => {
     if (!project) {
       setAutoStartWhenUnblockedProject(false);
@@ -395,6 +390,9 @@ export default function App() {
     for (const t of tasks) {
       const was = prevById.get(t.id);
       if (!was || was.status === 'done' || t.status !== 'done') {
+        continue;
+      }
+      if (cloudInlineDoneFollowUpTaskIdsRef.current.has(t.id)) {
         continue;
       }
       const allAfter = tasks;
@@ -786,6 +784,40 @@ export default function App() {
     };
   }, []);
 
+  const stripLocalSessionStateForTask = useCallback((taskId: string) => {
+    const ids = sessionsRef.current
+      .filter((s) => s.taskId === taskId)
+      .map((s) => s.id);
+    setSessions((prev) => prev.filter((s) => s.taskId !== taskId));
+    setOpenTabIds((prev) => {
+      const next = new Set(prev);
+      for (const sid of ids) next.delete(sid);
+      return next;
+    });
+    setActiveTabId((prev) => (ids.includes(prev) ? 'board' : prev));
+  }, []);
+
+  const maybeStripSessionsAfterNewWorkspaceClean = useCallback(
+    (before: Task | undefined, after: Task) => {
+      if (after.workspaceCleanedAt && !before?.workspaceCleanedAt) {
+        stripLocalSessionStateForTask(after.id);
+      }
+    },
+    [stripLocalSessionStateForTask],
+  );
+
+  useMcpRendererBridge({
+    project,
+    provider,
+    uid,
+    tasksSnapshot: tasks,
+    tasksRef,
+    cloudAutostartInFlightRef: cloudUnblockInFlightRef,
+    cloudInlineDoneFollowUpTaskIdsRef,
+    setCleanupLoadingTaskId: (tid) => setCleanupLoadingTaskId(tid),
+    stripLocalSessionStateForTask,
+  });
+
   const flushUpdate = useCallback(
     async (id: string) => {
       if (!provider) return;
@@ -804,35 +836,99 @@ export default function App() {
           patchToApply = { ...patchToApply, assigneeId: uidRef.current };
         }
       }
+      const needsDoneLock =
+        project?.kind === 'cloud' &&
+        preFlushTask.status !== 'done' &&
+        patchToApply.status === 'done';
+      const execFlush = async () => {
+        let localCleanupSpinnerId: string | null = null;
+        if (
+          project?.kind === 'local' &&
+          preFlushTask.status !== 'done' &&
+          patchToApply.status === 'done'
+        ) {
+          try {
+            if (await window.electronAPI.project.getAutoCleanupWorkspaceWhenDone()) {
+              localCleanupSpinnerId = id;
+              setCleanupLoadingTaskId(id);
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        try {
+          const updated = await provider.update(id, patchToApply);
+          const newer = pendingRef.current.get(id);
+          const mergedTask = mergeServerTaskWithPendingPatch(updated, newer?.patch);
+          let rowLocked = false;
+          if (project?.kind === 'cloud') {
+            const allTasksForSession = tasksRef.current.map((t) =>
+              t.id === id ? mergedTask : t,
+            );
+            await maybeCloudAutoStartSessionOnInProgressTransition(
+              preFlushTask,
+              mergedTask,
+              allTasksForSession,
+              {
+                source: 'cloud:flushUpdate',
+                inFlight: cloudUnblockInFlightRef.current,
+                logError: (msg, data) => console.error(msg, data),
+                actorUid: uidRef.current,
+              },
+            );
+            if (preFlushTask.status !== 'done' && mergedTask.status === 'done') {
+              const follow = await runCloudDoneTransitionFollowUp({
+                previous: preFlushTask,
+                updated: mergedTask,
+                allAfter: allTasksForSession,
+                provider,
+                actorUid: uidRef.current,
+                unblockInFlight: cloudUnblockInFlightRef.current,
+                getTasks: () => tasksRef.current,
+                setCleanupLoadingTaskId: (tid) => setCleanupLoadingTaskId(tid),
+                onStripSessions: stripLocalSessionStateForTask,
+              });
+              maybeStripSessionsAfterNewWorkspaceClean(
+                preFlushTask,
+                follow.workspaceCleaned ? follow.task : mergedTask,
+              );
+              if (follow.workspaceCleaned) {
+                setTasks((prev) =>
+                  prev.map((t) => (t.id === follow.task.id ? follow.task : t)),
+                );
+                rowLocked = true;
+              }
+            }
+          } else {
+            maybeStripSessionsAfterNewWorkspaceClean(preFlushTask, mergedTask);
+          }
+          if (!rowLocked) {
+            setTasks((prev) =>
+              prev.map((t) =>
+                t.id === id ? mergeServerTaskWithPendingPatch(updated, newer?.patch) : t,
+              ),
+            );
+          }
+        } finally {
+          if (localCleanupSpinnerId) setCleanupLoadingTaskId(null);
+        }
+      };
       try {
-        const updated = await provider.update(id, patchToApply);
-        const newer = pendingRef.current.get(id);
-        setTasks((prev) =>
-          prev.map((t) =>
-            t.id === id ? mergeServerTaskWithPendingPatch(updated, newer?.patch) : t,
-          ),
-        );
-        if (project?.kind === 'cloud') {
-          const allTasksForSession = tasksRef.current.map((t) =>
-            t.id === id ? { ...updated, ...(newer?.patch ?? {}) } : t,
-          );
-          await maybeCloudAutoStartSessionOnInProgressTransition(
-            preFlushTask,
-            updated,
-            allTasksForSession,
-            {
-              source: 'cloud:flushUpdate',
-              inFlight: cloudUnblockInFlightRef.current,
-              logError: (msg, data) => console.error(msg, data),
-              actorUid: uidRef.current,
-            },
-          );
+        if (needsDoneLock) {
+          cloudInlineDoneFollowUpTaskIdsRef.current.add(id);
+          try {
+            await execFlush();
+          } finally {
+            cloudInlineDoneFollowUpTaskIdsRef.current.delete(id);
+          }
+        } else {
+          await execFlush();
         }
       } catch (err) {
         console.error('[tasks.update] failed', err);
       }
     },
-    [provider, project?.kind],
+    [provider, project?.kind, stripLocalSessionStateForTask, maybeStripSessionsAfterNewWorkspaceClean],
   );
 
   const handleUpdateTask = useCallback(
@@ -940,6 +1036,8 @@ export default function App() {
         ),
       );
 
+      const needsDoneLock =
+        project?.kind === 'cloud' && previous.status !== 'done' && nextStatus === 'done';
       try {
         const dragPatch: TaskPatch = {
           status: nextStatus,
@@ -953,38 +1051,96 @@ export default function App() {
         ) {
           dragPatch.assigneeId = uid;
         }
-        const updated = await provider.update(draggableId, dragPatch);
-        const pending = pendingRef.current.get(draggableId);
-        setTasks((prev) =>
-          prev.map((t) =>
-            t.id === draggableId
-              ? mergeServerTaskWithPendingPatch(updated, pending?.patch)
-              : t,
-          ),
-        );
-        if (project?.kind === 'cloud') {
-          const allTasksForSession = tasksRef.current.map((t) =>
-            t.id === draggableId
-              ? { ...updated, ...(pending?.patch ?? {}) }
-              : t,
-          );
-          await maybeCloudAutoStartSessionOnInProgressTransition(
-            previous,
-            updated,
-            allTasksForSession,
-            {
-              source: 'cloud:dragEnd',
-              inFlight: cloudUnblockInFlightRef.current,
-              logError: (msg, data) => console.error(msg, data),
-              actorUid: uid,
-            },
-          );
+        const execDrag = async () => {
+          let localCleanupSpinnerId: string | null = null;
+          if (
+            project?.kind === 'local' &&
+            previous.status !== 'done' &&
+            nextStatus === 'done'
+          ) {
+            try {
+              if (await window.electronAPI.project.getAutoCleanupWorkspaceWhenDone()) {
+                localCleanupSpinnerId = draggableId;
+                setCleanupLoadingTaskId(draggableId);
+              }
+            } catch {
+              /* ignore */
+            }
+          }
+          try {
+            const updated = await provider.update(draggableId, dragPatch);
+            const pending = pendingRef.current.get(draggableId);
+            const merged = mergeServerTaskWithPendingPatch(updated, pending?.patch);
+            let rowLocked = false;
+            if (project?.kind === 'cloud') {
+              const allTasksForSession = tasksRef.current.map((t) =>
+                t.id === draggableId ? merged : t,
+              );
+              await maybeCloudAutoStartSessionOnInProgressTransition(
+                previous,
+                merged,
+                allTasksForSession,
+                {
+                  source: 'cloud:dragEnd',
+                  inFlight: cloudUnblockInFlightRef.current,
+                  logError: (msg, data) => console.error(msg, data),
+                  actorUid: uid,
+                },
+              );
+              if (previous.status !== 'done' && merged.status === 'done') {
+                const follow = await runCloudDoneTransitionFollowUp({
+                  previous,
+                  updated: merged,
+                  allAfter: allTasksForSession,
+                  provider,
+                  actorUid: uid ?? null,
+                  unblockInFlight: cloudUnblockInFlightRef.current,
+                  getTasks: () => tasksRef.current,
+                  setCleanupLoadingTaskId: (tid) => setCleanupLoadingTaskId(tid),
+                  onStripSessions: stripLocalSessionStateForTask,
+                });
+                maybeStripSessionsAfterNewWorkspaceClean(
+                  previous,
+                  follow.workspaceCleaned ? follow.task : merged,
+                );
+                if (follow.workspaceCleaned) {
+                  setTasks((prev) =>
+                    prev.map((t) => (t.id === follow.task.id ? follow.task : t)),
+                  );
+                  rowLocked = true;
+                }
+              }
+            } else {
+              maybeStripSessionsAfterNewWorkspaceClean(previous, merged);
+            }
+            if (!rowLocked) {
+              setTasks((prev) =>
+                prev.map((t) =>
+                  t.id === draggableId
+                    ? mergeServerTaskWithPendingPatch(updated, pending?.patch)
+                    : t,
+                ),
+              );
+            }
+          } finally {
+            if (localCleanupSpinnerId) setCleanupLoadingTaskId(null);
+          }
+        };
+        if (needsDoneLock) {
+          cloudInlineDoneFollowUpTaskIdsRef.current.add(draggableId);
+          try {
+            await execDrag();
+          } finally {
+            cloudInlineDoneFollowUpTaskIdsRef.current.delete(draggableId);
+          }
+        } else {
+          await execDrag();
         }
       } catch (err) {
         console.error('[tasks.update] drag-end failed', err);
       }
     },
-    [provider, project?.kind, tasks, uid],
+    [provider, project?.kind, tasks, uid, stripLocalSessionStateForTask, maybeStripSessionsAfterNewWorkspaceClean],
   );
 
   const handleMarkTaskDone = useCallback(
@@ -1025,17 +1181,74 @@ export default function App() {
         setActiveTabId('board');
       }
 
+      const needsDoneLock = project?.kind === 'cloud';
+      const execMarkDone = async () => {
+        let localCleanupSpinnerId: string | null = null;
+        if (project?.kind === 'local') {
+          try {
+            if (await window.electronAPI.project.getAutoCleanupWorkspaceWhenDone()) {
+              localCleanupSpinnerId = taskId;
+              setCleanupLoadingTaskId(taskId);
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        try {
+          const updated = await provider.update(taskId, {
+            status: 'done',
+            orderKey: nextOrderKey,
+          });
+          let rowLocked = false;
+          if (project?.kind === 'cloud' && task.status !== 'done' && updated.status === 'done') {
+            const allAfter = tasksRef.current.map((t) => (t.id === taskId ? updated : t));
+            const follow = await runCloudDoneTransitionFollowUp({
+              previous: task,
+              updated,
+              allAfter,
+              provider,
+              actorUid: uidRef.current,
+              unblockInFlight: cloudUnblockInFlightRef.current,
+              getTasks: () => tasksRef.current,
+              setCleanupLoadingTaskId: (tid) => setCleanupLoadingTaskId(tid),
+              onStripSessions: stripLocalSessionStateForTask,
+            });
+            maybeStripSessionsAfterNewWorkspaceClean(
+              task,
+              follow.workspaceCleaned ? follow.task : updated,
+            );
+            if (follow.workspaceCleaned) {
+              setTasks((prev) =>
+                prev.map((t) => (t.id === follow.task.id ? follow.task : t)),
+              );
+              rowLocked = true;
+            }
+          } else {
+            maybeStripSessionsAfterNewWorkspaceClean(task, updated);
+          }
+          if (!rowLocked) {
+            setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+          }
+        } finally {
+          if (localCleanupSpinnerId) setCleanupLoadingTaskId(null);
+        }
+      };
       try {
-        const updated = await provider.update(taskId, {
-          status: 'done',
-          orderKey: nextOrderKey,
-        });
-        setTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
+        if (needsDoneLock) {
+          cloudInlineDoneFollowUpTaskIdsRef.current.add(taskId);
+          try {
+            await execMarkDone();
+          } finally {
+            cloudInlineDoneFollowUpTaskIdsRef.current.delete(taskId);
+          }
+        } else {
+          await execMarkDone();
+        }
       } catch (err) {
         console.error('[tasks.update] mark done failed', err);
       }
     },
-    [provider, tasks],
+    [provider, tasks, project?.kind, stripLocalSessionStateForTask, maybeStripSessionsAfterNewWorkspaceClean],
   );
 
   const handleCreateTask = useCallback(
@@ -1068,19 +1281,6 @@ export default function App() {
     },
     [provider, tasks],
   );
-
-  const stripLocalSessionStateForTask = useCallback((taskId: string) => {
-    const ids = sessionsRef.current
-      .filter((s) => s.taskId === taskId)
-      .map((s) => s.id);
-    setSessions((prev) => prev.filter((s) => s.taskId !== taskId));
-    setOpenTabIds((prev) => {
-      const next = new Set(prev);
-      for (const sid of ids) next.delete(sid);
-      return next;
-    });
-    setActiveTabId((prev) => (ids.includes(prev) ? 'board' : prev));
-  }, []);
 
   const handleDeleteTask = useCallback(
     async (id: string) => {
