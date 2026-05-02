@@ -30,6 +30,9 @@ export interface McpBridgeTaskCreateInput {
   blockedByTaskIds?: string[];
   labels?: string[];
   assigneeId?: string;
+  /** Short branch name; defaults from project repo when omitted. */
+  sourceBranch?: string;
+  createSourceBranchIfMissing?: boolean;
 }
 
 export interface McpBridgeTaskPatch {
@@ -41,6 +44,8 @@ export interface McpBridgeTaskPatch {
   labels?: string[];
   autoStartOnUnblock?: boolean;
   assigneeId?: string | null;
+  sourceBranch?: string;
+  createSourceBranchIfMissing?: boolean;
 }
 
 export interface McpBridgeTasksCreatePayload {

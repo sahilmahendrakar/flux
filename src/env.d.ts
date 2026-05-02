@@ -5,6 +5,7 @@ import type {
   CloudProjectLocalBinding,
   LocalProject,
   OpenWorkspaceTarget,
+  RepoBranchDiscoveryResponse,
   RepoConfig,
   Session,
   SessionStartResult,
@@ -118,6 +119,11 @@ declare global {
           inviterEmail?: string;
         }) => Promise<{ ok: true } | { error: string }>;
       };
+      repo: {
+        getBranchDiscovery: (
+          requestedBranch?: string,
+        ) => Promise<RepoBranchDiscoveryResponse | { error: string }>;
+      };
       tasks: {
         getAll: () => Promise<Task[]>;
         create: (input: {
@@ -125,6 +131,8 @@ declare global {
           agent: Agent;
           blockedByTaskIds?: string[];
           labels?: string[];
+          sourceBranch?: string;
+          createSourceBranchIfMissing?: boolean;
         }) => Promise<Task>;
         update: (
           id: string,
@@ -142,6 +150,8 @@ declare global {
             | 'blockedByTaskIds'
             | 'labels'
             | 'autoStartOnUnblock'
+            | 'sourceBranch'
+            | 'createSourceBranchIfMissing'
           >
         >,
       ) => Promise<Task>;

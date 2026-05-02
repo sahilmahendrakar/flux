@@ -15,6 +15,7 @@ import {
 import type { Agent, Task, TaskStatus } from '../../types';
 import { validateBlockedByTaskIds } from '../../taskDependencies';
 import { normalizeTaskLabels } from '../../taskLabels';
+import { planTaskSourceBranchFieldsForCreate } from '../../taskBranches';
 import { getFirebaseFirestore } from '../firebase';
 import type {
   TaskCreateInput,
@@ -74,6 +75,14 @@ export class FirestoreTaskProvider implements TaskProvider {
     const db = getFirebaseFirestore();
     const col = collection(db, 'projects', this.projectId, 'tasks');
     const createLabels = normalizeTaskLabels(input.labels);
+    const disc = await window.electronAPI.repo.getBranchDiscovery();
+    if ('error' in disc) {
+      throw new Error(disc.error);
+    }
+    const planned = planTaskSourceBranchFieldsForCreate(disc, {
+      sourceBranch: input.sourceBranch,
+      createSourceBranchIfMissing: input.createSourceBranchIfMissing,
+    });
     const data = {
       title: input.title,
       status: input.status ?? ('backlog' as TaskStatus),
@@ -82,6 +91,8 @@ export class FirestoreTaskProvider implements TaskProvider {
       createdBy: this.uid,
       updatedAt: serverTimestamp(),
       updatedBy: this.uid,
+      sourceBranch: planned.sourceBranch,
+      createSourceBranchIfMissing: planned.createSourceBranchIfMissing,
       ...(input.orderKey !== undefined ? { orderKey: input.orderKey } : {}),
       ...(createLabels.length > 0 ? { labels: createLabels } : {}),
       ...(input.assigneeId !== undefined && input.assigneeId !== ''
@@ -130,6 +141,8 @@ export class FirestoreTaskProvider implements TaskProvider {
       createdBy: this.uid,
       updatedBy: this.uid,
       updatedAt: new Date().toISOString(),
+      sourceBranch: planned.sourceBranch,
+      createSourceBranchIfMissing: planned.createSourceBranchIfMissing,
       ...(input.orderKey !== undefined ? { orderKey: input.orderKey } : {}),
       ...(createLabels.length > 0 ? { labels: createLabels } : {}),
       ...(normalizedDeps ? { blockedByTaskIds: normalizedDeps } : {}),
@@ -189,6 +202,21 @@ export class FirestoreTaskProvider implements TaskProvider {
           typeof patch.assigneeId === 'string' ? patch.assigneeId.trim() : patch.assigneeId;
       }
     }
+    if (patch.sourceBranch !== undefined) {
+      const b = patch.sourceBranch.trim();
+      if (b.length === 0) {
+        updates.sourceBranch = deleteField();
+      } else {
+        updates.sourceBranch = b;
+      }
+    }
+    if (patch.createSourceBranchIfMissing !== undefined) {
+      if (patch.createSourceBranchIfMissing) {
+        updates.createSourceBranchIfMissing = true;
+      } else {
+        updates.createSourceBranchIfMissing = deleteField();
+      }
+    }
     await updateDoc(ref, updates);
     const after = await getDoc(ref);
     return toTask(
@@ -240,6 +268,8 @@ function toTask(
     ...parseBlockedByTaskIdsField(data.blockedByTaskIds),
     ...parseLabelsField(data.labels),
     ...parseAutoStartOnUnblockField(data.autoStartOnUnblock),
+    ...parseSourceBranchField(data.sourceBranch),
+    ...parseCreateSourceBranchIfMissingField(data.createSourceBranchIfMissing),
   };
 }
 
@@ -273,6 +303,23 @@ function parseLabelsField(
     return {};
   }
   return { labels: n };
+}
+
+function parseSourceBranchField(
+  val: unknown,
+): { sourceBranch: string } | Record<string, never> {
+  if (typeof val !== 'string' || val.trim() === '') {
+    return {};
+  }
+  return { sourceBranch: val.trim() };
+}
+
+function parseCreateSourceBranchIfMissingField(
+  val: unknown,
+): { createSourceBranchIfMissing: boolean } | Record<string, never> {
+  if (val === true) return { createSourceBranchIfMissing: true };
+  if (val === false) return { createSourceBranchIfMissing: false };
+  return {};
 }
 
 function parseBlockedByTaskIdsField(

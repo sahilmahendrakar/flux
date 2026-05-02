@@ -3,6 +3,10 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { promisify } from 'node:util';
 import type { RepoConfig } from '../types';
+import {
+  fetchOriginBranchBestEffort,
+  resolveLocalOrOriginRef,
+} from './repoGit';
 
 const execFile = promisify(execFileCallback);
 
@@ -20,6 +24,14 @@ function branchForTaskId(taskId: string): string {
  * from ProjectStore (which it shares a circular boot relationship with).
  */
 export type RepoConfigGetter = (rootPath: string) => Promise<RepoConfig | null>;
+
+/** Options for basing a new `flux/task-*` worktree on `Task.sourceBranch`. */
+export type WorktreeSourceBranchOptions = {
+  /** Normalized short branch name (task source / PR base intent). */
+  sourceBranchShort: string;
+  /** When the source ref is missing, create it from the project default via `resolveBaseRef`. */
+  createSourceBranchIfMissing: boolean;
+};
 
 export class WorktreeService {
   private repoConfigGetter: RepoConfigGetter | null = null;
@@ -49,7 +61,10 @@ export class WorktreeService {
     return this.rootPath;
   }
 
-  async create(taskId: string): Promise<{ worktreePath: string; branch: string }> {
+  async create(
+    taskId: string,
+    sourceOpts: WorktreeSourceBranchOptions,
+  ): Promise<{ worktreePath: string; branch: string }> {
     if (!this.rootPath) {
       throw new Error('WorktreeService: no project root path set');
     }
@@ -78,17 +93,40 @@ export class WorktreeService {
       ? await this.repoConfigGetter(this.rootPath).catch(() => null)
       : null;
 
+    const sourceShort = sourceOpts.sourceBranchShort;
+    await fetchOriginBranchBestEffort(this.rootPath, sourceShort);
+
     try {
       if (branchExists) {
         await execFile('git', ['worktree', 'add', worktreePath, branch], {
           cwd: this.rootPath,
         });
       } else {
-        const baseRef = await this.resolveBaseRef(repoConfig?.baseBranch);
-        const addArgs = baseRef
-          ? ['worktree', 'add', worktreePath, '-b', branch, baseRef]
-          : ['worktree', 'add', worktreePath, '-b', branch];
-        await execFile('git', addArgs, { cwd: this.rootPath });
+        let startRef = await resolveLocalOrOriginRef(this.rootPath, sourceShort);
+        if (!startRef && sourceOpts.createSourceBranchIfMissing) {
+          const parentRef = await this.resolveBaseRef(repoConfig?.baseBranch);
+          if (!parentRef) {
+            throw new Error(
+              `Cannot create missing source branch '${sourceShort}': project base is not available (check remotes and RepoConfig.baseBranch).`,
+            );
+          }
+          await execFile('git', ['branch', sourceShort, parentRef], {
+            cwd: this.rootPath,
+          });
+          startRef = await resolveLocalOrOriginRef(this.rootPath, sourceShort);
+        }
+        if (!startRef) {
+          throw new Error(
+            sourceOpts.createSourceBranchIfMissing
+              ? `Could not resolve or create source branch '${sourceShort}'.`
+              : `Source branch '${sourceShort}' does not exist locally or as origin/<branch>, and creating it is disabled for this task.`,
+          );
+        }
+        await execFile(
+          'git',
+          ['worktree', 'add', worktreePath, '-b', branch, startRef],
+          { cwd: this.rootPath },
+        );
       }
     } catch (err: unknown) {
       const message =

@@ -33,10 +33,18 @@ import type {
   ProjectTabState,
   LocalProject,
   Project,
+  RepoBranchDiscoveryResponse,
   RepoConfig,
   SessionStartResult,
   Task,
 } from './types';
+import {
+  classifyGitBranchPresence,
+  effectiveTaskSourceBranchShort,
+  planTaskSourceBranchFieldsForCreate,
+  resolveCreateSourceBranchIfMissingForStart,
+} from './taskBranches';
+import { collectRepoBranchDiscovery } from './main/repoGit';
 import {
   getTaskBlockedStartInfo,
   isTaskBlocked,
@@ -543,6 +551,43 @@ app.whenReady().then(async () => {
   ipcMain.handle('project:getRepos', async (): Promise<RepoConfig[]> => {
     return projectStore.getReposAt(activeProjectDir());
   });
+
+  ipcMain.handle(
+    'repo:getBranchDiscovery',
+    async (
+      _e,
+      requestedBranch?: string,
+    ): Promise<RepoBranchDiscoveryResponse | { error: string }> => {
+      try {
+        const projectDir = activeProjectDir();
+        const repos = await projectStore.getReposAt(projectDir);
+        const repo = repos[0];
+        if (!repo?.rootPath) {
+          return { error: 'No repository root configured for this project' };
+        }
+        const base = await collectRepoBranchDiscovery(repo.rootPath, repo.baseBranch);
+        if (requestedBranch == null || requestedBranch.trim() === '') {
+          return base;
+        }
+        const { normalizedShort, presence } = classifyGitBranchPresence(
+          requestedBranch,
+          base.localBranches,
+          base.remoteBranches,
+        );
+        return {
+          ...base,
+          classification: {
+            raw: requestedBranch,
+            normalizedShort,
+            presence,
+          },
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+  );
   ipcMain.handle(
     'project:updateRepo',
     async (
@@ -830,13 +875,36 @@ app.whenReady().then(async () => {
     'tasks:create',
     async (
       _e,
-      input: { title: string; agent: Agent; blockedByTaskIds?: string[]; labels?: string[] },
+      input: {
+        title: string;
+        agent: Agent;
+        blockedByTaskIds?: string[];
+        labels?: string[];
+        sourceBranch?: string;
+        createSourceBranchIfMissing?: boolean;
+      },
     ) => {
       const project = projectStore.get();
       if (!project) {
         throw new Error('No local project open');
       }
-      return taskStore.create({ ...input, projectId: project.id });
+      const projectDir = activeProjectDir();
+      const repos = await projectStore.getReposAt(projectDir);
+      const repo = repos.find((r) => r.rootPath === project.rootPath) ?? repos[0];
+      if (!repo?.rootPath) {
+        throw new Error('No repository root configured for this project');
+      }
+      const discovery = await collectRepoBranchDiscovery(repo.rootPath, repo.baseBranch);
+      const planned = planTaskSourceBranchFieldsForCreate(discovery, {
+        sourceBranch: input.sourceBranch,
+        createSourceBranchIfMissing: input.createSourceBranchIfMissing,
+      });
+      return taskStore.create({
+        ...input,
+        projectId: project.id,
+        sourceBranch: planned.sourceBranch,
+        createSourceBranchIfMissing: planned.createSourceBranchIfMissing,
+      });
     },
   );
   ipcMain.handle('tasks:update', async (_e, id, patch) =>
@@ -885,6 +953,32 @@ app.whenReady().then(async () => {
       memberIds: [],
       createdAt: '',
       ...prefs,
+    };
+  }
+
+  async function worktreeSourceOptsForTaskSession(
+    task: Task,
+    project: Project,
+  ): Promise<{ sourceBranchShort: string; createSourceBranchIfMissing: boolean }> {
+    const projectDir = activeProjectDir();
+    const repos = await projectStore.getReposAt(projectDir);
+    const repo = repos.find((r) => r.rootPath === project.rootPath) ?? repos[0];
+    const discovery = await collectRepoBranchDiscovery(
+      project.rootPath,
+      repo?.baseBranch ?? 'main',
+    );
+    const sourceEff = effectiveTaskSourceBranchShort(task, discovery.defaultBranchShort);
+    const { presence } = classifyGitBranchPresence(
+      sourceEff,
+      discovery.localBranches,
+      discovery.remoteBranches,
+    );
+    return {
+      sourceBranchShort: sourceEff,
+      createSourceBranchIfMissing: resolveCreateSourceBranchIfMissingForStart(
+        task,
+        presence,
+      ),
     };
   }
 
@@ -973,7 +1067,8 @@ app.whenReady().then(async () => {
       let worktreePath = '';
       let branch = '';
       try {
-        const created = await worktreeService.create(task.id);
+        const sourceOpts = await worktreeSourceOptsForTaskSession(merged, project);
+        const created = await worktreeService.create(task.id, sourceOpts);
         worktreePath = created.worktreePath;
         branch = created.branch;
       } catch (err: unknown) {
@@ -1046,6 +1141,8 @@ app.whenReady().then(async () => {
       | 'blockedByTaskIds'
       | 'labels'
       | 'autoStartOnUnblock'
+      | 'sourceBranch'
+      | 'createSourceBranchIfMissing'
     >
   >;
 

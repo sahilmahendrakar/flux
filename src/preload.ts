@@ -7,6 +7,7 @@ import type {
   OpenWorkspaceTarget,
   PlanningSession,
   ProjectTabState,
+  RepoBranchDiscoveryResponse,
   RepoConfig,
   Session,
   SessionStartResult,
@@ -128,7 +129,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     activateCloud: (payload: { id: string; rootPath: string }) =>
       ipcRenderer.invoke('projects:activateCloud', payload) as Promise<ActivateCloudResult>,
     clearLocalBinding: (cloudProjectId: string) =>
-      ipcRenderer.invoke('projects:clearLocalBinding', cloudProjectId) as Promise<void>,
+      ipcRenderer.invoke('projects:clearLocalBinding', cloudProjectId) as Promise<void      >,
+  },
+  repo: {
+    getBranchDiscovery: (requestedBranch?: string) =>
+      ipcRenderer.invoke('repo:getBranchDiscovery', requestedBranch) as Promise<
+        RepoBranchDiscoveryResponse | { error: string }
+      >,
   },
   auth: {
     startGoogleLogin: () =>
@@ -156,6 +163,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       agent: Agent;
       blockedByTaskIds?: string[];
       labels?: string[];
+      sourceBranch?: string;
+      createSourceBranchIfMissing?: boolean;
     }) => ipcRenderer.invoke('tasks:create', input) as Promise<Task>,
     update: (
       id: string,
@@ -173,6 +182,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
           | 'blockedByTaskIds'
           | 'labels'
           | 'autoStartOnUnblock'
+          | 'sourceBranch'
+          | 'createSourceBranchIfMissing'
         >
       >,
     ) => ipcRenderer.invoke('tasks:update', id, patch) as Promise<Task>,

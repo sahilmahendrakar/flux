@@ -12,6 +12,8 @@ import type { AppStateStore } from './AppStateStore';
 import type { LocalBindingStore } from './LocalBindingStore';
 import type { McpRendererBridge, McpBridgeResult } from './McpRendererBridge';
 import type { ActiveProjectKey, Task } from '../types';
+import { planTaskSourceBranchFieldsForCreate } from '../taskBranches';
+import { collectRepoBranchDiscovery } from './repoGit';
 import type {
   McpBridgeMember,
   McpBridgeProjectInfoResult,
@@ -69,6 +71,8 @@ export class McpServer {
             | 'blockedByTaskIds'
             | 'labels'
             | 'autoStartOnUnblock'
+            | 'sourceBranch'
+            | 'createSourceBranchIfMissing'
           >
         >,
       ) => Promise<Task>;
@@ -234,6 +238,18 @@ export class McpServer {
           .email()
           .optional()
           .describe('Email of the team member to assign this task to (cloud projects only)'),
+        sourceBranch: z
+          .string()
+          .optional()
+          .describe(
+            'Git branch this task is based on (short name). Defaults to the project default branch when omitted.',
+          ),
+        createSourceBranchIfMissing: z
+          .boolean()
+          .optional()
+          .describe(
+            'When true and sourceBranch does not exist yet, Flux creates it from the project default on first session start.',
+          ),
       },
       async (input) => {
         try {
@@ -247,10 +263,23 @@ export class McpServer {
               ? active.project.defaultTaskAgent
               : this.bindingStore.getPrefs(active.activeKey.id).defaultTaskAgent);
           if (active.kind === 'local') {
+            const repos = await this.projectStore.getReposAt(active.projectDir);
+            const repo =
+              repos.find((r) => r.rootPath === active.project.rootPath) ?? repos[0];
+            if (!repo?.rootPath) {
+              return jsonToolPayload({ error: 'No repository root configured for this project' });
+            }
+            const discovery = await collectRepoBranchDiscovery(repo.rootPath, repo.baseBranch);
+            const planned = planTaskSourceBranchFieldsForCreate(discovery, {
+              sourceBranch: input.sourceBranch,
+              createSourceBranchIfMissing: input.createSourceBranchIfMissing,
+            });
             let task = await this.taskStore.create({
               title: input.title,
               agent,
               projectId: active.project.id,
+              sourceBranch: planned.sourceBranch,
+              createSourceBranchIfMissing: planned.createSourceBranchIfMissing,
               ...(input.blockedByTaskIds?.length
                 ? { blockedByTaskIds: input.blockedByTaskIds }
                 : {}),
@@ -285,6 +314,10 @@ export class McpServer {
                 : {}),
               ...(input.labels !== undefined ? { labels: input.labels } : {}),
               ...(assigneeId !== undefined ? { assigneeId } : {}),
+              ...(input.sourceBranch !== undefined ? { sourceBranch: input.sourceBranch } : {}),
+              ...(input.createSourceBranchIfMissing !== undefined
+                ? { createSourceBranchIfMissing: input.createSourceBranchIfMissing }
+                : {}),
             },
           };
           const result = await this.bridge.request<Task>(
@@ -331,6 +364,8 @@ export class McpServer {
           .nullable()
           .optional()
           .describe('Email to assign, or null to unassign (cloud only)'),
+        sourceBranch: z.string().optional(),
+        createSourceBranchIfMissing: z.boolean().optional(),
       },
       async (input) => {
         try {
@@ -355,6 +390,8 @@ export class McpServer {
                 | 'blockedByTaskIds'
                 | 'labels'
                 | 'autoStartOnUnblock'
+                | 'sourceBranch'
+                | 'createSourceBranchIfMissing'
               >
             > = {};
             if (input.title !== undefined) patch.title = input.title;
@@ -366,6 +403,12 @@ export class McpServer {
             if (input.labels !== undefined) patch.labels = input.labels;
             if (input.autoStartOnUnblock !== undefined) {
               patch.autoStartOnUnblock = input.autoStartOnUnblock;
+            }
+            if (input.sourceBranch !== undefined) {
+              patch.sourceBranch = input.sourceBranch;
+            }
+            if (input.createSourceBranchIfMissing !== undefined) {
+              patch.createSourceBranchIfMissing = input.createSourceBranchIfMissing;
             }
             const updated = await this.taskActions.updateTask(input.id, patch);
             this.notifyTasksChanged();
@@ -394,6 +437,8 @@ export class McpServer {
               | 'blockedByTaskIds'
               | 'labels'
               | 'autoStartOnUnblock'
+              | 'sourceBranch'
+              | 'createSourceBranchIfMissing'
             >
           > & { assigneeId?: string | null } = {};
           if (input.title !== undefined) patch.title = input.title;
@@ -406,6 +451,12 @@ export class McpServer {
           if (input.labels !== undefined) patch.labels = input.labels;
           if (input.autoStartOnUnblock !== undefined) {
             patch.autoStartOnUnblock = input.autoStartOnUnblock;
+          }
+          if (input.sourceBranch !== undefined) {
+            patch.sourceBranch = input.sourceBranch;
+          }
+          if (input.createSourceBranchIfMissing !== undefined) {
+            patch.createSourceBranchIfMissing = input.createSourceBranchIfMissing;
           }
           if (assigneeId !== undefined) patch.assigneeId = assigneeId;
           const payload: McpBridgeTasksUpdatePayload = { taskId: input.id, patch };
