@@ -1,0 +1,27 @@
+src/components/ThemeModeCompactToggle.tsx
+  92b7c1955396a958 1-70
+src/components/Sidebar.tsx
+  92b7c1955396a958 4,276,280-291
+src/components/AppShell.tsx
+  92b7c1955396a958 5,104-115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "4287562e2409334c13c58904166146fb2c4acab8",
+  "prompts": {
+    "92b7c1955396a958": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c7ec597a-514b-407e-8b04-ed4841ad5d76",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 99,
+      "total_deletions": 21,
+      "accepted_lines": 97,
+      "overriden_lines": 0
+    }
+  }
+}
