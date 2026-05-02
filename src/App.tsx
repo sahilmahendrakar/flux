@@ -1179,7 +1179,7 @@ export default function App() {
           updated,
           allAfter,
           provider,
-          actorUid: null,
+          actorUid: uidRef.current,
           unblockInFlight: cloudUnblockInFlightRef.current,
           getTasks: () => tasksRef.current.map((t) => (t.id === updated.id ? updated : t)),
           setCleanupLoadingTaskId: (tid) => setCleanupLoadingTaskId(tid),
