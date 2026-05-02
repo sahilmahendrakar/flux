@@ -60,6 +60,8 @@ import { normalizeTaskLabels } from './taskLabels';
 import { invalidateSessionAttachCache } from './terminal/warmAttach';
 import { isTaskBlocked } from './taskDependencies';
 import { useMcpRendererBridge } from './renderer/mcp/useMcpRendererBridge';
+import { usePlanningDocsFirestoreSync } from './renderer/planningDocs/usePlanningDocsFirestoreSync';
+import { isFirebaseConfigured } from './renderer/firebase';
 import { maybeCloudAutoStartSessionOnInProgressTransition } from './cloudInProgressAutostartApply';
 import { runCloudDoneTransitionFollowUp } from './cloudTaskDoneFollowUp';
 import { assigneePatchForCloudAutoStartOnUnblock } from './cloudAutoStartUnblockAssignee';
@@ -458,6 +460,11 @@ export default function App() {
     const unsub = provider.subscribe((all) => setTasks(all));
     return () => unsub();
   }, [provider]);
+
+  usePlanningDocsFirestoreSync({
+    enabled: project?.kind === 'cloud' && !!uid && isFirebaseConfigured(),
+    projectId: project?.kind === 'cloud' ? project.id : null,
+  });
 
   useEffect(() => {
     if (!project) {

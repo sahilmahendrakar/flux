@@ -29,6 +29,7 @@ import type {
   McpBridgeResponse,
 } from './mcpBridge';
 import type { PlanningDocFileEntry } from './planningDocs/types';
+import type { PlanningDocsApplyFirestoreSnapshotResult } from './planningDocs/syncTypes';
 
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY?: string;
@@ -268,6 +269,16 @@ declare global {
         read: (relativePath: string) => Promise<
           { content: string } | { error: string }
         >;
+        applyFirestoreSnapshot: (payload: {
+          projectId: string;
+          docs: Array<{
+            docId: string;
+            relativePath: string;
+            markdown: string;
+            remoteRevision: string;
+          }>;
+          removedDocIds: string[];
+        }) => Promise<PlanningDocsApplyFirestoreSnapshotResult>;
         onChanged: (cb: () => void) => () => void;
       };
       mcpBridge: {

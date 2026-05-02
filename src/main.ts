@@ -36,7 +36,12 @@ import { shouldAutoMoveTaskToReviewForOpenPr } from './githubPrReviewWhenOpenAut
 import { keyForInsert, sortColumn } from './renderer/tasks/orderKey';
 import { AuthServer } from './main/AuthServer';
 import { EmailService, type InviteEmailInput } from './main/EmailService';
-import { createPlanningDocsWatcher } from './main/PlanningDocsWatcher';
+import {
+  createPlanningDocsWatcher,
+  notifyPlanningDocsChanged,
+} from './main/PlanningDocsWatcher';
+import { applyFirestorePlanningDocsSnapshot } from './main/planningDocsFirestoreHydrate';
+import type { PlanningDocsApplyFirestoreSnapshotResult } from './planningDocs/syncTypes';
 import {
   createPlanningDocsProviderBundle,
   planningDocsProviderForActiveProject,
@@ -2370,6 +2375,36 @@ app.whenReady().then(async () => {
       relativePath: string,
     ): Promise<{ content: string } | { error: string }> => {
       return activePlanningDocsProvider().read(relativePath);
+    },
+  );
+
+  ipcMain.handle(
+    'planningDocs:applyFirestoreSnapshot',
+    async (_e, payload: unknown): Promise<PlanningDocsApplyFirestoreSnapshotResult> => {
+      const key = appStateStore.get().activeProjectKey;
+      if (!payload || typeof payload !== 'object') {
+        return { ok: false, code: 'INVALID_PAYLOAD' };
+      }
+      const projectId = (payload as { projectId?: unknown }).projectId;
+      if (typeof projectId !== 'string') {
+        return { ok: false, code: 'INVALID_PAYLOAD' };
+      }
+      if (key?.kind !== 'cloud' || key.id !== projectId) {
+        return { ok: false, code: 'PROJECT_MISMATCH' };
+      }
+      const planningDir = resolvePlanningDocsDir();
+      if (!planningDir) {
+        return { ok: false, code: 'NO_PROJECT' };
+      }
+      planningDocsWatcher?.suppressFsNotifications(600);
+      const applied = await applyFirestorePlanningDocsSnapshot(planningDir, payload);
+      if (!applied.ok) {
+        return { ok: false, code: 'INVALID_PAYLOAD' };
+      }
+      if (applied.changed) {
+        notifyPlanningDocsChanged();
+      }
+      return { ok: true };
     },
   );
 
