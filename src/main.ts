@@ -45,6 +45,12 @@ import {
   resolveCreateSourceBranchIfMissingForStart,
 } from './taskBranches';
 import { collectRepoBranchDiscovery } from './main/repoGit';
+import { isWorktreeCreateError } from './main/worktreeCreateError';
+import {
+  taskHasBlockingWorkspaceState,
+  taskSourceBranchSettingsWouldChange,
+} from './main/taskSourceBranchGuard';
+import { fluxTaskWorkBranchName } from './main/fluxTaskBranch';
 import {
   getTaskBlockedStartInfo,
   isTaskBlocked,
@@ -967,7 +973,10 @@ app.whenReady().then(async () => {
       project.rootPath,
       repo?.baseBranch ?? 'main',
     );
-    const sourceEff = effectiveTaskSourceBranchShort(task, discovery.defaultBranchShort);
+    const sourceEff =
+      effectiveTaskSourceBranchShort(task, discovery.defaultBranchShort) ||
+      discovery.defaultBranchShort ||
+      'main';
     const { presence } = classifyGitBranchPresence(
       sourceEff,
       discovery.localBranches,
@@ -1072,6 +1081,16 @@ app.whenReady().then(async () => {
         worktreePath = created.worktreePath;
         branch = created.branch;
       } catch (err: unknown) {
+        if (isWorktreeCreateError(err)) {
+          console.error('[session:start] worktree create failed', {
+            taskId: task.id,
+            projectId: project.id,
+            code: err.code,
+            branchName: err.branchName,
+            message: err.message,
+          });
+          return finish({ error: err.code, message: err.message });
+        }
         const message = err instanceof Error ? err.message : String(err);
         console.error('[session:start] worktree create failed', {
           taskId: task.id,
@@ -1296,6 +1315,34 @@ app.whenReady().then(async () => {
       }
       patchToApply = { ...patch, blockedByTaskIds: v.normalized };
     }
+
+    const touchesSourceBranch =
+      patchToApply.sourceBranch !== undefined ||
+      patchToApply.createSourceBranchIfMissing !== undefined;
+    if (touchesSourceBranch) {
+      const projectDir = activeProjectDir();
+      const repos = await projectStore.getReposAt(projectDir);
+      const repo = repos.find((r) => r.rootPath === project.rootPath) ?? repos[0];
+      const discovery = await collectRepoBranchDiscovery(
+        project.rootPath,
+        repo?.baseBranch ?? 'main',
+      );
+      if (taskSourceBranchSettingsWouldChange(previous, patchToApply, discovery.defaultBranchShort)) {
+        const locked = await taskHasBlockingWorkspaceState({
+          taskId: id,
+          listSessions: () => daemonClient.listSessions(),
+          projectDir: worktreeService.getProjectDir(),
+          rootPath: worktreeService.getRootPath(),
+        });
+        if (locked) {
+          const fluxBranch = fluxTaskWorkBranchName(id);
+          throw new Error(
+            `Cannot change this task's source branch while a Flux workspace exists (session, worktree folder, or local branch '${fluxBranch}'). Remove the workspace or stop the session first.`,
+          );
+        }
+      }
+    }
+
     const updated = await taskStore.update(id, patchToApply);
     await maybeAutoStartSessionOnInProgressTransition(previous, updated, source, options);
     if (updated.status === 'done' && previous.status !== 'done') {
