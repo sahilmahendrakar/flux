@@ -1,0 +1,27 @@
+src/components/AgentBadge.tsx
+  42d00088ab9a1e5c 2,12-27,29-43,46-47
+src/components/agentProviderIcons.tsx
+  42d00088ab9a1e5c 1-48
+src/components/TaskCard.tsx
+  42d00088ab9a1e5c 254,372
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "a337b3137187a9d4ae5122fc69cf5aa2ec028850",
+  "prompts": {
+    "42d00088ab9a1e5c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c0dd73d8-cd9b-4d53-a0d5-fe7a4f83f813",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 84,
+      "total_deletions": 5,
+      "accepted_lines": 84,
+      "overriden_lines": 0
+    }
+  }
+}
