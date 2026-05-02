@@ -30,6 +30,8 @@ interface Props {
   onTogglePlanPanel: () => void;
   /** Cloud-only: team members for the assignee picker. */
   projectMembers?: ProjectMember[];
+  onTaskPrClick?: (taskId: string) => void;
+  prLoadingTaskId?: string | null;
 }
 
 export default function Board({
@@ -46,6 +48,8 @@ export default function Board({
   planPanelOpen,
   onTogglePlanPanel,
   projectMembers,
+  onTaskPrClick,
+  prLoadingTaskId,
 }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [boardFilter, setBoardFilter] = useState<BoardFilterState>(
@@ -165,6 +169,8 @@ export default function Board({
               autoStartWhenUnblockedProject={autoStartWhenUnblockedProject}
               onToggleTaskAutoStartOnUnblock={onToggleTaskAutoStartOnUnblock}
               membersMap={membersMap}
+              onTaskPrClick={onTaskPrClick}
+              prLoadingTaskId={prLoadingTaskId}
               emptyState={
                 col.id === 'backlog' && projectIsEmpty
                   ? 'No tasks yet. Create one to get started.'

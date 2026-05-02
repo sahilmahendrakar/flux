@@ -18,6 +18,8 @@ interface Props {
   onToggleTaskAutoStartOnUnblock: (taskId: string, enabled: boolean) => void;
   emptyState?: ReactNode;
   membersMap?: Map<string, ProjectMember>;
+  onTaskPrClick?: (taskId: string) => void;
+  prLoadingTaskId?: string | null;
 }
 
 export default function Column({
@@ -34,6 +36,8 @@ export default function Column({
   onToggleTaskAutoStartOnUnblock,
   emptyState,
   membersMap,
+  onTaskPrClick,
+  prLoadingTaskId,
 }: Props) {
   const isNeedsInput = id === 'needs-input';
   const isDone = id === 'done';
@@ -97,6 +101,8 @@ export default function Column({
                 autoStartWhenUnblockedProject={autoStartWhenUnblockedProject}
                 onToggleTaskAutoStartOnUnblock={onToggleTaskAutoStartOnUnblock}
                 assigneeMember={task.assigneeId ? membersMap?.get(task.assigneeId) : undefined}
+                onTaskPrClick={onTaskPrClick}
+                prLoading={prLoadingTaskId === task.id}
               />
             ))}
             {provided.placeholder}
