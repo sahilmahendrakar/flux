@@ -36,6 +36,7 @@ interface ConfigFile {
   autoStartSessionOnInProgress: boolean;
   autoStartWhenUnblocked: boolean;
   autoCleanupWorkspaceWhenDone: boolean;
+  autoMarkDoneWhenPrMerged: boolean;
   autoMoveToReviewWhenPrOpen: boolean;
   repos: RepoConfig[];
 }
@@ -75,6 +76,7 @@ function configToLocalProject(c: ConfigFile): LocalProject {
     autoStartSessionOnInProgress: c.autoStartSessionOnInProgress === true,
     autoStartWhenUnblocked: c.autoStartWhenUnblocked === true,
     autoCleanupWorkspaceWhenDone: c.autoCleanupWorkspaceWhenDone === true,
+    autoMarkDoneWhenPrMerged: c.autoMarkDoneWhenPrMerged === true,
     autoMoveToReviewWhenPrOpen: c.autoMoveToReviewWhenPrOpen === true,
     repos: c.repos,
   };
@@ -162,6 +164,7 @@ function parseConfig(raw: string): ConfigFile | null {
     autoCleanupWorkspaceWhenDone:
       p.autoCleanupWorkspaceWhenDone === true ||
       (p as { autoDeleteTaskWhenDone?: boolean }).autoDeleteTaskWhenDone === true,
+    autoMarkDoneWhenPrMerged: p.autoMarkDoneWhenPrMerged === true,
     autoMoveToReviewWhenPrOpen: p.autoMoveToReviewWhenPrOpen === true,
     repos,
     ...(planningModels ? { planningModels } : {}),
@@ -471,6 +474,33 @@ export class ProjectStore {
     return next.autoCleanupWorkspaceWhenDone;
   }
 
+  async getAutoMarkDoneWhenPrMergedAt(projectDir: string): Promise<boolean> {
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    return parsed.autoMarkDoneWhenPrMerged === true;
+  }
+
+  async setAutoMarkDoneWhenPrMergedAt(
+    projectDir: string,
+    enabled: boolean,
+  ): Promise<boolean> {
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    const next: ConfigFile = {
+      ...parsed,
+      autoMarkDoneWhenPrMerged: enabled === true,
+    };
+    await atomicWriteFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
+    if (this.projectDir === projectDir && this.project) {
+      this.project = configToLocalProject(next);
+    }
+    return next.autoMarkDoneWhenPrMerged;
+  }
+
   async getAutoMoveToReviewWhenPrOpenAt(projectDir: string): Promise<boolean> {
     const configPath = path.join(projectDir, 'config.json');
     const raw = await fs.readFile(configPath, 'utf8');
@@ -562,6 +592,7 @@ export class ProjectStore {
         autoStartSessionOnInProgress: false,
         autoStartWhenUnblocked: false,
         autoCleanupWorkspaceWhenDone: false,
+        autoMarkDoneWhenPrMerged: false,
         autoMoveToReviewWhenPrOpen: false,
         repos: [{ rootPath: resolvedRoot, baseBranch: DEFAULT_BASE_BRANCH }],
       };

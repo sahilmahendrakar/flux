@@ -247,6 +247,10 @@ function ProjectConfigPane({
   const [autoCleanupOnDoneLoading, setAutoCleanupOnDoneLoading] = useState(true);
   const [autoCleanupOnDoneSaveState, setAutoCleanupOnDoneSaveState] = useState<SaveState>('idle');
   const [autoCleanupOnDoneError, setAutoCleanupOnDoneError] = useState<string | null>(null);
+  const [autoDoneOnPrMergeEnabled, setAutoDoneOnPrMergeEnabled] = useState(false);
+  const [autoDoneOnPrMergeLoading, setAutoDoneOnPrMergeLoading] = useState(true);
+  const [autoDoneOnPrMergeSaveState, setAutoDoneOnPrMergeSaveState] = useState<SaveState>('idle');
+  const [autoDoneOnPrMergeError, setAutoDoneOnPrMergeError] = useState<string | null>(null);
   const [autoReviewOnOpenPrEnabled, setAutoReviewOnOpenPrEnabled] = useState(false);
   const [autoReviewOnOpenPrLoading, setAutoReviewOnOpenPrLoading] = useState(true);
   const [autoReviewOnOpenPrSaveState, setAutoReviewOnOpenPrSaveState] = useState<SaveState>('idle');
@@ -395,6 +399,31 @@ function ProjectConfigPane({
       })
       .finally(() => {
         if (!cancelled) setAutoCleanupOnDoneLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setAutoDoneOnPrMergeLoading(true);
+    setAutoDoneOnPrMergeError(null);
+    void window.electronAPI.project
+      .getAutoMarkDoneWhenPrMerged()
+      .then((enabled) => {
+        if (!cancelled) {
+          setAutoDoneOnPrMergeEnabled(enabled);
+          setAutoDoneOnPrMergeSaveState('idle');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setAutoDoneOnPrMergeError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAutoDoneOnPrMergeLoading(false);
       });
     return () => {
       cancelled = true;
@@ -565,6 +594,24 @@ function ProjectConfigPane({
     }, 1500);
   }, []);
 
+  const handleAutoDoneOnPrMergeChange = useCallback(async (enabled: boolean) => {
+    setAutoDoneOnPrMergeEnabled(enabled);
+    setAutoDoneOnPrMergeSaveState('saving');
+    setAutoDoneOnPrMergeError(null);
+    const result = await window.electronAPI.project.setAutoMarkDoneWhenPrMerged(enabled);
+    if ('error' in result) {
+      setAutoDoneOnPrMergeSaveState('error');
+      setAutoDoneOnPrMergeError(result.error);
+      setAutoDoneOnPrMergeEnabled((prev) => !prev);
+      return;
+    }
+    setAutoDoneOnPrMergeEnabled(result.enabled);
+    setAutoDoneOnPrMergeSaveState('saved');
+    window.setTimeout(() => {
+      setAutoDoneOnPrMergeSaveState((state) => (state === 'saved' ? 'idle' : state));
+    }, 1500);
+  }, []);
+
   const handleAutoReviewOnOpenPrChange = useCallback(async (enabled: boolean) => {
     setAutoReviewOnOpenPrEnabled(enabled);
     setAutoReviewOnOpenPrSaveState('saving');
@@ -605,8 +652,8 @@ function ProjectConfigPane({
               Automations
             </h2>
             <p className="mt-1 text-[12px] leading-snug text-zinc-500">
-              Choose when sessions start automatically, when finished workspaces are cleaned up, and
-              when an open GitHub pull request should move a task into Review.
+              Choose when sessions start automatically, when merged or open pull requests update the
+              board, and when finished workspaces are cleaned up.
             </p>
           </div>
           <div className="divide-y divide-white/[0.06]">
@@ -667,6 +714,27 @@ function ProjectConfigPane({
               error={autoCleanupOnDoneError}
             />
             <AutomationSettingRow
+              key={`${project.id}-auto-done-pr-merged`}
+              title="Move to Done when linked PR merges"
+              description={
+                <>
+                  After a linked GitHub PR refresh shows the PR merged, move the task to Done only
+                  from “In progress”, “Needs input”, or “Review”, when the task has
+                  a PR URL, is not blocked by incomplete dependencies, and the refresh actually
+                  changed PR metadata. Backlog tasks are never auto-completed. For cloud projects this
+                  preference is stored per machine (local binding), like other automations.
+                </>
+              }
+              checked={autoDoneOnPrMergeEnabled}
+              onCheckedChange={(next) => void handleAutoDoneOnPrMergeChange(next)}
+              switchDisabled={
+                autoDoneOnPrMergeLoading || autoDoneOnPrMergeSaveState === 'saving'
+              }
+              loading={autoDoneOnPrMergeLoading}
+              saveState={autoDoneOnPrMergeSaveState}
+              error={autoDoneOnPrMergeError}
+            />
+            <AutomationSettingRow
               key={`${project.id}-auto-review-open-pr`}
               title="Move to Review when pull request is open"
               description={
@@ -674,8 +742,7 @@ function ProjectConfigPane({
                   After Flux refreshes PR metadata from GitHub, if the linked PR is open and the task
                   is in Backlog or In progress, move it to Review. When GitHub reports a head
                   branch, it must match this task&apos;s Flux work branch. Merged or closed PRs are
-                  ignored (safe alongside a future “Done when merged” automation). For cloud
-                  projects this preference is stored per machine.
+                  ignored. For cloud projects this preference is stored per machine.
                 </>
               }
               checked={autoReviewOnOpenPrEnabled}

@@ -51,6 +51,10 @@ import type { TaskPatch, TaskProvider } from './renderer/tasks/TaskProvider';
 import { LocalTaskProvider } from './renderer/tasks/LocalTaskProvider';
 import { FirestoreTaskProvider } from './renderer/tasks/FirestoreTaskProvider';
 import { useGithubPrBoardRefresh } from './renderer/tasks/useGithubPrBoardRefresh';
+import {
+  reconcileCloudSilenceFromDaemon,
+  useCloudSilenceReconciliation,
+} from './renderer/tasks/useCloudSilenceReconciliation';
 import { keyForInsert, sortColumn } from './renderer/tasks/orderKey';
 import { normalizeTaskLabels } from './taskLabels';
 import { invalidateSessionAttachCache } from './terminal/warmAttach';
@@ -575,14 +579,6 @@ export default function App() {
     return unsub;
   }, [provider]);
 
-  useGithubPrBoardRefresh({
-    projectId: project?.id,
-    projectKind: project?.kind,
-    provider,
-    tasks,
-    enabled: Boolean(project && !activationLoading && provider),
-  });
-
   const tasksWorktreeIdsKey = useMemo(
     () =>
       tasks
@@ -755,6 +751,16 @@ export default function App() {
   useEffect(() => {
     projectRef.current = project;
   }, [project]);
+
+  useCloudSilenceReconciliation({
+    enabled: project?.kind === 'cloud',
+    projectId: project?.id,
+    sessions,
+    tasksRef,
+    uidRef,
+    providerRef,
+    setTasks,
+  });
 
   // Silence-based needs-input detection: subscribe to agent-state for running sessions.
   // Subscriptions are managed incrementally to avoid a teardown+recreate gap on every
@@ -955,71 +961,43 @@ export default function App() {
         if (project.kind === 'cloud') {
           void (async () => {
             try {
-              // Run both requests in parallel — IPC is fast, Firestore slower.
-              const [silenceStates, initialTasks] = await Promise.all([
-                window.electronAPI.sessions.getSilenceStates(),
-                // Wait up to 5 s for the Firestore provider to emit its first
-                // non-empty batch for this project (it's async, IPC is faster).
-                new Promise<Task[]>((resolve) => {
-                  const currentProvider = providerRef.current;
-                  if (!currentProvider) { resolve([]); return; }
-                  const timeout = setTimeout(() => { unsub(); resolve([]); }, 5_000);
-                  const unsub = currentProvider.subscribe((all) => {
-                    const mine = all.filter((t) => t.projectId === project.id);
-                    if (mine.length > 0) {
-                      clearTimeout(timeout);
-                      unsub();
-                      resolve(mine);
-                    }
-                  });
-                }),
-              ]);
+              // Wait up to 5 s for the Firestore provider to emit its first
+              // non-empty batch for this project (it's async). Silence state is
+              // fetched inside reconcileCloudSilenceFromDaemon.
+              const initialTasks = await new Promise<Task[]>((resolve) => {
+                const currentProvider = providerRef.current;
+                if (!currentProvider) {
+                  resolve([]);
+                  return;
+                }
+                const timeout = setTimeout(() => {
+                  unsub();
+                  resolve([]);
+                }, 5_000);
+                const unsub = currentProvider.subscribe((all) => {
+                  const mine = all.filter((t) => t.projectId === project.id);
+                  if (mine.length > 0) {
+                    clearTimeout(timeout);
+                    unsub();
+                    resolve(mine);
+                  }
+                });
+              });
 
               const currentProvider = providerRef.current;
               if (!currentProvider || cancelled) return;
 
-              // Build session → task lookup from live sessions + daemon report.
-              const sessionToTask = new Map<string, string>();
-              for (const s of projectSessions) {
-                if (s.taskId) sessionToTask.set(s.id, s.taskId);
-              }
-              for (const { id, taskId } of silenceStates) {
-                if (taskId && !sessionToTask.has(id)) sessionToTask.set(id, taskId);
-              }
-
-              const taskById = new Map<string, Task>(initialTasks.map((t) => [t.id, t]));
-
-              const currentUid = uidRef.current;
-              for (const { id, state } of silenceStates) {
-                const taskId = sessionToTask.get(id);
-                if (!taskId) continue;
-                const task = taskById.get(taskId);
-                if (!task) continue;
-
-                if (state !== 'silent' || task.status !== 'in-progress') continue;
-                // Only the assignee may mutate the task status.
-                if (!currentUid || task.assigneeId !== currentUid) continue;
-
-                console.log('[task:status] in-progress → needs-input (silence detected, startup catchup)', {
-                  taskId,
-                  assigneeId: task.assigneeId,
-                });
-                setTasks((prev) =>
-                  prev.map((t) =>
-                    t.id === taskId ? { ...t, status: 'needs-input' } : t,
-                  ),
-                );
-                void currentProvider
-                  .update(taskId, { status: 'needs-input' })
-                  .catch((err) => {
-                    console.error('[task:status] Firestore write failed (needs-input, startup catchup)', {
-                      taskId,
-                      err,
-                    });
-                  });
-              }
+              await reconcileCloudSilenceFromDaemon({
+                projectId: project.id,
+                sessions: projectSessions,
+                tasks: initialTasks,
+                uid: uidRef.current,
+                provider: currentProvider,
+                setTasks,
+                source: 'startup-catchup',
+              });
             } catch (err) {
-              console.warn('[task:status] startup catchup getSilenceStates failed', err);
+              console.warn('[task:status] startup cloud silence catchup failed', err);
             }
           })();
         }
@@ -1118,6 +1096,57 @@ export default function App() {
     },
     [stripLocalSessionStateForTask],
   );
+
+  const handleCloudPrRefreshMergedAutoDone = useCallback(
+    async ({ previous, updated }: { previous: Task; updated: Task }) => {
+      if (project?.kind !== 'cloud' || !provider) return;
+      if (previous.status === 'done' || updated.status !== 'done') return;
+      const allAfter = tasksRef.current.map((t) => (t.id === updated.id ? updated : t));
+      cloudInlineDoneFollowUpTaskIdsRef.current.add(updated.id);
+      try {
+        const follow = await runCloudDoneTransitionFollowUp({
+          previous,
+          updated,
+          allAfter,
+          provider,
+          actorUid: null,
+          unblockInFlight: cloudUnblockInFlightRef.current,
+          getTasks: () => tasksRef.current.map((t) => (t.id === updated.id ? updated : t)),
+          setCleanupLoadingTaskId: (tid) => setCleanupLoadingTaskId(tid),
+          onStripSessions: stripLocalSessionStateForTask,
+        });
+        maybeStripSessionsAfterNewWorkspaceClean(
+          previous,
+          follow.workspaceCleaned ? follow.task : updated,
+        );
+        if (follow.workspaceCleaned) {
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === follow.task.id ? mergeTaskRowPreserveMissing(t, follow.task) : t,
+            ),
+          );
+        } else {
+          setTasks((prev) =>
+            prev.map((t) => (t.id === updated.id ? mergeTaskRowPreserveMissing(t, updated) : t)),
+          );
+        }
+      } finally {
+        cloudInlineDoneFollowUpTaskIdsRef.current.delete(updated.id);
+      }
+    },
+    [project?.kind, provider, stripLocalSessionStateForTask, maybeStripSessionsAfterNewWorkspaceClean],
+  );
+
+  useGithubPrBoardRefresh({
+    projectId: project?.id,
+    projectKind: project?.kind,
+    provider,
+    tasks,
+    enabled: Boolean(project && !activationLoading && provider),
+    autoMarkDoneWhenPrMerged: project?.autoMarkDoneWhenPrMerged === true,
+    autoMoveToReviewWhenPrOpen: project?.autoMoveToReviewWhenPrOpen === true,
+    onCloudPrMergedAutoDone: handleCloudPrRefreshMergedAutoDone,
+  });
 
   useMcpRendererBridge({
     project,

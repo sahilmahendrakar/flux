@@ -31,7 +31,9 @@ import {
   prMetadataRefMismatchWarning,
 } from './main/githubTaskPr';
 import { githubPrRefreshViewEqual } from './githubPrMetadata';
+import { shouldAutoMarkDoneAfterPrMergeRefresh } from './autoMarkDoneWhenPrMerged';
 import { shouldAutoMoveTaskToReviewForOpenPr } from './githubPrReviewWhenOpenAutomation';
+import { keyForInsert, sortColumn } from './renderer/tasks/orderKey';
 import { AuthServer } from './main/AuthServer';
 import { EmailService, type InviteEmailInput } from './main/EmailService';
 import { createPlanningDocsWatcher } from './main/PlanningDocsWatcher';
@@ -398,6 +400,20 @@ app.whenReady().then(async () => {
   }
 
   daemonClient.onAgentState = applyAgentState;
+
+  async function reconcileSilenceStatesFromDaemon(
+    states: { id: string; taskId?: string; state: AgentState }[],
+    meta?: unknown,
+  ): Promise<void> {
+    void meta;
+    for (const { id, taskId, state } of states) {
+      if (taskId && !sessionTaskMap.has(id)) sessionTaskMap.set(id, taskId);
+      await applyAgentState(id, state);
+    }
+  }
+
+  daemonClient.onSilenceStatesSnapshot = reconcileSilenceStatesFromDaemon;
+  daemonClient.startSilencePolling();
 
   const userData = app.getPath('userData');
   await migrateLegacyProjectsJson({
@@ -836,6 +852,35 @@ app.whenReady().then(async () => {
           activeProjectDir(),
           enabled,
         );
+        return { ok: true, enabled: next };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+  );
+  ipcMain.handle('project:getAutoMarkDoneWhenPrMerged', async () => {
+    const key = appStateStore.get().activeProjectKey;
+    if (key?.kind === 'cloud') {
+      return bindingStore.getPrefs(key.id).autoMarkDoneWhenPrMerged;
+    }
+    return projectStore.getAutoMarkDoneWhenPrMergedAt(activeProjectDir());
+  });
+  ipcMain.handle(
+    'project:setAutoMarkDoneWhenPrMerged',
+    async (_e, enabled: boolean): Promise<{ ok: true; enabled: boolean } | { error: string }> => {
+      try {
+        const key = appStateStore.get().activeProjectKey;
+        if (key?.kind === 'cloud') {
+          await bindingStore.setPrefs(key.id, {
+            autoMarkDoneWhenPrMerged: enabled === true,
+          });
+          return {
+            ok: true,
+            enabled: bindingStore.getPrefs(key.id).autoMarkDoneWhenPrMerged,
+          };
+        }
+        const next = await projectStore.setAutoMarkDoneWhenPrMergedAt(activeProjectDir(), enabled);
         return { ok: true, enabled: next };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -1380,24 +1425,63 @@ app.whenReady().then(async () => {
           await taskStore.update(taskId, { githubPr: viewed.githubPr });
           persisted = true;
           broadcastLocalTasksChanged();
-          const autoReview = await readAutoMoveToReviewWhenPrOpen();
+
+          let autoMarkPref = false;
+          try {
+            autoMarkPref = await projectStore.getAutoMarkDoneWhenPrMergedAt(activeProjectDir());
+          } catch (err) {
+            console.warn('[tasks:refreshPullRequest] failed to read autoMarkDoneWhenPrMerged', err);
+          }
+          const allTasks = taskStore.getAll(project.id);
           if (
-            shouldAutoMoveTaskToReviewForOpenPr({
-              enabled: autoReview,
-              taskStatus: row.status,
-              githubPr: viewed.githubPr,
-              taskId,
+            shouldAutoMarkDoneAfterPrMergeRefresh({
+              task: row,
+              refreshedGithubPr: viewed.githubPr,
+              prefEnabled: autoMarkPref,
+              allTasks,
             })
           ) {
+            const destCol = sortColumn(
+              allTasks.filter((t) => t.id !== taskId),
+              'done',
+            );
+            let nextOrderKey: string;
+            try {
+              nextOrderKey = keyForInsert(destCol, destCol.length);
+            } catch (err) {
+              console.error('[tasks:refreshPullRequest] keyForInsert failed; using fallback', err);
+              nextOrderKey = String(Date.now());
+            }
             try {
               await updateTaskWithTransitionHandling(
                 taskId,
-                { status: 'review' },
-                'github-pr:refresh-open',
+                { status: 'done', orderKey: nextOrderKey },
+                'pr:mergedRefresh',
               );
               broadcastLocalTasksChanged();
-            } catch (err: unknown) {
-              console.warn('[github-pr:auto-review] move after refresh failed', taskId, err);
+            } catch (err) {
+              console.warn('[tasks:refreshPullRequest] auto-mark done failed', taskId, err);
+            }
+          } else {
+            const autoReview = await readAutoMoveToReviewWhenPrOpen();
+            if (
+              shouldAutoMoveTaskToReviewForOpenPr({
+                enabled: autoReview,
+                taskStatus: row.status,
+                githubPr: viewed.githubPr,
+                taskId,
+              })
+            ) {
+              try {
+                await updateTaskWithTransitionHandling(
+                  taskId,
+                  { status: 'review' },
+                  'github-pr:refresh-open',
+                );
+                broadcastLocalTasksChanged();
+              } catch (err: unknown) {
+                console.warn('[github-pr:auto-review] move after refresh failed', taskId, err);
+              }
             }
           }
         }

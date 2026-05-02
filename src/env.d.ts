@@ -18,7 +18,12 @@ import type {
   TaskPullRequestIpcResult,
   TaskSessionStartProgress,
 } from './types';
-import type { AgentState, AttachResult, PlanningAttachResult } from './daemon/protocol';
+import type {
+  AgentState,
+  AttachResult,
+  DaemonStreamCatchupPayload,
+  PlanningAttachResult,
+} from './daemon/protocol';
 import type {
   McpBridgeRequest,
   McpBridgeResponse,
@@ -91,6 +96,10 @@ declare global {
         ) => Promise<{ ok: true; enabled: boolean } | { error: string }>;
         getAutoCleanupWorkspaceWhenDone: () => Promise<boolean>;
         setAutoCleanupWorkspaceWhenDone: (
+          enabled: boolean,
+        ) => Promise<{ ok: true; enabled: boolean } | { error: string }>;
+        getAutoMarkDoneWhenPrMerged: () => Promise<boolean>;
+        setAutoMarkDoneWhenPrMerged: (
           enabled: boolean,
         ) => Promise<{ ok: true; enabled: boolean } | { error: string }>;
         getAutoMoveToReviewWhenPrOpen: () => Promise<boolean>;
@@ -213,6 +222,9 @@ declare global {
         getSilenceStates: () => Promise<
           { id: string; taskId?: string; state: AgentState }[]
         >;
+        onDaemonStreamCatchup: (
+          cb: (payload: DaemonStreamCatchupPayload) => void,
+        ) => () => void;
         onTaskStartProgress: (cb: (p: TaskSessionStartProgress) => void) => () => void;
       };
       shells: {

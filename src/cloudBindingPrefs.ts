@@ -20,6 +20,7 @@ export interface ResolvedCloudBindingPrefs {
   autoStartSessionOnInProgress: boolean;
   autoStartWhenUnblocked: boolean;
   autoCleanupWorkspaceWhenDone: boolean;
+  autoMarkDoneWhenPrMerged: boolean;
   autoMoveToReviewWhenPrOpen: boolean;
 }
 
@@ -53,6 +54,7 @@ export function resolvedPrefsFromBinding(
     autoCleanupWorkspaceWhenDone:
       binding?.autoCleanupWorkspaceWhenDone === true ||
       binding?.autoDeleteTaskWhenDone === true,
+    autoMarkDoneWhenPrMerged: binding?.autoMarkDoneWhenPrMerged === true,
     autoMoveToReviewWhenPrOpen: binding?.autoMoveToReviewWhenPrOpen === true,
   };
 }

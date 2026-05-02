@@ -251,7 +251,7 @@ export default function TaskCard({
   const isReview = task.status === 'review';
   const isDone = task.status === 'done';
   const workspaceCleaned = Boolean(task.workspaceCleanedAt);
-  const agentBadgeTitle = modelSummaryForTask(task);
+  const agentModelSummary = modelSummaryForTask(task);
   const blocked = isTaskBlocked(task, allTasks);
   const blocksCount = getBlockedTasks(task.id, allTasks).length;
   const perTaskUnblockAuto = task.autoStartOnUnblock === true;
@@ -369,7 +369,7 @@ export default function TaskCard({
               </div>
               <div className="mt-3 flex items-center justify-between gap-2">
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-                  <AgentBadge agent={task.agent} title={agentBadgeTitle} />
+                  <AgentBadge agent={task.agent} summary={agentModelSummary} variant="icon" />
                   {showBranchChip ? (
                     <span
                       title={branchChipTitle}
