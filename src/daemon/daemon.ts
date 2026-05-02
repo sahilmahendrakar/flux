@@ -140,7 +140,8 @@ function runStreamPump(): void {
     let writes = 0;
     while (sock && !sock.destroyed && writes < STREAM_MAX_WRITES_PER_TURN) {
       while (streamControlQueue.length > 0 && writes < STREAM_MAX_WRITES_PER_TURN) {
-        const f = streamControlQueue.shift()!;
+        const f = streamControlQueue.shift();
+        if (f === undefined) break;
         sock.write(encodeLine(f));
         writes++;
       }
@@ -150,7 +151,9 @@ function runStreamPump(): void {
         streamDataQueue.length > 0 &&
         writes < STREAM_MAX_WRITES_PER_TURN
       ) {
-        sock.write(encodeLine(streamDataQueue.shift()!));
+        const d = streamDataQueue.shift();
+        if (d === undefined) break;
+        sock.write(encodeLine(d));
         burst++;
         writes++;
       }

@@ -400,8 +400,9 @@ app.whenReady().then(async () => {
 
   async function reconcileSilenceStatesFromDaemon(
     states: { id: string; taskId?: string; state: AgentState }[],
-    _meta?: unknown,
+    meta?: unknown,
   ): Promise<void> {
+    void meta;
     for (const { id, taskId, state } of states) {
       if (taskId && !sessionTaskMap.has(id)) sessionTaskMap.set(id, taskId);
       await applyAgentState(id, state);

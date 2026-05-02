@@ -78,7 +78,7 @@ export function useTerminalPtyStream({
 
   useEffect(() => {
     const api = window.electronAPI.sessions.onDaemonStreamCatchup;
-    if (!api) return () => {};
+    if (!api) return () => undefined;
     return api(() => {
       invalidateAttachCacheRef.current?.();
       setCatchupGeneration((g) => g + 1);
