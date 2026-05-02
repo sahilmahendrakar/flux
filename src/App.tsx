@@ -57,6 +57,7 @@ import { isTaskBlocked } from './taskDependencies';
 import { useMcpRendererBridge } from './renderer/mcp/useMcpRendererBridge';
 import { maybeCloudAutoStartSessionOnInProgressTransition } from './cloudInProgressAutostartApply';
 import { runCloudDoneTransitionFollowUp } from './cloudTaskDoneFollowUp';
+import { assigneePatchForCloudAutoStartOnUnblock } from './cloudAutoStartUnblockAssignee';
 import { applyUnblockAutostartForCompletedBlocker } from './unblockAutostartApply';
 import type { UnblockAutostartPolicy } from './unblockAutostart';
 import {
@@ -1091,16 +1092,15 @@ export default function App() {
           patchToApply = { ...patchToApply, assigneeId: uidRef.current };
         }
       }
-      if (
-        project?.kind === 'cloud' &&
-        uidRef.current &&
-        patchToApply.autoStartOnUnblock === true &&
-        !preFlushTask.assigneeId?.trim()
-      ) {
-        if (patchToApply.assigneeId === undefined) {
-          patchToApply = { ...patchToApply, assigneeId: uidRef.current };
-        }
-      }
+      patchToApply = {
+        ...patchToApply,
+        ...assigneePatchForCloudAutoStartOnUnblock({
+          projectKind: project?.kind,
+          actorUid: uidRef.current ?? undefined,
+          previousAssigneeId: preFlushTask.assigneeId,
+          patch: patchToApply,
+        }),
+      };
       const needsDoneLock =
         project?.kind === 'cloud' &&
         preFlushTask.status !== 'done' &&
@@ -1233,14 +1233,15 @@ export default function App() {
             next = { ...next };
             delete next.createSourceBranchIfMissing;
           }
-          if (
-            project?.kind === 'cloud' &&
-            uid &&
-            patch.autoStartOnUnblock === true &&
-            !t.assigneeId?.trim()
-          ) {
-            next = { ...next, assigneeId: uid };
-          }
+          next = {
+            ...next,
+            ...assigneePatchForCloudAutoStartOnUnblock({
+              projectKind: project?.kind,
+              actorUid: uid ?? undefined,
+              previousAssigneeId: t.assigneeId,
+              patch,
+            }),
+          };
           return next;
         }),
       );
@@ -1281,15 +1282,15 @@ export default function App() {
       const preFlushTask =
         existing?.preFlushTask ?? tasksRef.current.find((t) => t.id === id);
       if (!preFlushTask) return;
-      if (
-        project?.kind === 'cloud' &&
-        uid &&
-        patch.autoStartOnUnblock === true &&
-        !preFlushTask.assigneeId?.trim() &&
-        persistable.assigneeId === undefined
-      ) {
-        persistable.assigneeId = uid;
-      }
+      Object.assign(
+        persistable,
+        assigneePatchForCloudAutoStartOnUnblock({
+          projectKind: project?.kind,
+          actorUid: uid ?? undefined,
+          previousAssigneeId: preFlushTask.assigneeId,
+          patch,
+        }),
+      );
       const merged: TaskPatch = { ...existing?.patch, ...persistable };
       const timer = setTimeout(() => {
         void flushUpdate(id);
