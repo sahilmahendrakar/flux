@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Task } from '../../types';
-import { githubPrRefreshViewEqual } from '../../githubPrMetadata';
-import { shouldAutoMarkDoneAfterPrMergeRefresh } from '../../autoMarkDoneWhenPrMerged';
-import { shouldAutoMoveTaskToReviewForOpenPr } from '../../githubPrReviewWhenOpenAutomation';
-import { keyForInsert, sortColumn } from './orderKey';
-import type { TaskPatch, TaskProvider } from './TaskProvider';
+import { buildCloudGithubPrRefreshPatch } from './cloudGithubPrRefreshReconcile';
+import type { TaskProvider } from './TaskProvider';
 
 const DEBOUNCE_MS = 1800;
 const POLL_MS = 7 * 60 * 1000;
@@ -27,9 +24,9 @@ async function runPool<T>(items: T[], concurrency: number, fn: (item: T) => Prom
 
 /**
  * Refreshes linked GitHub PR metadata for board tasks (debounced). Local tasks
- * are persisted in the main process when the IPC row exists; cloud tasks are
- * updated here only when `githubPr` meaningfully changes, to limit Firestore
- * writes across teammates.
+ * are persisted in the main process when the IPC row exists; cloud tasks get
+ * `githubPr` updates when the view changes, and may get status-only writes when
+ * metadata already matches GitHub but merge/review prefs still require a move.
  */
 export function useGithubPrBoardRefresh(input: {
   projectId: string | undefined;
@@ -107,44 +104,25 @@ export function useGithubPrBoardRefresh(input: {
           console.warn('[githubPrRefresh]', task.id, result.code, result.message);
           return;
         }
-        if (githubPrRefreshViewEqual(task.githubPr, result.githubPr)) return;
-        if (kind === 'cloud') {
-          const snapshot = tasksRef.current;
-          const patch: TaskPatch = { githubPr: result.githubPr };
-          if (
-            shouldAutoMarkDoneAfterPrMergeRefresh({
-              task,
-              refreshedGithubPr: result.githubPr,
-              prefEnabled: autoMarkDoneRef.current,
-              allTasks: snapshot,
-            })
-          ) {
-            const destCol = sortColumn(
-              snapshot.filter((t) => t.id !== task.id),
-              'done',
-            );
-            let nextOrderKey: string;
-            try {
-              nextOrderKey = keyForInsert(destCol, destCol.length);
-            } catch (err) {
-              console.error('[githubPrRefresh] keyForInsert failed', task.id, err);
-              nextOrderKey = String(Date.now());
-            }
-            patch.status = 'done';
-            patch.orderKey = nextOrderKey;
-          } else if (
-            shouldAutoMoveTaskToReviewForOpenPr({
-              enabled: autoMoveReviewRef.current,
-              taskStatus: task.status,
-              githubPr: result.githubPr,
-              taskId: task.id,
-            })
-          ) {
-            patch.status = 'review';
-          }
+        const snapshot = tasksRef.current;
+        const live = snapshot.find((t) => t.id === task.id) ?? task;
+        const refreshed = result.githubPr;
+
+        if (kind !== 'cloud') {
+          return;
+        }
+
+        const patch = buildCloudGithubPrRefreshPatch({
+          live,
+          refreshed,
+          snapshot,
+          autoMarkDoneWhenPrMerged: autoMarkDoneRef.current,
+          autoMoveToReviewWhenPrOpen: autoMoveReviewRef.current,
+        });
+        if (patch) {
           const updated = await prov.update(task.id, patch);
           if (patch.status === 'done' && onCloudPrMergedAutoDoneRef.current) {
-            await onCloudPrMergedAutoDoneRef.current({ previous: task, updated });
+            await onCloudPrMergedAutoDoneRef.current({ previous: live, updated });
           }
         }
       } catch (err) {
@@ -162,6 +140,8 @@ export function useGithubPrBoardRefresh(input: {
     }, DEBOUNCE_MS);
   }, [enabled, projectId, projectKind, provider, execute]);
 
+  // Invalidate in-flight refresh only when project/provider identity changes — not when
+  // `tasksGithubPrKey` changes mid-sweep (that would abort other tasks in the same run).
   useEffect(() => {
     if (!enabled || !projectId || !projectKind || !provider) return;
     schedule();
@@ -172,13 +152,33 @@ export function useGithubPrBoardRefresh(input: {
         debounceRef.current = null;
       }
     };
-  }, [enabled, projectId, projectKind, provider, tasksGithubPrKey, schedule]);
+  }, [enabled, projectId, projectKind, provider, schedule]);
+
+  useEffect(() => {
+    if (!enabled || !projectId || !projectKind || !provider) return;
+    schedule();
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
+  }, [tasksGithubPrKey, enabled, projectId, projectKind, provider, schedule]);
 
   useEffect(() => {
     if (!enabled || !projectId) return;
     const onFocus = () => schedule();
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
+  }, [enabled, projectId, schedule]);
+
+  useEffect(() => {
+    if (!enabled || !projectId) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') schedule();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [enabled, projectId, schedule]);
 
   useEffect(() => {

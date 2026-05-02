@@ -1455,68 +1455,71 @@ app.whenReady().then(async () => {
         : undefined;
 
       let persisted = false;
-      if (project) {
-        if (row && !githubPrRefreshViewEqual(row.githubPr, viewed.githubPr)) {
+      if (project && row) {
+        const prChanged = !githubPrRefreshViewEqual(row.githubPr, viewed.githubPr);
+        if (prChanged) {
           await taskStore.update(taskId, { githubPr: viewed.githubPr });
           persisted = true;
           broadcastLocalTasksChanged();
+        }
 
-          let autoMarkPref = false;
+        let autoMarkPref = false;
+        try {
+          autoMarkPref = await projectStore.getAutoMarkDoneWhenPrMergedAt(activeProjectDir());
+        } catch (err) {
+          console.warn('[tasks:refreshPullRequest] failed to read autoMarkDoneWhenPrMerged', err);
+        }
+        const allTasks = taskStore.getAll(project.id);
+        const rowForAuto = allTasks.find((t) => t.id === taskId) ?? row;
+
+        if (
+          shouldAutoMarkDoneAfterPrMergeRefresh({
+            task: rowForAuto,
+            refreshedGithubPr: viewed.githubPr,
+            prefEnabled: autoMarkPref,
+            allTasks,
+          })
+        ) {
+          const destCol = sortColumn(
+            allTasks.filter((t) => t.id !== taskId),
+            'done',
+          );
+          let nextOrderKey: string;
           try {
-            autoMarkPref = await projectStore.getAutoMarkDoneWhenPrMergedAt(activeProjectDir());
+            nextOrderKey = keyForInsert(destCol, destCol.length);
           } catch (err) {
-            console.warn('[tasks:refreshPullRequest] failed to read autoMarkDoneWhenPrMerged', err);
+            console.error('[tasks:refreshPullRequest] keyForInsert failed; using fallback', err);
+            nextOrderKey = String(Date.now());
           }
-          const allTasks = taskStore.getAll(project.id);
+          try {
+            await updateTaskWithTransitionHandling(
+              taskId,
+              { status: 'done', orderKey: nextOrderKey },
+              'pr:mergedRefresh',
+            );
+            broadcastLocalTasksChanged();
+          } catch (err) {
+            console.warn('[tasks:refreshPullRequest] auto-mark done failed', taskId, err);
+          }
+        } else {
+          const autoReview = await readAutoMoveToReviewWhenPrOpen();
           if (
-            shouldAutoMarkDoneAfterPrMergeRefresh({
-              task: row,
-              refreshedGithubPr: viewed.githubPr,
-              prefEnabled: autoMarkPref,
-              allTasks,
+            shouldAutoMoveTaskToReviewForOpenPr({
+              enabled: autoReview,
+              taskStatus: rowForAuto.status,
+              githubPr: viewed.githubPr,
+              taskId,
             })
           ) {
-            const destCol = sortColumn(
-              allTasks.filter((t) => t.id !== taskId),
-              'done',
-            );
-            let nextOrderKey: string;
-            try {
-              nextOrderKey = keyForInsert(destCol, destCol.length);
-            } catch (err) {
-              console.error('[tasks:refreshPullRequest] keyForInsert failed; using fallback', err);
-              nextOrderKey = String(Date.now());
-            }
             try {
               await updateTaskWithTransitionHandling(
                 taskId,
-                { status: 'done', orderKey: nextOrderKey },
-                'pr:mergedRefresh',
+                { status: 'review' },
+                'github-pr:refresh-open',
               );
               broadcastLocalTasksChanged();
-            } catch (err) {
-              console.warn('[tasks:refreshPullRequest] auto-mark done failed', taskId, err);
-            }
-          } else {
-            const autoReview = await readAutoMoveToReviewWhenPrOpen();
-            if (
-              shouldAutoMoveTaskToReviewForOpenPr({
-                enabled: autoReview,
-                taskStatus: row.status,
-                githubPr: viewed.githubPr,
-                taskId,
-              })
-            ) {
-              try {
-                await updateTaskWithTransitionHandling(
-                  taskId,
-                  { status: 'review' },
-                  'github-pr:refresh-open',
-                );
-                broadcastLocalTasksChanged();
-              } catch (err: unknown) {
-                console.warn('[github-pr:auto-review] move after refresh failed', taskId, err);
-              }
+            } catch (err: unknown) {
+              console.warn('[github-pr:auto-review] move after refresh failed', taskId, err);
             }
           }
         }
