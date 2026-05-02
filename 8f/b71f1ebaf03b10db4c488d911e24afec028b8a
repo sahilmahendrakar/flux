@@ -1,0 +1,25 @@
+src/components/openWorkspaceTargetIcons.tsx
+  88dd0334e43ff0c0 1-102
+src/components/OpenInWorkspaceButton.tsx
+  88dd0334e43ff0c0 4,126,133,136-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "8fb71f1ebaf03b10db4c488d911e24afec028b8a",
+  "prompts": {
+    "88dd0334e43ff0c0": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0fddced2-7012-449d-b06e-5d3b972fd657",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 116,
+      "total_deletions": 12,
+      "accepted_lines": 107,
+      "overriden_lines": 0
+    }
+  }
+}
