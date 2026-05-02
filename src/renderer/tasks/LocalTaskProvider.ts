@@ -70,7 +70,8 @@ export class LocalTaskProvider implements TaskProvider {
   }
 
   async update(id: string, patch: TaskPatch): Promise<Task> {
-    // assigneeId is cloud-only; strip it so it never reaches the local IPC handler
+    // assigneeId is cloud-only (no persisted multi-user owner on disk); strip before IPC.
+    // Auto-assign when enabling auto-start on unblock is cloud-only in App.
     const localPatch = { ...patch };
     delete localPatch.assigneeId;
     const updated = await window.electronAPI.tasks.update(id, localPatch);

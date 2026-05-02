@@ -20,6 +20,7 @@ import type {
 } from '../../mcpBridge';
 import { fetchProjectMembersForBridge } from '../projects/members';
 import type { TaskProvider } from '../tasks/TaskProvider';
+import { assigneePatchForCloudAutoStartOnUnblock } from '../../cloudAutoStartUnblockAssignee';
 
 type ActiveProject = LocalProject | CloudProject;
 
@@ -159,16 +160,16 @@ async function handleRequest(
             patch = { ...patch, assigneeId: uid };
           }
         }
-        if (
-          project.kind === 'cloud' &&
-          uid &&
-          previous &&
-          patch.autoStartOnUnblock === true &&
-          !previous.assigneeId?.trim()
-        ) {
-          if (patch.assigneeId === undefined) {
-            patch = { ...patch, assigneeId: uid };
-          }
+        if (previous) {
+          patch = {
+            ...patch,
+            ...assigneePatchForCloudAutoStartOnUnblock({
+              projectKind: project.kind,
+              actorUid: uid ?? undefined,
+              previousAssigneeId: previous.assigneeId,
+              patch,
+            }),
+          };
         }
         const lockDone =
           project.kind === 'cloud' &&
