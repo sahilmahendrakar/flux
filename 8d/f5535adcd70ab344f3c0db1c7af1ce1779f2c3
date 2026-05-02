@@ -1,0 +1,27 @@
+src/cloudTaskDoneFollowUp.ts
+  5344623b70c931fe 6-21,30-32,124-128,135,138
+src/mcpBridge.ts
+  5344623b70c931fe 107
+src/cloudTaskDoneFollowUp.test.ts
+  5344623b70c931fe 1-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "8df5535adcd70ab344f3c0db1c7af1ce1779f2c3",
+  "prompts": {
+    "5344623b70c931fe": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ce73b283-b5be-4240-a561-b084025c4738",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 96,
+      "total_deletions": 4,
+      "accepted_lines": 96,
+      "overriden_lines": 0
+    }
+  }
+}
