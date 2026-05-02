@@ -74,6 +74,10 @@ declare global {
         setAutoStartWhenUnblocked: (
           enabled: boolean,
         ) => Promise<{ ok: true; enabled: boolean } | { error: string }>;
+        getAutoCleanupWorkspaceWhenDone: () => Promise<boolean>;
+        setAutoCleanupWorkspaceWhenDone: (
+          enabled: boolean,
+        ) => Promise<{ ok: true; enabled: boolean } | { error: string }>;
       };
       projects: {
         listLocal: () => Promise<LocalProject[]>;

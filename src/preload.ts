@@ -81,6 +81,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('project:setAutoStartWhenUnblocked', enabled) as Promise<
         { ok: true; enabled: boolean } | { error: string }
       >,
+    getAutoCleanupWorkspaceWhenDone: () =>
+      ipcRenderer.invoke('project:getAutoCleanupWorkspaceWhenDone') as Promise<boolean>,
+    setAutoCleanupWorkspaceWhenDone: (enabled: boolean) =>
+      ipcRenderer.invoke('project:setAutoCleanupWorkspaceWhenDone', enabled) as Promise<
+        { ok: true; enabled: boolean } | { error: string }
+      >,
   },
   projects: {
     listLocal: () =>

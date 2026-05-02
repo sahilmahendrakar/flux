@@ -14,6 +14,7 @@ export interface ResolvedCloudBindingPrefs {
   defaultTaskAgent: Agent;
   autoStartSessionOnInProgress: boolean;
   autoStartWhenUnblocked: boolean;
+  autoCleanupWorkspaceWhenDone: boolean;
 }
 
 function isAgent(value: unknown): value is Agent {
@@ -35,6 +36,9 @@ export function resolvedPrefsFromBinding(
       : CLOUD_BINDING_DEFAULT_TASK_AGENT,
     autoStartSessionOnInProgress: binding?.autoStartSessionOnInProgress === true,
     autoStartWhenUnblocked: binding?.autoStartWhenUnblocked === true,
+    autoCleanupWorkspaceWhenDone:
+      binding?.autoCleanupWorkspaceWhenDone === true ||
+      binding?.autoDeleteTaskWhenDone === true,
   };
 }
 

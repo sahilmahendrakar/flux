@@ -25,6 +25,7 @@ interface ConfigFile {
   defaultTaskAgent: Agent;
   autoStartSessionOnInProgress: boolean;
   autoStartWhenUnblocked: boolean;
+  autoCleanupWorkspaceWhenDone: boolean;
   repos: RepoConfig[];
 }
 
@@ -49,6 +50,7 @@ function configToLocalProject(c: ConfigFile): LocalProject {
     defaultTaskAgent: c.defaultTaskAgent ?? DEFAULT_AGENT,
     autoStartSessionOnInProgress: c.autoStartSessionOnInProgress === true,
     autoStartWhenUnblocked: c.autoStartWhenUnblocked === true,
+    autoCleanupWorkspaceWhenDone: c.autoCleanupWorkspaceWhenDone === true,
     repos: c.repos,
   };
 }
@@ -111,6 +113,9 @@ function parseConfig(raw: string): ConfigFile | null {
         : DEFAULT_AGENT,
     autoStartSessionOnInProgress: p.autoStartSessionOnInProgress === true,
     autoStartWhenUnblocked: p.autoStartWhenUnblocked === true,
+    autoCleanupWorkspaceWhenDone:
+      p.autoCleanupWorkspaceWhenDone === true ||
+      (p as { autoDeleteTaskWhenDone?: boolean }).autoDeleteTaskWhenDone === true,
     repos,
   };
 }
@@ -354,6 +359,33 @@ export class ProjectStore {
     return next.autoStartWhenUnblocked;
   }
 
+  async getAutoCleanupWorkspaceWhenDoneAt(projectDir: string): Promise<boolean> {
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    return parsed.autoCleanupWorkspaceWhenDone === true;
+  }
+
+  async setAutoCleanupWorkspaceWhenDoneAt(
+    projectDir: string,
+    enabled: boolean,
+  ): Promise<boolean> {
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    const next: ConfigFile = {
+      ...parsed,
+      autoCleanupWorkspaceWhenDone: enabled === true,
+    };
+    await atomicWriteFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
+    if (this.projectDir === projectDir && this.project) {
+      this.project = configToLocalProject(next);
+    }
+    return next.autoCleanupWorkspaceWhenDone;
+  }
+
   private async mutateConfig(
     fn: (c: ConfigFile) => ConfigFile,
   ): Promise<void> {
@@ -417,6 +449,7 @@ export class ProjectStore {
         defaultTaskAgent: DEFAULT_AGENT,
         autoStartSessionOnInProgress: false,
         autoStartWhenUnblocked: false,
+        autoCleanupWorkspaceWhenDone: false,
         repos: [{ rootPath: resolvedRoot, baseBranch: DEFAULT_BASE_BRANCH }],
       };
     } else {

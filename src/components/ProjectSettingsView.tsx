@@ -121,6 +121,10 @@ function ProjectConfigPane({
   const [whenUnblockedLoading, setWhenUnblockedLoading] = useState(true);
   const [whenUnblockedSaveState, setWhenUnblockedSaveState] = useState<SaveState>('idle');
   const [whenUnblockedError, setWhenUnblockedError] = useState<string | null>(null);
+  const [autoCleanupOnDoneEnabled, setAutoCleanupOnDoneEnabled] = useState(false);
+  const [autoCleanupOnDoneLoading, setAutoCleanupOnDoneLoading] = useState(true);
+  const [autoCleanupOnDoneSaveState, setAutoCleanupOnDoneSaveState] = useState<SaveState>('idle');
+  const [autoCleanupOnDoneError, setAutoCleanupOnDoneError] = useState<string | null>(null);
   const [planningAgentSaveState, setPlanningAgentSaveState] = useState<SaveState>('idle');
   const [planningAgentError, setPlanningAgentError] = useState<string | null>(null);
   const [defaultTaskAgentSaveState, setDefaultTaskAgentSaveState] = useState<SaveState>('idle');
@@ -206,6 +210,31 @@ function ProjectConfigPane({
     };
   }, [project.id]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setAutoCleanupOnDoneLoading(true);
+    setAutoCleanupOnDoneError(null);
+    void window.electronAPI.project
+      .getAutoCleanupWorkspaceWhenDone()
+      .then((enabled) => {
+        if (!cancelled) {
+          setAutoCleanupOnDoneEnabled(enabled);
+          setAutoCleanupOnDoneSaveState('idle');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setAutoCleanupOnDoneError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAutoCleanupOnDoneLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+
   const handleWhenUnblockedChange = useCallback(async (enabled: boolean) => {
     setWhenUnblockedEnabled(enabled);
     setWhenUnblockedSaveState('saving');
@@ -278,6 +307,24 @@ function ProjectConfigPane({
     setAutoStartSaveState('saved');
     window.setTimeout(() => {
       setAutoStartSaveState((state) => (state === 'saved' ? 'idle' : state));
+    }, 1500);
+  }, []);
+
+  const handleAutoCleanupOnDoneChange = useCallback(async (enabled: boolean) => {
+    setAutoCleanupOnDoneEnabled(enabled);
+    setAutoCleanupOnDoneSaveState('saving');
+    setAutoCleanupOnDoneError(null);
+    const result = await window.electronAPI.project.setAutoCleanupWorkspaceWhenDone(enabled);
+    if ('error' in result) {
+      setAutoCleanupOnDoneSaveState('error');
+      setAutoCleanupOnDoneError(result.error);
+      setAutoCleanupOnDoneEnabled((prev) => !prev);
+      return;
+    }
+    setAutoCleanupOnDoneEnabled(result.enabled);
+    setAutoCleanupOnDoneSaveState('saved');
+    window.setTimeout(() => {
+      setAutoCleanupOnDoneSaveState((state) => (state === 'saved' ? 'idle' : state));
     }, 1500);
   }, []);
 
@@ -357,6 +404,41 @@ function ProjectConfigPane({
               <span className="text-emerald-400">Saved</span>
             ) : whenUnblockedError ? (
               <span className="text-red-400">{whenUnblockedError}</span>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-[13px] font-medium text-zinc-200">
+                Clean up workspace when moved to Done
+              </h2>
+              <p className="mt-0.5 text-[12px] leading-snug text-zinc-500">
+                After a task reaches Done, automatically run the same cleanup as the broom on the
+                card: stop agent sessions and remove the task git worktree on this machine. The
+                task stays in Done with the broom marked complete. Applies to drags, detail status
+                changes, and MCP updates. For cloud projects this preference is stored per machine.
+              </p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-[12px] text-zinc-300">
+              <input
+                type="checkbox"
+                checked={autoCleanupOnDoneEnabled}
+                disabled={autoCleanupOnDoneLoading || autoCleanupOnDoneSaveState === 'saving'}
+                onChange={(e) => void handleAutoCleanupOnDoneChange(e.target.checked)}
+                className="h-4 w-4 rounded border-white/[0.2] bg-[#09090b]"
+              />
+              Enabled
+            </label>
+          </div>
+          <div className="mt-2 min-h-4 text-[11px]">
+            {autoCleanupOnDoneSaveState === 'saving' ? (
+              <span className="text-zinc-500">Saving…</span>
+            ) : autoCleanupOnDoneSaveState === 'saved' ? (
+              <span className="text-emerald-400">Saved</span>
+            ) : autoCleanupOnDoneError ? (
+              <span className="text-red-400">{autoCleanupOnDoneError}</span>
             ) : null}
           </div>
         </section>
