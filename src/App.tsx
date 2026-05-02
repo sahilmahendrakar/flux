@@ -47,6 +47,7 @@ import type { ProjectMember } from './renderer/projects/members';
 import type { TaskPatch, TaskProvider } from './renderer/tasks/TaskProvider';
 import { LocalTaskProvider } from './renderer/tasks/LocalTaskProvider';
 import { FirestoreTaskProvider } from './renderer/tasks/FirestoreTaskProvider';
+import { useGithubPrBoardRefresh } from './renderer/tasks/useGithubPrBoardRefresh';
 import { keyForInsert, sortColumn } from './renderer/tasks/orderKey';
 import { normalizeTaskLabels } from './taskLabels';
 import { invalidateSessionAttachCache } from './terminal/warmAttach';
@@ -97,6 +98,7 @@ function mergeServerTaskWithPendingPatch(task: Task, patch: TaskPatch | undefine
   const {
     assigneeId,
     workspaceCleanedAt,
+    githubPr,
     sourceBranch,
     createSourceBranchIfMissing,
     ...rest
@@ -116,6 +118,14 @@ function mergeServerTaskWithPendingPatch(task: Task, patch: TaskPatch | undefine
       delete next.workspaceCleanedAt;
     } else {
       next = { ...next, workspaceCleanedAt };
+    }
+  }
+  if (githubPr !== undefined) {
+    if (githubPr === null) {
+      next = { ...next };
+      delete next.githubPr;
+    } else {
+      next = { ...next, githubPr };
     }
   }
   if (sourceBranch !== undefined) {
@@ -522,6 +532,14 @@ export default function App() {
     });
     return unsub;
   }, [provider]);
+
+  useGithubPrBoardRefresh({
+    projectId: project?.id,
+    projectKind: project?.kind,
+    provider,
+    tasks,
+    enabled: Boolean(project && !activationLoading && provider),
+  });
 
   // ----- Initial active-project hydration -----
   useEffect(() => {
