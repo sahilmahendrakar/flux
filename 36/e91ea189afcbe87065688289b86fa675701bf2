@@ -1,0 +1,59 @@
+src/components/ProjectSettingsView.tsx
+  76d02dd7e39142cd 13-14,758,866
+src/components/Column.tsx
+  76d02dd7e39142cd 5,32,58,144
+src/components/Board.tsx
+  76d02dd7e39142cd 16,52,76,210
+src/components/PlanningPanel.tsx
+  76d02dd7e39142cd 1,4,7-8,258-261,328,414,422-440
+  f9bff7e8741c6dc2 6,9
+src/components/SettingsSwitch.tsx
+  76d02dd7e39142cd 1-51
+src/components/AgentSessionPrefsMenu.tsx
+  f9bff7e8741c6dc2 11-12,16,24-30,35-40,45,64,107,109-111
+  76d02dd7e39142cd 1-10,13-15,17-23,31-34,41-44,46-63,65-106,108,112-260
+src/components/TaskCard.tsx
+  76d02dd7e39142cd 20,227-228,250,295-298,317,319,371-378,380-383
+src/components/AgentModelPicker.tsx
+  f9bff7e8741c6dc2 80,89,94,98,137-141,143-144,155-160,162-163,171-174,176-181,183-184,188,192-195,197-199,201-205,207-209,213-217,219-222,225,228-230,232-242,244-255,259,277
+  76d02dd7e39142cd 3,10,13,16-18,42-48,52,72-79,81-86,90-93,95-97,99,104,107-108,142,145-154,161,164-170,175,182,185-187,189-191,196,200,206,210-212,218,223-224,226-227,231,243,257,265-269,271
+src/components/TaskCardAgentSpawnMenu.tsx
+  76d02dd7e39142cd 1-101
+src/App.tsx
+  76d02dd7e39142cd 2543-2545
+src/components/agentSessionPrefsSurface.ts
+  76d02dd7e39142cd 1-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "36e91ea189afcbe87065688289b86fa675701bf2",
+  "prompts": {
+    "76d02dd7e39142cd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b2fa1f3e-059a-462d-bd7f-d58b4d594438",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 1545,
+      "total_deletions": 1518,
+      "accepted_lines": 567,
+      "overriden_lines": 0
+    },
+    "f9bff7e8741c6dc2": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fa5cabbe-4273-459f-93bd-398359e1b07e",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 753,
+      "total_deletions": 521,
+      "accepted_lines": 112,
+      "overriden_lines": 1
+    }
+  }
+}
