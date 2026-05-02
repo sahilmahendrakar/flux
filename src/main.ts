@@ -32,6 +32,7 @@ import {
 } from './main/githubTaskPr';
 import { githubPrRefreshViewEqual } from './githubPrMetadata';
 import { shouldAutoMarkDoneAfterPrMergeRefresh } from './autoMarkDoneWhenPrMerged';
+import { shouldAutoMoveTaskToReviewForOpenPr } from './githubPrReviewWhenOpenAutomation';
 import { keyForInsert, sortColumn } from './renderer/tasks/orderKey';
 import { AuthServer } from './main/AuthServer';
 import { EmailService, type InviteEmailInput } from './main/EmailService';
@@ -691,6 +692,18 @@ app.whenReady().then(async () => {
     throw new Error('No active project');
   }
 
+  async function readAutoMoveToReviewWhenPrOpen(): Promise<boolean> {
+    const key = appStateStore.get().activeProjectKey;
+    if (key?.kind === 'cloud') {
+      return bindingStore.getPrefs(key.id).autoMoveToReviewWhenPrOpen;
+    }
+    try {
+      return await projectStore.getAutoMoveToReviewWhenPrOpenAt(activeProjectDir());
+    } catch {
+      return false;
+    }
+  }
+
   ipcMain.handle('project:getRepos', async (): Promise<RepoConfig[]> => {
     return projectStore.getReposAt(activeProjectDir());
   });
@@ -868,6 +881,38 @@ app.whenReady().then(async () => {
           };
         }
         const next = await projectStore.setAutoMarkDoneWhenPrMergedAt(activeProjectDir(), enabled);
+        return { ok: true, enabled: next };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+  );
+  ipcMain.handle('project:getAutoMoveToReviewWhenPrOpen', async () => {
+    const key = appStateStore.get().activeProjectKey;
+    if (key?.kind === 'cloud') {
+      return bindingStore.getPrefs(key.id).autoMoveToReviewWhenPrOpen;
+    }
+    return projectStore.getAutoMoveToReviewWhenPrOpenAt(activeProjectDir());
+  });
+  ipcMain.handle(
+    'project:setAutoMoveToReviewWhenPrOpen',
+    async (_e, enabled: boolean): Promise<{ ok: true; enabled: boolean } | { error: string }> => {
+      try {
+        const key = appStateStore.get().activeProjectKey;
+        if (key?.kind === 'cloud') {
+          await bindingStore.setPrefs(key.id, {
+            autoMoveToReviewWhenPrOpen: enabled === true,
+          });
+          return {
+            ok: true,
+            enabled: bindingStore.getPrefs(key.id).autoMoveToReviewWhenPrOpen,
+          };
+        }
+        const next = await projectStore.setAutoMoveToReviewWhenPrOpenAt(
+          activeProjectDir(),
+          enabled,
+        );
         return { ok: true, enabled: next };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -1289,6 +1334,26 @@ app.whenReady().then(async () => {
           await taskStore.update(taskId, { githubPr: result.githubPr });
           persisted = true;
           broadcastLocalTasksChanged();
+          const autoReview = await readAutoMoveToReviewWhenPrOpen();
+          if (
+            shouldAutoMoveTaskToReviewForOpenPr({
+              enabled: autoReview,
+              taskStatus: row.status,
+              githubPr: result.githubPr,
+              taskId,
+            })
+          ) {
+            try {
+              await updateTaskWithTransitionHandling(
+                taskId,
+                { status: 'review' },
+                'github-pr:create-open',
+              );
+              broadcastLocalTasksChanged();
+            } catch (err: unknown) {
+              console.warn('[github-pr:auto-review] move after create failed', taskId, err);
+            }
+          }
         }
       }
       return {
@@ -1396,6 +1461,27 @@ app.whenReady().then(async () => {
               broadcastLocalTasksChanged();
             } catch (err) {
               console.warn('[tasks:refreshPullRequest] auto-mark done failed', taskId, err);
+            }
+          } else {
+            const autoReview = await readAutoMoveToReviewWhenPrOpen();
+            if (
+              shouldAutoMoveTaskToReviewForOpenPr({
+                enabled: autoReview,
+                taskStatus: row.status,
+                githubPr: viewed.githubPr,
+                taskId,
+              })
+            ) {
+              try {
+                await updateTaskWithTransitionHandling(
+                  taskId,
+                  { status: 'review' },
+                  'github-pr:refresh-open',
+                );
+                broadcastLocalTasksChanged();
+              } catch (err: unknown) {
+                console.warn('[github-pr:auto-review] move after refresh failed', taskId, err);
+              }
             }
           }
         }

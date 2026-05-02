@@ -116,6 +116,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('project:setAutoMarkDoneWhenPrMerged', enabled) as Promise<
         { ok: true; enabled: boolean } | { error: string }
       >,
+    getAutoMoveToReviewWhenPrOpen: () =>
+      ipcRenderer.invoke('project:getAutoMoveToReviewWhenPrOpen') as Promise<boolean>,
+    setAutoMoveToReviewWhenPrOpen: (enabled: boolean) =>
+      ipcRenderer.invoke('project:setAutoMoveToReviewWhenPrOpen', enabled) as Promise<
+        { ok: true; enabled: boolean } | { error: string }
+      >,
   },
   projects: {
     listLocal: () =>

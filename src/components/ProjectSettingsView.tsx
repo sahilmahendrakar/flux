@@ -251,6 +251,10 @@ function ProjectConfigPane({
   const [autoDoneOnPrMergeLoading, setAutoDoneOnPrMergeLoading] = useState(true);
   const [autoDoneOnPrMergeSaveState, setAutoDoneOnPrMergeSaveState] = useState<SaveState>('idle');
   const [autoDoneOnPrMergeError, setAutoDoneOnPrMergeError] = useState<string | null>(null);
+  const [autoReviewOnOpenPrEnabled, setAutoReviewOnOpenPrEnabled] = useState(false);
+  const [autoReviewOnOpenPrLoading, setAutoReviewOnOpenPrLoading] = useState(true);
+  const [autoReviewOnOpenPrSaveState, setAutoReviewOnOpenPrSaveState] = useState<SaveState>('idle');
+  const [autoReviewOnOpenPrError, setAutoReviewOnOpenPrError] = useState<string | null>(null);
   const [planningAgentSaveState, setPlanningAgentSaveState] = useState<SaveState>('idle');
   const [planningAgentError, setPlanningAgentError] = useState<string | null>(null);
   const [defaultTaskAgentSaveState, setDefaultTaskAgentSaveState] = useState<SaveState>('idle');
@@ -426,6 +430,31 @@ function ProjectConfigPane({
     };
   }, [project.id]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setAutoReviewOnOpenPrLoading(true);
+    setAutoReviewOnOpenPrError(null);
+    void window.electronAPI.project
+      .getAutoMoveToReviewWhenPrOpen()
+      .then((enabled) => {
+        if (!cancelled) {
+          setAutoReviewOnOpenPrEnabled(enabled);
+          setAutoReviewOnOpenPrSaveState('idle');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setAutoReviewOnOpenPrError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAutoReviewOnOpenPrLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+
   const handleWhenUnblockedChange = useCallback(async (enabled: boolean) => {
     setWhenUnblockedEnabled(enabled);
     setWhenUnblockedSaveState('saving');
@@ -583,6 +612,24 @@ function ProjectConfigPane({
     }, 1500);
   }, []);
 
+  const handleAutoReviewOnOpenPrChange = useCallback(async (enabled: boolean) => {
+    setAutoReviewOnOpenPrEnabled(enabled);
+    setAutoReviewOnOpenPrSaveState('saving');
+    setAutoReviewOnOpenPrError(null);
+    const result = await window.electronAPI.project.setAutoMoveToReviewWhenPrOpen(enabled);
+    if ('error' in result) {
+      setAutoReviewOnOpenPrSaveState('error');
+      setAutoReviewOnOpenPrError(result.error);
+      setAutoReviewOnOpenPrEnabled((prev) => !prev);
+      return;
+    }
+    setAutoReviewOnOpenPrEnabled(result.enabled);
+    setAutoReviewOnOpenPrSaveState('saved');
+    window.setTimeout(() => {
+      setAutoReviewOnOpenPrSaveState((state) => (state === 'saved' ? 'idle' : state));
+    }, 1500);
+  }, []);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto w-full max-w-2xl px-8 py-10">
@@ -605,8 +652,8 @@ function ProjectConfigPane({
               Automations
             </h2>
             <p className="mt-1 text-[12px] leading-snug text-zinc-500">
-              Choose when sessions start automatically, when merged PRs update the board, and when
-              finished workspaces are cleaned up.
+              Choose when sessions start automatically, when merged or open pull requests update the
+              board, and when finished workspaces are cleaned up.
             </p>
           </div>
           <div className="divide-y divide-white/[0.06]">
@@ -686,6 +733,26 @@ function ProjectConfigPane({
               loading={autoDoneOnPrMergeLoading}
               saveState={autoDoneOnPrMergeSaveState}
               error={autoDoneOnPrMergeError}
+            />
+            <AutomationSettingRow
+              key={`${project.id}-auto-review-open-pr`}
+              title="Move to Review when pull request is open"
+              description={
+                <>
+                  After Flux refreshes PR metadata from GitHub, if the linked PR is open and the task
+                  is in Backlog or In progress, move it to Review. When GitHub reports a head
+                  branch, it must match this task&apos;s Flux work branch. Merged or closed PRs are
+                  ignored. For cloud projects this preference is stored per machine.
+                </>
+              }
+              checked={autoReviewOnOpenPrEnabled}
+              onCheckedChange={(next) => void handleAutoReviewOnOpenPrChange(next)}
+              switchDisabled={
+                autoReviewOnOpenPrLoading || autoReviewOnOpenPrSaveState === 'saving'
+              }
+              loading={autoReviewOnOpenPrLoading}
+              saveState={autoReviewOnOpenPrSaveState}
+              error={autoReviewOnOpenPrError}
             />
           </div>
         </section>

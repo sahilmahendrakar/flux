@@ -21,6 +21,7 @@ export interface ResolvedCloudBindingPrefs {
   autoStartWhenUnblocked: boolean;
   autoCleanupWorkspaceWhenDone: boolean;
   autoMarkDoneWhenPrMerged: boolean;
+  autoMoveToReviewWhenPrOpen: boolean;
 }
 
 function isAgent(value: unknown): value is Agent {
@@ -54,6 +55,7 @@ export function resolvedPrefsFromBinding(
       binding?.autoCleanupWorkspaceWhenDone === true ||
       binding?.autoDeleteTaskWhenDone === true,
     autoMarkDoneWhenPrMerged: binding?.autoMarkDoneWhenPrMerged === true,
+    autoMoveToReviewWhenPrOpen: binding?.autoMoveToReviewWhenPrOpen === true,
   };
 }
 

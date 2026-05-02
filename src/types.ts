@@ -97,9 +97,14 @@ export interface LocalProject {
   autoCleanupWorkspaceWhenDone: boolean;
   /**
    * When on, refreshing linked GitHub PR metadata that shows the PR merged can move the task
-   * to Done from In progress or Needs input (not backlog), if it is not dependency-blocked.
+   * to Done from In progress, Needs input, or Review (not backlog), if it is not dependency-blocked.
    */
   autoMarkDoneWhenPrMerged: boolean;
+  /**
+   * When on, refreshing PR metadata (or creating a PR) that shows an open GitHub PR for this
+   * task’s Flux branch may move the task from Backlog or In progress into Review.
+   */
+  autoMoveToReviewWhenPrOpen: boolean;
   repos: RepoConfig[];
 }
 
@@ -126,6 +131,7 @@ export interface CloudProjectLocalBinding {
   autoStartWhenUnblocked?: boolean;
   autoCleanupWorkspaceWhenDone?: boolean;
   autoMarkDoneWhenPrMerged?: boolean;
+  autoMoveToReviewWhenPrOpen?: boolean;
   /** @deprecated Read `autoCleanupWorkspaceWhenDone`; kept for localBindings migration. */
   autoDeleteTaskWhenDone?: boolean;
 }
@@ -148,6 +154,7 @@ export interface CloudProject {
   autoStartWhenUnblocked?: boolean;
   autoCleanupWorkspaceWhenDone?: boolean;
   autoMarkDoneWhenPrMerged?: boolean;
+  autoMoveToReviewWhenPrOpen?: boolean;
   /** @deprecated */
   autoDeleteTaskWhenDone?: boolean;
 }

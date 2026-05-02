@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Task } from '../../types';
 import { githubPrRefreshViewEqual } from '../../githubPrMetadata';
 import { shouldAutoMarkDoneAfterPrMergeRefresh } from '../../autoMarkDoneWhenPrMerged';
+import { shouldAutoMoveTaskToReviewForOpenPr } from '../../githubPrReviewWhenOpenAutomation';
 import { keyForInsert, sortColumn } from './orderKey';
 import type { TaskPatch, TaskProvider } from './TaskProvider';
 
@@ -38,6 +39,8 @@ export function useGithubPrBoardRefresh(input: {
   enabled: boolean;
   /** When true, merged PR metadata may move cloud tasks to Done (see `shouldAutoMarkDoneAfterPrMergeRefresh`). */
   autoMarkDoneWhenPrMerged: boolean;
+  /** When true, open PR metadata may move cloud tasks from backlog/in-progress to Review. */
+  autoMoveToReviewWhenPrOpen: boolean;
   /**
    * After a cloud task is written as Done from merged PR metadata, run the same
    * follow-up as an explicit Done transition (unblock autostart, optional cleanup).
@@ -51,6 +54,7 @@ export function useGithubPrBoardRefresh(input: {
     tasks,
     enabled,
     autoMarkDoneWhenPrMerged,
+    autoMoveToReviewWhenPrOpen,
     onCloudPrMergedAutoDone,
   } = input;
   const generationRef = useRef(0);
@@ -62,6 +66,8 @@ export function useGithubPrBoardRefresh(input: {
   kindRef.current = projectKind;
   const autoMarkDoneRef = useRef(autoMarkDoneWhenPrMerged);
   autoMarkDoneRef.current = autoMarkDoneWhenPrMerged;
+  const autoMoveReviewRef = useRef(autoMoveToReviewWhenPrOpen);
+  autoMoveReviewRef.current = autoMoveToReviewWhenPrOpen;
   const onCloudPrMergedAutoDoneRef = useRef(onCloudPrMergedAutoDone);
   onCloudPrMergedAutoDoneRef.current = onCloudPrMergedAutoDone;
 
@@ -103,18 +109,18 @@ export function useGithubPrBoardRefresh(input: {
         }
         if (githubPrRefreshViewEqual(task.githubPr, result.githubPr)) return;
         if (kind === 'cloud') {
-          const list = tasksRef.current;
+          const snapshot = tasksRef.current;
           const patch: TaskPatch = { githubPr: result.githubPr };
           if (
             shouldAutoMarkDoneAfterPrMergeRefresh({
               task,
               refreshedGithubPr: result.githubPr,
               prefEnabled: autoMarkDoneRef.current,
-              allTasks: list,
+              allTasks: snapshot,
             })
           ) {
             const destCol = sortColumn(
-              list.filter((t) => t.id !== task.id),
+              snapshot.filter((t) => t.id !== task.id),
               'done',
             );
             let nextOrderKey: string;
@@ -126,6 +132,15 @@ export function useGithubPrBoardRefresh(input: {
             }
             patch.status = 'done';
             patch.orderKey = nextOrderKey;
+          } else if (
+            shouldAutoMoveTaskToReviewForOpenPr({
+              enabled: autoMoveReviewRef.current,
+              taskStatus: task.status,
+              githubPr: result.githubPr,
+              taskId: task.id,
+            })
+          ) {
+            patch.status = 'review';
           }
           const updated = await prov.update(task.id, patch);
           if (patch.status === 'done' && onCloudPrMergedAutoDoneRef.current) {
