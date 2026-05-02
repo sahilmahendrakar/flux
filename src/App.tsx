@@ -2555,6 +2555,10 @@ export default function App() {
                         onOpenSessionTab={handleOpenSessionTab}
                         onArchiveSession={(id) => void handleArchiveSession(id)}
                         projectMembers={projectMembers}
+                        onTaskPrClick={(id) => void handleTaskPrClick(id)}
+                        prLoading={
+                          selectedTask ? prLoadingTaskId === selectedTask.id : false
+                        }
                       />
                     </div>
                     <div
