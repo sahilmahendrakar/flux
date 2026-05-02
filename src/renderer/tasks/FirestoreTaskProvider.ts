@@ -171,6 +171,7 @@ export class FirestoreTaskProvider implements TaskProvider {
         {
           sourceBranch: previous.sourceBranch,
           createSourceBranchIfMissing: previous.createSourceBranchIfMissing,
+          githubPr: previous.githubPr,
         },
         {
           ...(patch.sourceBranch !== undefined ? { sourceBranch: patch.sourceBranch } : {}),

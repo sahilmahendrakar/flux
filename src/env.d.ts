@@ -159,7 +159,9 @@ declare global {
       ) => Promise<Task>;
         assertSourceBranchEditable: (
           taskId: string,
-          previous: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'>,
+          previous: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'> & {
+            githubPr?: TaskGithubPr;
+          },
           patch: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'>,
         ) => Promise<{ ok: true } | { ok: false; message: string }>;
         delete: (id: string) => Promise<void>;

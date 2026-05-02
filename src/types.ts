@@ -147,8 +147,7 @@ export type TaskPrErrorCode =
   | 'PR_CREATE_FAILED'
   | 'PR_VIEW_FAILED'
   | 'PR_BASE_BRANCH_MISSING_REMOTE'
-  | 'PR_BASE_BRANCH_PUSH_FAILED'
-  | 'PR_METADATA_MISMATCH';
+  | 'PR_BASE_BRANCH_PUSH_FAILED';
 
 export type TaskPullRequestIpcResult =
   | {
