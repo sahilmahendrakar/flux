@@ -1,0 +1,41 @@
+src/main/taskSourceBranchGuard.test.ts
+  25fab405c305cb6b 1-78
+src/main/fluxTaskBranch.ts
+  25fab405c305cb6b 1-8
+src/main/worktreeCreateError.ts
+  25fab405c305cb6b 1-21
+src/main/WorktreeService.ts
+  25fab405c305cb6b 8,10-11,15-22,79,100-107,116-124,126-156,159,162-165,174-180,263,310-312,314-318,336,343,356-367,369
+src/main/taskSourceBranchGuard.ts
+  25fab405c305cb6b 1-82
+src/types.ts
+  25fab405c305cb6b 183-194
+src/main/repoGit.branchResolve.test.ts
+  25fab405c305cb6b 1-105
+src/main.ts
+  25fab405c305cb6b 48-53,976-979,1084-1093,1318-1345
+src/main/WorktreeService.integration.test.ts
+  25fab405c305cb6b 1-131
+src/main/repoGit.ts
+  25fab405c305cb6b 104-122,124-126,128-133,135,137-138,140,142-143,145,147-157,159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "835afc286c45b90edc55df6b89b2cbd7b9208e7f",
+  "prompts": {
+    "25fab405c305cb6b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "bfef6eb5-f33b-4b0d-8727-abfc30cbea23",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 653,
+      "total_deletions": 77,
+      "accepted_lines": 630,
+      "overriden_lines": 0
+    }
+  }
+}
