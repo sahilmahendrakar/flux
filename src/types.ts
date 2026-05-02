@@ -98,6 +98,37 @@ export interface CloudProject {
 
 export type Project = LocalProject | CloudProject;
 
+export type TaskGithubPrState = 'open' | 'closed' | 'merged';
+
+/** GitHub pull request linked to a task (persisted locally and in Firestore). */
+export interface TaskGithubPr {
+  url: string;
+  number?: number;
+  state?: TaskGithubPrState;
+  mergedAt?: string;
+  headBranch?: string;
+  baseBranch?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Structured errors from `tasks:createPullRequest` / `tasks:refreshPullRequest`. */
+export type TaskPrErrorCode =
+  | 'NO_PROJECT'
+  | 'NO_WORKTREE'
+  | 'NO_PR_URL'
+  | 'TASK_METADATA_REQUIRED'
+  | 'GH_NOT_INSTALLED'
+  | 'GH_AUTH_FAILED'
+  | 'NO_GITHUB_REMOTE'
+  | 'BRANCH_PUSH_FAILED'
+  | 'PR_CREATE_FAILED'
+  | 'PR_VIEW_FAILED';
+
+export type TaskPullRequestIpcResult =
+  | { ok: true; githubPr: TaskGithubPr; persisted: boolean }
+  | { ok: false; code: TaskPrErrorCode; message: string };
+
 export interface Task {
   id: string;
   title: string;
@@ -139,6 +170,8 @@ export interface Task {
   blockedByTaskIds?: string[];
   /** If true, auto-start a session for this task when the last dependency completes, even if project “when unblocked” is off. */
   autoStartOnUnblock?: boolean;
+  /** Linked GitHub PR metadata (optional). */
+  githubPr?: TaskGithubPr;
 }
 
 export type SessionStatus = 'idle' | 'running' | 'stopped' | 'error';

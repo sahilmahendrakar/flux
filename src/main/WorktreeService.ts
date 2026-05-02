@@ -3,16 +3,9 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { promisify } from 'node:util';
 import type { RepoConfig } from '../types';
+import { branchForTaskId } from '../taskBranch';
 
 const execFile = promisify(execFileCallback);
-
-function sanitiseTaskId(taskId: string): string {
-  return taskId.replace(/[^a-zA-Z0-9]/g, '-');
-}
-
-function branchForTaskId(taskId: string): string {
-  return `flux/task-${sanitiseTaskId(taskId)}`;
-}
 
 /**
  * Async getter that returns the per-repo config for the given rootPath, or

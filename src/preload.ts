@@ -12,6 +12,8 @@ import type {
   SessionStartResult,
   Shell,
   Task,
+  TaskGithubPr,
+  TaskPullRequestIpcResult,
   TaskSessionStartProgress,
 } from './types';
 import type { AgentState, AttachResult, PlanningAttachResult } from './daemon/protocol';
@@ -174,10 +176,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
           | 'labels'
           | 'autoStartOnUnblock'
         >
-      >,
+      > & { githubPr?: TaskGithubPr | null },
     ) => ipcRenderer.invoke('tasks:update', id, patch) as Promise<Task>,
     delete: (id: string) =>
       ipcRenderer.invoke('tasks:delete', id) as Promise<void>,
+    createPullRequest: (payload: { taskId: string; title?: string; description?: string }) =>
+      ipcRenderer.invoke('tasks:createPullRequest', payload) as Promise<TaskPullRequestIpcResult>,
+    refreshPullRequest: (payload: { taskId: string; githubPr?: TaskGithubPr }) =>
+      ipcRenderer.invoke('tasks:refreshPullRequest', payload) as Promise<TaskPullRequestIpcResult>,
     cleanupResources: (id: string) =>
       ipcRenderer.invoke('tasks:cleanupResources', id) as Promise<{ errors: string[] }>,
     onChanged: (cb: () => void) => {

@@ -94,7 +94,7 @@ function isWorkspaceSessionTabId(tabId: string): boolean {
 /** Apply debounced cloud patches onto a server task for optimistic UI (`null` clears optional fields). */
 function mergeServerTaskWithPendingPatch(task: Task, patch: TaskPatch | undefined): Task {
   if (!patch) return task;
-  const { assigneeId, workspaceCleanedAt, ...rest } = patch;
+  const { assigneeId, workspaceCleanedAt, githubPr, ...rest } = patch;
   let next: Task = { ...task, ...rest };
   if (assigneeId !== undefined) {
     if (assigneeId === null || assigneeId === '') {
@@ -110,6 +110,14 @@ function mergeServerTaskWithPendingPatch(task: Task, patch: TaskPatch | undefine
       delete next.workspaceCleanedAt;
     } else {
       next = { ...next, workspaceCleanedAt };
+    }
+  }
+  if (githubPr !== undefined) {
+    if (githubPr === null) {
+      next = { ...next };
+      delete next.githubPr;
+    } else {
+      next = { ...next, githubPr };
     }
   }
   return next;

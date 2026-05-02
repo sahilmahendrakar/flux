@@ -11,7 +11,7 @@ import type { ProjectStore } from './ProjectStore';
 import type { AppStateStore } from './AppStateStore';
 import type { LocalBindingStore } from './LocalBindingStore';
 import type { McpRendererBridge, McpBridgeResult } from './McpRendererBridge';
-import type { ActiveProjectKey, Task } from '../types';
+import type { ActiveProjectKey, Task, TaskGithubPr } from '../types';
 import type {
   McpBridgeMember,
   McpBridgeProjectInfoResult,
@@ -70,7 +70,7 @@ export class McpServer {
             | 'labels'
             | 'autoStartOnUnblock'
           >
-        >,
+        > & { githubPr?: TaskGithubPr | null },
       ) => Promise<Task>;
       startTask: (id: string) => Promise<Task>;
       startSessionForExistingTask: (task: Task) => Promise<void>;
@@ -331,6 +331,20 @@ export class McpServer {
           .nullable()
           .optional()
           .describe('Email to assign, or null to unassign (cloud only)'),
+        githubPr: z
+          .object({
+            url: z.string(),
+            number: z.number().optional(),
+            state: z.enum(['open', 'closed', 'merged']).optional(),
+            mergedAt: z.string().optional(),
+            headBranch: z.string().optional(),
+            baseBranch: z.string().optional(),
+            createdAt: z.string().optional(),
+            updatedAt: z.string().optional(),
+          })
+          .nullable()
+          .optional()
+          .describe('GitHub PR metadata to set or null to clear'),
       },
       async (input) => {
         try {
@@ -356,7 +370,7 @@ export class McpServer {
                 | 'labels'
                 | 'autoStartOnUnblock'
               >
-            > = {};
+            > & { githubPr?: TaskGithubPr | null } = {};
             if (input.title !== undefined) patch.title = input.title;
             if (input.description !== undefined) patch.description = input.description;
             if (input.status !== undefined) patch.status = input.status;
@@ -366,6 +380,9 @@ export class McpServer {
             if (input.labels !== undefined) patch.labels = input.labels;
             if (input.autoStartOnUnblock !== undefined) {
               patch.autoStartOnUnblock = input.autoStartOnUnblock;
+            }
+            if (input.githubPr !== undefined) {
+              patch.githubPr = input.githubPr;
             }
             const updated = await this.taskActions.updateTask(input.id, patch);
             this.notifyTasksChanged();
@@ -395,7 +412,7 @@ export class McpServer {
               | 'labels'
               | 'autoStartOnUnblock'
             >
-          > & { assigneeId?: string | null } = {};
+          > & { assigneeId?: string | null; githubPr?: TaskGithubPr | null } = {};
           if (input.title !== undefined) patch.title = input.title;
           if (input.description !== undefined) patch.description = input.description;
           if (input.status !== undefined) patch.status = input.status;
@@ -406,6 +423,9 @@ export class McpServer {
           if (input.labels !== undefined) patch.labels = input.labels;
           if (input.autoStartOnUnblock !== undefined) {
             patch.autoStartOnUnblock = input.autoStartOnUnblock;
+          }
+          if (input.githubPr !== undefined) {
+            patch.githubPr = input.githubPr;
           }
           if (assigneeId !== undefined) patch.assigneeId = assigneeId;
           const payload: McpBridgeTasksUpdatePayload = { taskId: input.id, patch };

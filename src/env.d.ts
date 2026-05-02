@@ -12,6 +12,8 @@ import type {
   PlanningSession,
   ActiveProjectKey,
   ProjectTabState,
+  TaskGithubPr,
+  TaskPullRequestIpcResult,
   TaskSessionStartProgress,
 } from './types';
 import type { AgentState, AttachResult, PlanningAttachResult } from './daemon/protocol';
@@ -143,9 +145,18 @@ declare global {
             | 'labels'
             | 'autoStartOnUnblock'
           >
-        >,
+        > & { githubPr?: TaskGithubPr | null },
       ) => Promise<Task>;
         delete: (id: string) => Promise<void>;
+        createPullRequest: (payload: {
+          taskId: string;
+          title?: string;
+          description?: string;
+        }) => Promise<TaskPullRequestIpcResult>;
+        refreshPullRequest: (payload: {
+          taskId: string;
+          githubPr?: TaskGithubPr;
+        }) => Promise<TaskPullRequestIpcResult>;
         cleanupResources: (id: string) => Promise<{ errors: string[] }>;
         onChanged: (cb: () => void) => () => void;
       };

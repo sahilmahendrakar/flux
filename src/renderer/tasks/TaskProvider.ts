@@ -1,4 +1,4 @@
-import type { Agent, Task, TaskStatus } from '../../types';
+import type { Agent, Task, TaskGithubPr, TaskStatus } from '../../types';
 
 export type TaskPatch = Partial<
   Pick<
@@ -16,7 +16,7 @@ export type TaskPatch = Partial<
     | 'autoStartOnUnblock'
     | 'assigneeId'
   >
-> & { workspaceCleanedAt?: string | null };
+> & { workspaceCleanedAt?: string | null; githubPr?: TaskGithubPr | null };
 
 export type TaskCreateInput = {
   title: string;
