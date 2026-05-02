@@ -1,0 +1,25 @@
+src/components/SessionTerminalView.tsx
+  eabb5b3b0282cf2d 2,50-53,264-265,273-282,363-414
+src/App.tsx
+  eabb5b3b0282cf2d 2445-2446
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "d3c735e4207bf06a8d245adab5870fe22f248037",
+  "prompts": {
+    "eabb5b3b0282cf2d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "dfddfd64-fc0c-42d4-b732-4e82665334c5",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 72,
+      "total_deletions": 1,
+      "accepted_lines": 71,
+      "overriden_lines": 0
+    }
+  }
+}
