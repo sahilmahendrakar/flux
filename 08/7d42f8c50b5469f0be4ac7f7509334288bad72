@@ -1,0 +1,39 @@
+src/components/Board.tsx
+  74d65691f13ed292 20-26,39-40,57,182,202-203
+src/components/TaskCard.tsx
+  74d65691f13ed292 3,6,31,46,56-61,140-156
+src/taskBranches.test.ts
+  74d65691f13ed292 4-5,8-9,13-14,133-299
+src/taskBranches.ts
+  74d65691f13ed292 123-251
+src/components/NewTaskModal.tsx
+  74d65691f13ed292 3-4,8,12-18,39-42,50-70,95-97,101-102,152-162
+src/App.tsx
+  74d65691f13ed292 97-103,121-136,218,248-270,1003-1012,1040-1045,1317-1323,1341-1344,2097
+src/components/TaskDetailPanel.tsx
+  74d65691f13ed292 26,48-55,225-229,247-297,693-713,1137-1162
+src/components/TaskSourceBranchPicker.tsx
+  74d65691f13ed292 1-232
+src/components/Column.tsx
+  74d65691f13ed292 22,40,105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "087d42f8c50b5469f0be4ac7f7509334288bad72",
+  "prompts": {
+    "74d65691f13ed292": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9950a551-bbaf-4a78-afe6-85c6e3140cfe",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 857,
+      "total_deletions": 53,
+      "accepted_lines": 815,
+      "overriden_lines": 0
+    }
+  }
+}
