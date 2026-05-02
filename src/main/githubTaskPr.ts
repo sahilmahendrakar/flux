@@ -2,6 +2,7 @@ import { execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { TaskGithubPr, TaskPrErrorCode } from '../types';
 import { branchForTaskId } from '../taskBranch';
+import { normalizeGitBranchShortName } from '../taskBranches';
 import { parseGhPrViewJsonStdout } from '../githubPrMetadata';
 
 const execFile = promisify(execFileCallback);
@@ -12,6 +13,9 @@ export type TaskPrOk = {
   ok: true;
   githubPr: TaskGithubPr;
 };
+
+/** Successful PR create, including whether the base branch had to be published to origin first. */
+export type TaskPrCreateOk = TaskPrOk & { pushedBaseBranch: boolean };
 
 function errnoCode(err: unknown): string | undefined {
   return err && typeof err === 'object' && 'code' in err
@@ -196,6 +200,164 @@ async function gitPushHead(worktreePath: string): Promise<TaskPrError | null> {
 const PR_VIEW_FIELDS =
   'url,number,state,mergedAt,headRefName,baseRefName,createdAt,updatedAt';
 
+/** Arguments for `gh pr create` (excluding leading `gh`), for tests and tooling. */
+export function buildGhPrCreateArgs(input: {
+  title: string;
+  body: string;
+  baseBranch: string;
+  headBranch: string;
+}): string[] {
+  return [
+    'pr',
+    'create',
+    '--title',
+    input.title,
+    '--body',
+    input.body,
+    '--base',
+    input.baseBranch,
+    '--head',
+    input.headBranch,
+    '--json',
+    PR_VIEW_FIELDS,
+  ];
+}
+
+/** True when `origin` already advertises `refs/heads/<branchShort>`. */
+export async function originHasHeadBranch(
+  gitRootPath: string,
+  branchShort: string,
+): Promise<boolean> {
+  const name = normalizeGitBranchShortName(branchShort);
+  if (!name) return false;
+  try {
+    const { stdout } = await git(['ls-remote', '--heads', 'origin', name], gitRootPath);
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function localHeadBranchExists(gitRootPath: string, branchShort: string): Promise<boolean> {
+  const name = normalizeGitBranchShortName(branchShort);
+  if (!name) return false;
+  try {
+    await execFile('git', ['show-ref', '--verify', '--quiet', `refs/heads/${name}`], {
+      cwd: gitRootPath,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function pushOriginHeadFromLocal(
+  gitRootPath: string,
+  branchShort: string,
+): Promise<TaskPrError | null> {
+  const name = normalizeGitBranchShortName(branchShort);
+  if (!name) {
+    return { ok: false, code: 'PR_CREATE_FAILED', message: 'Cannot push empty branch name' };
+  }
+  try {
+    await execFile(
+      'git',
+      ['push', '-u', 'origin', `refs/heads/${name}:refs/heads/${name}`],
+      { cwd: gitRootPath, maxBuffer: 10 * 1024 * 1024 },
+    );
+    return null;
+  } catch (err: unknown) {
+    return {
+      ok: false,
+      code: 'PR_BASE_BRANCH_PUSH_FAILED',
+      message:
+        stderrOf(err).trim() ||
+        `Publishing branch "${name}" to origin failed (GitHub needs it as the pull request base).`,
+    };
+  }
+}
+
+/** Pure branch of `ensureRemotePrBaseBranch` (for tests): given presence flags, what would we do? */
+export function classifyRemotePrBaseReadiness(args: {
+  originHasBranch: boolean;
+  localHasBranch: boolean;
+}): 'remote_ok' | 'push_local' | 'missing_everywhere' {
+  if (args.originHasBranch) return 'remote_ok';
+  if (args.localHasBranch) return 'push_local';
+  return 'missing_everywhere';
+}
+
+/**
+ * Ensures the PR base branch exists on `origin` before `gh pr create`.
+ * When it exists locally but not on the remote, pushes `refs/heads/<branch>` to origin.
+ */
+export async function ensureRemotePrBaseBranch(
+  gitRootPath: string,
+  baseBranchShort: string,
+): Promise<{ ok: true; pushedBaseBranch: boolean } | TaskPrError> {
+  const base = normalizeGitBranchShortName(baseBranchShort);
+  if (!base) {
+    return {
+      ok: false,
+      code: 'PR_CREATE_FAILED',
+      message: 'Pull request base branch resolved to an empty name.',
+    };
+  }
+  const originHas = await originHasHeadBranch(gitRootPath, base);
+  const localHas = await localHeadBranchExists(gitRootPath, base);
+  const readiness = classifyRemotePrBaseReadiness({
+    originHasBranch: originHas,
+    localHasBranch: localHas,
+  });
+  if (readiness === 'remote_ok') {
+    return { ok: true, pushedBaseBranch: false };
+  }
+  if (readiness === 'push_local') {
+    const pushErr = await pushOriginHeadFromLocal(gitRootPath, base);
+    if (pushErr) return pushErr;
+    return { ok: true, pushedBaseBranch: true };
+  }
+  return {
+    ok: false,
+    code: 'PR_BASE_BRANCH_MISSING_REMOTE',
+    message: `Base branch "${base}" is not on GitHub yet, and there is no local "${base}" branch to publish. Push that branch to origin from the main clone, or pick a base branch that already exists on the remote.`,
+  };
+}
+
+/** Force persisted head/base to match the Flux work branch and the task-selected PR base. */
+export function mergeTaskPrPersistFields(
+  parsed: TaskGithubPr,
+  headBranch: string,
+  baseBranch: string,
+): TaskGithubPr {
+  const b = normalizeGitBranchShortName(baseBranch);
+  return {
+    ...parsed,
+    headBranch,
+    baseBranch: b || parsed.baseBranch,
+  };
+}
+
+/** Compares previously stored PR refs with GitHub's current view (refresh diagnostics). */
+export function prMetadataRefMismatchWarning(
+  stored: TaskGithubPr | undefined,
+  live: TaskGithubPr,
+): string | undefined {
+  if (!stored) return undefined;
+  const parts: string[] = [];
+  if (stored.headBranch && live.headBranch && stored.headBranch !== live.headBranch) {
+    parts.push(
+      `GitHub now reports head branch "${live.headBranch}" (Flux had "${stored.headBranch}").`,
+    );
+  }
+  if (stored.baseBranch && live.baseBranch && stored.baseBranch !== live.baseBranch) {
+    parts.push(
+      `GitHub now reports base branch "${live.baseBranch}" (Flux had "${stored.baseBranch}").`,
+    );
+  }
+  return parts.length > 0 ? parts.join(' ') : undefined;
+}
+
 export async function ghPrViewJson(
   worktreePath: string,
   prSelector: string,
@@ -231,9 +393,18 @@ export async function createPullRequestForTaskWorktree(params: {
   taskId: string;
   title: string;
   body: string;
+  /** Normalized short branch name: task source branch, else project default. */
   baseBranch: string;
-}): Promise<TaskPrOk | TaskPrError> {
+}): Promise<TaskPrCreateOk | TaskPrError> {
   const { worktreePath, gitRootPath, taskId, title, body, baseBranch } = params;
+  const prBase = normalizeGitBranchShortName(baseBranch);
+  if (!prBase) {
+    return {
+      ok: false,
+      code: 'PR_CREATE_FAILED',
+      message: 'Pull request base branch resolved to an empty name.',
+    };
+  }
 
   const pre = await assertGhAvailable(worktreePath);
   if (pre) return pre;
@@ -247,27 +418,34 @@ export async function createPullRequestForTaskWorktree(params: {
   const branchCheck = expectTaskBranch(taskId, branchResult);
   if (branchCheck) return branchCheck;
 
+  const baseReady = await ensureRemotePrBaseBranch(gitRootPath, prBase);
+  if (!baseReady.ok) return baseReady;
+  const pushedBaseBranch = baseReady.pushedBaseBranch;
+
   const pushErr = await gitPushHead(worktreePath);
   if (pushErr) return pushErr;
 
-  const jsonArgs = [
-    'pr',
-    'create',
-    '--title',
+  const jsonArgs = buildGhPrCreateArgs({
     title,
-    '--body',
     body,
-    '--base',
-    baseBranch,
-    '--head',
-    branchResult,
-    '--json',
-    PR_VIEW_FIELDS,
-  ];
+    baseBranch: prBase,
+    headBranch: branchResult,
+  });
   const r = await gh(jsonArgs, worktreePath);
   if (!r.ok) {
     const fallback = await gh(
-      ['pr', 'create', '--title', title, '--body', body, '--base', baseBranch, '--head', branchResult],
+      [
+        'pr',
+        'create',
+        '--title',
+        title,
+        '--body',
+        body,
+        '--base',
+        prBase,
+        '--head',
+        branchResult,
+      ],
       worktreePath,
     );
     if (!fallback.ok) {
@@ -293,7 +471,8 @@ export async function createPullRequestForTaskWorktree(params: {
       const url = line.replace(/\s/g, '');
       return {
         ok: true,
-        githubPr: { url, headBranch: branchResult, baseBranch },
+        pushedBaseBranch,
+        githubPr: mergeTaskPrPersistFields({ url }, branchResult, prBase),
       };
     }
     return {
@@ -311,5 +490,9 @@ export async function createPullRequestForTaskWorktree(params: {
       message: 'gh pr create succeeded but JSON could not be parsed',
     };
   }
-  return { ok: true, githubPr: parsed };
+  return {
+    ok: true,
+    pushedBaseBranch,
+    githubPr: mergeTaskPrPersistFields(parsed, branchResult, prBase),
+  };
 }

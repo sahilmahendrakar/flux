@@ -171,6 +171,7 @@ export class FirestoreTaskProvider implements TaskProvider {
         {
           sourceBranch: previous.sourceBranch,
           createSourceBranchIfMissing: previous.createSourceBranchIfMissing,
+          githubPr: previous.githubPr,
         },
         {
           ...(patch.sourceBranch !== undefined ? { sourceBranch: patch.sourceBranch } : {}),
@@ -254,6 +255,13 @@ export class FirestoreTaskProvider implements TaskProvider {
         updates.createSourceBranchIfMissing = deleteField();
       }
     }
+    if (patch.githubPr !== undefined) {
+      if (patch.githubPr === null) {
+        updates.githubPr = deleteField();
+      } else {
+        updates.githubPr = githubPrToFirestore(patch.githubPr);
+      }
+    }
     await updateDoc(ref, updates);
     const after = await getDoc(ref);
     return toTask(
@@ -308,6 +316,7 @@ function toTask(
     ...parseGithubPrFirestoreField(data.githubPr),
     ...parseSourceBranchField(data.sourceBranch),
     ...parseCreateSourceBranchIfMissingField(data.createSourceBranchIfMissing),
+    ...parseGithubPrFirestoreField(data.githubPr),
   };
 }
 

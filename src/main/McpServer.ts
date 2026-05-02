@@ -435,6 +435,9 @@ export class McpServer {
             if (input.createSourceBranchIfMissing !== undefined) {
               patch.createSourceBranchIfMissing = input.createSourceBranchIfMissing;
             }
+            if (input.githubPr !== undefined) {
+              patch.githubPr = input.githubPr;
+            }
             const updated = await this.taskActions.updateTask(input.id, patch);
             this.notifyTasksChanged();
             return jsonToolPayload(updated);
@@ -485,6 +488,9 @@ export class McpServer {
           }
           if (input.createSourceBranchIfMissing !== undefined) {
             patch.createSourceBranchIfMissing = input.createSourceBranchIfMissing;
+          }
+          if (input.githubPr !== undefined) {
+            patch.githubPr = input.githubPr;
           }
           if (assigneeId !== undefined) patch.assigneeId = assigneeId;
           const payload: McpBridgeTasksUpdatePayload = { taskId: input.id, patch };

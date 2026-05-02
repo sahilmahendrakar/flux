@@ -251,6 +251,13 @@ export class TaskStore {
         delete updated.createSourceBranchIfMissing;
       }
     }
+    if (patchGithubPr !== undefined) {
+      if (patchGithubPr === null) {
+        delete updated.githubPr;
+      } else {
+        updated.githubPr = patchGithubPr;
+      }
+    }
     this.tasks[index] = updated;
     await this.save();
     return updated;

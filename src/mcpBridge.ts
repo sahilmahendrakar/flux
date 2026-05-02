@@ -48,6 +48,7 @@ export interface McpBridgeTaskPatch {
   githubPr?: TaskGithubPr | null;
   sourceBranch?: string;
   createSourceBranchIfMissing?: boolean;
+  githubPr?: TaskGithubPr | null;
 }
 
 export interface McpBridgeTasksCreatePayload {

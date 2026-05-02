@@ -145,10 +145,20 @@ export type TaskPrErrorCode =
   | 'NO_GITHUB_REMOTE'
   | 'BRANCH_PUSH_FAILED'
   | 'PR_CREATE_FAILED'
-  | 'PR_VIEW_FAILED';
+  | 'PR_VIEW_FAILED'
+  | 'PR_BASE_BRANCH_MISSING_REMOTE'
+  | 'PR_BASE_BRANCH_PUSH_FAILED';
 
 export type TaskPullRequestIpcResult =
-  | { ok: true; githubPr: TaskGithubPr; persisted: boolean }
+  | {
+      ok: true;
+      githubPr: TaskGithubPr;
+      persisted: boolean;
+      /** True when the base branch was pushed to origin so the PR could be opened. */
+      pushedBaseBranch?: boolean;
+      /** Human-readable note when GitHub ref names differ from stored PR metadata (refresh only). */
+      metadataMismatchWarning?: string;
+    }
   | { ok: false; code: TaskPrErrorCode; message: string };
 
 export interface Task {
@@ -192,8 +202,6 @@ export interface Task {
   blockedByTaskIds?: string[];
   /** If true, auto-start a session for this task when the last dependency completes, even if project “when unblocked” is off. */
   autoStartOnUnblock?: boolean;
-  /** Linked GitHub PR metadata (optional). */
-  githubPr?: TaskGithubPr;
   /**
    * Git branch this task is logically based on (PR merge target / conceptual base).
    * Distinct from {@link Session.branch}, which is the generated `flux/task-<id>` work branch.
@@ -206,6 +214,8 @@ export interface Task {
    * was chosen from discovery (already exists), and `true` when the user typed a new name.
    */
   createSourceBranchIfMissing?: boolean;
+  /** Linked GitHub PR metadata (optional). */
+  githubPr?: TaskGithubPr;
 }
 
 export type SessionStatus = 'idle' | 'running' | 'stopped' | 'error';

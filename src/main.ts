@@ -27,6 +27,7 @@ import { openWorkspacePath, resolveTaskWorktreePath } from './main/openWorkspace
 import {
   createPullRequestForTaskWorktree,
   ghPrViewJson,
+  prMetadataRefMismatchWarning,
 } from './main/githubTaskPr';
 import { githubPrRefreshViewEqual } from './githubPrMetadata';
 import { AuthServer } from './main/AuthServer';
@@ -940,7 +941,9 @@ app.whenReady().then(async () => {
       const tid = taskId.trim();
       const prev =
         previousFields && typeof previousFields === 'object'
-          ? (previousFields as Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'>)
+          ? (previousFields as Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'> & {
+              githubPr?: TaskGithubPr;
+            })
           : {};
       const patch =
         patchFields && typeof patchFields === 'object'
@@ -971,6 +974,18 @@ app.whenReady().then(async () => {
         } as Task;
         if (!taskSourceBranchSettingsWouldChange(previousTask, patch, discovery.defaultBranchShort)) {
           return { ok: true };
+        }
+        const localRow =
+          project && project.kind === 'local'
+            ? taskStore.getAll(project.id).find((t) => t.id === tid)
+            : undefined;
+        const linkedPrUrl = (localRow?.githubPr?.url ?? prev.githubPr?.url)?.trim();
+        if (linkedPrUrl) {
+          return {
+            ok: false,
+            message:
+              'Cannot change this task\'s source branch while a GitHub pull request is linked. Clear the pull request metadata on the task first, then you can change the base branch.',
+          };
         }
         const locked = await taskHasBlockingWorkspaceState({
           taskId: tid,
@@ -1063,16 +1078,19 @@ app.whenReady().then(async () => {
           message: 'Task title is required (open a local task or pass title in the payload)',
         };
       }
-      let baseBranch = 'main';
+      let repoDefaultBranch = 'main';
       try {
         const repos = await projectStore.getReposAt(activeProjectDir());
         const norm = (p: string) => path.normalize(p);
         const match =
           repos.find((r) => norm(r.rootPath) === norm(rootPath)) ?? repos[0];
-        if (match?.baseBranch) baseBranch = match.baseBranch;
+        const b = (match?.baseBranch ?? 'main').trim();
+        if (b) repoDefaultBranch = b;
       } catch {
         /* keep default */
       }
+      const taskRow = project ? taskStore.getAll(project.id).find((t) => t.id === taskId) : undefined;
+      const prBaseBranch = effectiveTaskSourceBranchShort(taskRow ?? {}, repoDefaultBranch);
       const body = description.trim() || `_Task_: ${title}`;
       const result = await createPullRequestForTaskWorktree({
         worktreePath,
@@ -1080,7 +1098,7 @@ app.whenReady().then(async () => {
         taskId,
         title,
         body,
-        baseBranch,
+        baseBranch: prBaseBranch,
       });
       if (!result.ok) return result;
 
@@ -1093,7 +1111,12 @@ app.whenReady().then(async () => {
           broadcastLocalTasksChanged();
         }
       }
-      return { ok: true, githubPr: result.githubPr, persisted };
+      return {
+        ok: true,
+        githubPr: result.githubPr,
+        persisted,
+        pushedBaseBranch: result.pushedBaseBranch,
+      };
     },
   );
 
@@ -1143,16 +1166,25 @@ app.whenReady().then(async () => {
         return viewed;
       }
 
+      const row = project ? taskStore.getAll(project.id).find((t) => t.id === taskId) : undefined;
+      const metadataMismatchWarning = row?.githubPr
+        ? prMetadataRefMismatchWarning(row.githubPr, viewed.githubPr)
+        : undefined;
+
       let persisted = false;
       if (project) {
-        const row = taskStore.getAll(project.id).find((t) => t.id === taskId);
         if (row && !githubPrRefreshViewEqual(row.githubPr, viewed.githubPr)) {
           await taskStore.update(taskId, { githubPr: viewed.githubPr });
           persisted = true;
           broadcastLocalTasksChanged();
         }
       }
-      return { ok: true, githubPr: viewed.githubPr, persisted };
+      return {
+        ok: true,
+        githubPr: viewed.githubPr,
+        persisted,
+        ...(metadataMismatchWarning ? { metadataMismatchWarning } : {}),
+      };
     },
   );
 
@@ -1569,6 +1601,11 @@ app.whenReady().then(async () => {
         repo?.baseBranch ?? 'main',
       );
       if (taskSourceBranchSettingsWouldChange(previous, patchToApply, discovery.defaultBranchShort)) {
+        if (previous.githubPr?.url?.trim()) {
+          throw new Error(
+            'Cannot change this task\'s source branch while a GitHub pull request is linked. Clear the pull request metadata on the task first.',
+          );
+        }
         const locked = await taskHasBlockingWorkspaceState({
           taskId: id,
           listSessions: () => daemonClient.listSessions(),

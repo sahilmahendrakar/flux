@@ -191,7 +191,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ) => ipcRenderer.invoke('tasks:update', id, patch) as Promise<Task>,
     assertSourceBranchEditable: (
       taskId: string,
-      previous: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'>,
+      previous: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'> & {
+        githubPr?: TaskGithubPr;
+      },
       patch: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'>,
     ) =>
       ipcRenderer.invoke(
