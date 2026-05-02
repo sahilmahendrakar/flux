@@ -182,6 +182,9 @@ declare global {
         }) => Promise<TaskPullRequestIpcResult>;
         cleanupResources: (id: string) => Promise<{ errors: string[] }>;
         onChanged: (cb: () => void) => () => void;
+        onUserInput: (
+          cb: (p: { sessionId: string; taskId: string }) => void,
+        ) => () => void;
       };
       sessions: {
         start: (
@@ -202,6 +205,9 @@ declare global {
         ) => () => void;
         onExit: (cb: (session: Session) => void) => () => void;
         onAgentState: (sessionId: string, cb: (state: AgentState) => void) => () => void;
+        getSilenceStates: () => Promise<
+          { id: string; taskId?: string; state: AgentState }[]
+        >;
         onTaskStartProgress: (cb: (p: TaskSessionStartProgress) => void) => () => void;
       };
       shells: {
