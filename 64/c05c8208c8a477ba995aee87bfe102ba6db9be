@@ -1,0 +1,27 @@
+src/components/TaskCard.tsx
+  7578f328be9f7abe 474,489
+src/App.tsx
+  7578f328be9f7abe 2064
+src/components/GithubPrIconButton.tsx
+  7578f328be9f7abe 1,11,66,81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "64c05c8208c8a477ba995aee87bfe102ba6db9be",
+  "prompts": {
+    "7578f328be9f7abe": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "94bab9a6-4114-4df7-b40b-103fb6fc524a",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 32,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    }
+  }
+}
