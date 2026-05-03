@@ -1,0 +1,43 @@
+src/components/Board.tsx
+  46f1da50b1b6c1fc 44-45,74,209
+src/App.tsx
+  46f1da50b1b6c1fc 55-60,286-301,874-886,1253-1362,1974,1979-1999,2014-2021,2032,2077-2082,2106-2111,2698,2744,2811,2867-2871
+src/components/TaskCard.tsx
+  46f1da50b1b6c1fc 8,223,249,270,459-461,474-476,489-491,503-504
+src/githubPrDiscoveryMessages.ts
+  46f1da50b1b6c1fc 1-35
+src/components/TaskDetailPanel.tsx
+  46f1da50b1b6c1fc 123-124,226,923
+src/components/GithubPrIconButton.tsx
+  46f1da50b1b6c1fc 1,11-12,25,36,50-52,65-67,80-82,91-92
+src/components/Column.tsx
+  46f1da50b1b6c1fc 28,55,143
+src/renderer/tasks/applyGithubPrRefreshFromRenderer.test.ts
+  46f1da50b1b6c1fc 1-74
+src/githubPrDiscoveryMessages.test.ts
+  46f1da50b1b6c1fc 1-40
+src/renderer/tasks/applyGithubPrRefreshFromRenderer.ts
+  46f1da50b1b6c1fc 1-50
+src/components/SessionTerminalView.tsx
+  46f1da50b1b6c1fc 56,274,391
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "fa60eaf11ebb7d8c467cdc44720ada7a556c30fd",
+  "prompts": {
+    "46f1da50b1b6c1fc": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a0553d2d-cd61-4aca-831f-0f274b21b44b",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 455,
+      "total_deletions": 25,
+      "accepted_lines": 440,
+      "overriden_lines": 0
+    }
+  }
+}
