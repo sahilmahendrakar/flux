@@ -111,6 +111,19 @@ function isWorkspaceSessionTabId(tabId: string): boolean {
   return true;
 }
 
+/**
+ * When true, deleting the task should show an in-app confirm first (board `TaskCard` uses
+ * disk worktree map + session list; any task-linked session covers agents before a path exists).
+ */
+function taskDeleteNeedsWorkspaceConfirmation(
+  taskId: string,
+  sessions: Session[],
+  taskHasWorktreeById: Record<string, boolean>,
+): boolean {
+  if (taskHasWorktreeById[taskId] === true) return true;
+  return sessions.some((s) => s.taskId === taskId);
+}
+
 /** Apply debounced cloud patches onto a server task for optimistic UI (`null` clears optional fields). */
 function mergeServerTaskWithPendingPatch(task: Task, patch: TaskPatch | undefined): Task {
   if (!patch) return task;
@@ -247,6 +260,7 @@ export default function App() {
     }
   });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [taskDeleteConfirmId, setTaskDeleteConfirmId] = useState<string | null>(null);
   const [cleanupConfirmTaskId, setCleanupConfirmTaskId] = useState<string | null>(null);
   const [cleanupLoadingTaskId, setCleanupLoadingTaskId] = useState<string | null>(null);
   const [cleanupError, setCleanupError] = useState<string | null>(null);
@@ -2008,6 +2022,29 @@ export default function App() {
     [provider, stripLocalSessionStateForTask],
   );
 
+  const requestDeleteTask = useCallback(
+    (id: string, opts?: { closeDetail?: boolean }) => {
+      if (taskDeleteNeedsWorkspaceConfirmation(id, sessions, taskHasWorktreeById)) {
+        setTaskDeleteConfirmId(id);
+        return;
+      }
+      if (opts?.closeDetail) setSelectedTaskId(null);
+      void handleDeleteTask(id);
+    },
+    [sessions, taskHasWorktreeById, handleDeleteTask],
+  );
+
+  const cancelTaskDeleteConfirm = useCallback(() => {
+    setTaskDeleteConfirmId(null);
+  }, []);
+
+  const confirmTaskDelete = useCallback(() => {
+    const id = taskDeleteConfirmId;
+    if (!id) return;
+    setTaskDeleteConfirmId(null);
+    void handleDeleteTask(id);
+  }, [taskDeleteConfirmId, handleDeleteTask]);
+
   const requestCleanupTask = useCallback(
     (taskId: string) => {
       const task = tasks.find((t) => t.id === taskId);
@@ -2101,6 +2138,7 @@ export default function App() {
   const handleProjectActivated = useCallback((p: ActiveProject) => {
     setProject(p);
     setSelectedTaskId(null);
+    setTaskDeleteConfirmId(null);
     setCleanupConfirmTaskId(null);
     setCleanupLoadingTaskId(null);
     setCleanupError(null);
@@ -2130,6 +2168,7 @@ export default function App() {
     setProject(null);
     setTasks([]);
     setSelectedTaskId(null);
+    setTaskDeleteConfirmId(null);
     setCleanupConfirmTaskId(null);
     setCleanupLoadingTaskId(null);
     setCleanupError(null);
@@ -2552,6 +2591,12 @@ export default function App() {
     [cleanupConfirmTaskId, tasks],
   );
 
+  const taskDeleteConfirmTask = useMemo(
+    () =>
+      taskDeleteConfirmId ? tasks.find((t) => t.id === taskDeleteConfirmId) ?? null : null,
+    [taskDeleteConfirmId, tasks],
+  );
+
   // Sort tasks per column for the board (orderKey-aware). Falls back to
   // createdAt/id for rows without a key.
   const sortedTasks = useMemo(() => {
@@ -2761,7 +2806,7 @@ export default function App() {
                               /* Session workspace Details tab is not a dismissible overlay. */
                             },
                             onUpdate: handleUpdateTask,
-                            onDelete: handleDeleteTask,
+                            onDelete: requestDeleteTask,
                             remoteRunner:
                               tabTask && cloudProjectId
                                 ? findRemoteRunner(
@@ -2845,7 +2890,7 @@ export default function App() {
                         onDragEnd={handleDragEnd}
                         onCreateTask={handleCreateTask}
                         defaultTaskAgent={defaultTaskAgentForProject(project)}
-                        onDeleteTask={handleDeleteTask}
+                        onDeleteTask={requestDeleteTask}
                         onRequestCleanupTask={requestCleanupTask}
                         cleanupLoadingTaskId={cleanupLoadingTaskId}
                         onCardClick={(id) => setSelectedTaskId(id)}
@@ -2888,7 +2933,7 @@ export default function App() {
                         onSelectTask={(id) => setSelectedTaskId(id)}
                         onClose={() => setSelectedTaskId(null)}
                         onUpdate={handleUpdateTask}
-                        onDelete={handleDeleteTask}
+                        onDelete={requestDeleteTask}
                         onMarkAsDone={
                           selectedTask && selectedTask.status !== 'done' && !isTaskBlocked(selectedTask, tasks)
                             ? () => void handleMarkTaskDone(selectedTask.id, { closeDetail: true })
@@ -3035,6 +3080,22 @@ export default function App() {
           destructive={false}
           onConfirm={() => void confirmCleanupTask()}
           onCancel={cancelCleanupTask}
+        />
+      ) : null}
+      {taskDeleteConfirmTask ? (
+        <ConfirmDialog
+          title="Delete task and workspace?"
+          description={`This removes "${taskDeleteConfirmTask.title}" from the board and tears down its Flux workspace.`}
+          bullets={[
+            'Remove the task from the board',
+            'End agent sessions tied to this task (running agents stop)',
+            'Close terminals opened in those workspaces',
+            'Remove the git worktree from disk when one exists',
+          ]}
+          confirmLabel="Delete task"
+          destructive
+          onConfirm={() => void confirmTaskDelete()}
+          onCancel={cancelTaskDeleteConfirm}
         />
       ) : null}
     </div>
