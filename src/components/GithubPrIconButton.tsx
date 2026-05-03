@@ -1,4 +1,4 @@
-import { Clock, GitMerge, GitPullRequest, GitPullRequestCreate, Loader2 } from 'lucide-react';
+import { GitMerge, GitPullRequest, GitPullRequestCreate, Loader2 } from 'lucide-react';
 import type { TaskGithubPr } from '../types';
 
 export interface GithubPrIconButtonProps {
@@ -8,7 +8,7 @@ export interface GithubPrIconButtonProps {
   hasWorktree: boolean;
   onTaskPrClick?: (taskId: string) => void;
   prLoading?: boolean;
-  /** After delegating PR creation to the agent; click again to discover the PR on GitHub. */
+  /** After delegating PR creation to the agent; amber styling until a PR URL is linked (icon stays create). */
   prAgentAwaiting?: boolean;
 }
 
@@ -63,7 +63,7 @@ export function GithubPrIconButton({
                 : prLinked
                   ? 'Open pull request'
                   : prAwaitingAgent
-                    ? 'Pull request requested from agent; click to check GitHub'
+                    ? 'Pull request requested from agent; click to send creation prompt again'
                     : 'Create GitHub pull request'
       }
       title={
@@ -78,7 +78,7 @@ export function GithubPrIconButton({
                 : prLinked
                   ? 'Open pull request'
                   : prAwaitingAgent
-                    ? 'PR creation was sent to the agent — click to refresh, or wait for automatic checks'
+                    ? 'PR creation was sent to the agent — click to send again, or wait for automatic checks'
                     : 'Create GitHub pull request'
       }
     >
@@ -88,8 +88,6 @@ export function GithubPrIconButton({
         <GitMerge className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
       ) : prLinked ? (
         <GitPullRequest className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-      ) : prAwaitingAgent ? (
-        <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
       ) : (
         <GitPullRequestCreate className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
       )}
