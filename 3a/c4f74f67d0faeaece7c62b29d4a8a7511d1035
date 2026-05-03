@@ -1,0 +1,43 @@
+src/main.ts
+  f476de4f60148e22 3
+  53f3425213ca300f 301-309,318,324
+forge.config.ts
+  53f3425213ca300f 18-19
+  f476de4f60148e22 9-12
+vite.main.config.ts
+  f476de4f60148e22 2,5,9,16-18
+  53f3425213ca300f 1,3-4,6-8,10-15,30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "3ac4f74f67d0faeaece7c62b29d4a8a7511d1035",
+  "prompts": {
+    "53f3425213ca300f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "f893fe27-5c73-401e-9093-ecf81373df9e",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 40,
+      "total_deletions": 25,
+      "accepted_lines": 40,
+      "overriden_lines": 0
+    },
+    "f476de4f60148e22": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d3171842-6d3a-4a60-85f9-30dc80d68cb3",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 36,
+      "total_deletions": 1,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}
