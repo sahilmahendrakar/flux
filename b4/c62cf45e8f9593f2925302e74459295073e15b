@@ -1,0 +1,93 @@
+src/main/sessionInputDebug.test.ts
+  844d7b2be9a4ddfc 1-22
+src/App.tsx
+  844d7b2be9a4ddfc 26,176-180,189-194,1840,1850
+src/main/DaemonClient.ts
+  9359bc5a58820290 76-81,158-161,744,884-909
+  cc2587d936dc77fe 48-62,245,259,301,373,720,875-883
+src/taskAgentPullRequestPrompt.test.ts
+  844d7b2be9a4ddfc 1-2,4-38,49,52-58,60-64,68-69
+  f78e3fec4fa64c89 3,39-48,50-51,59,65-67
+src/taskAgentPullRequestPrompt.ts
+  f78e3fec4fa64c89 15-16,20-44,62-64,71-72,77-82,88,90
+  844d7b2be9a4ddfc 1-14,17-19,45-61,65-70,73-76,83-87,89,91-92
+src/main.ts
+  9359bc5a58820290 1483-1484
+  844d7b2be9a4ddfc 32-37,58,77-79,1305-1347,1349-1350,1360,1382-1410,1412-1420,1422-1436,1438-1443,1445-1448,1450-1456,1458,1474-1480,1482,1497,2192
+  f78e3fec4fa64c89 76,1459-1472,1481
+  cc2587d936dc77fe 1485-1496
+src/preload.ts
+  844d7b2be9a4ddfc 19,233-240
+src/env.d.ts
+  844d7b2be9a4ddfc 19,188,192
+src/main/resolveProjectRepoDefaultBranch.ts
+  844d7b2be9a4ddfc 1-28
+src/main/sessionInputDebug.ts
+  844d7b2be9a4ddfc 1-44
+src/types.ts
+  844d7b2be9a4ddfc 178,182-183,207-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b4c62cf45e8f9593f2925302e74459295073e15b",
+  "prompts": {
+    "844d7b2be9a4ddfc": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7ccf9805-6997-4fae-8cbf-d52087dace68",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 447,
+      "total_deletions": 190,
+      "accepted_lines": 370,
+      "overriden_lines": 0
+    },
+    "9359bc5a58820290": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "399d4fd1-7500-4980-960f-8931361ff028",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 286,
+      "total_deletions": 192,
+      "accepted_lines": 42,
+      "overriden_lines": 1
+    },
+    "cc2587d936dc77fe": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4f1a367a-07b1-49b1-8314-eea0c9b86863",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 91,
+      "total_deletions": 96,
+      "accepted_lines": 43,
+      "overriden_lines": 0
+    },
+    "f78e3fec4fa64c89": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "80aaf124-b816-40eb-9d7f-793ddc871f8c",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 78,
+      "total_deletions": 34,
+      "accepted_lines": 74,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_d2c1d28943b3a6": {
+      "author": "Sahil Mahendrakar"
+    }
+  }
+}
