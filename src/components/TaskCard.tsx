@@ -5,7 +5,6 @@ import { broom } from '@lucide/lab';
 import {
   Ban,
   CirclePlay,
-  Clock,
   GitBranch,
   GitMerge,
   GitPullRequest,
@@ -472,7 +471,7 @@ export default function TaskCard({
                                 : prLinked
                                   ? 'Open pull request'
                                   : prAwaitingAgent
-                                    ? 'Pull request requested from agent; click to check GitHub'
+                                    ? 'Pull request requested from agent; click to send creation prompt again'
                                     : 'Create GitHub pull request'
                       }
                       title={
@@ -487,7 +486,7 @@ export default function TaskCard({
                                 : prLinked
                                   ? 'Open pull request'
                                   : prAwaitingAgent
-                                    ? 'PR creation was sent to the agent — click to refresh, or wait for automatic checks'
+                                    ? 'PR creation was sent to the agent — click to send again, or wait for automatic checks'
                                     : 'Create GitHub pull request'
                       }
                     >
@@ -500,8 +499,6 @@ export default function TaskCard({
                         <GitMerge className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                       ) : prLinked ? (
                         <GitPullRequest className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
-                      ) : prAwaitingAgent ? (
-                        <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
                       ) : (
                         <GitPullRequestCreate className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                       )}

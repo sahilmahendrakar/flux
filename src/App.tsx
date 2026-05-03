@@ -2034,26 +2034,6 @@ export default function App() {
       }
       if (createPrInflightTaskIdRef.current === taskId) return;
 
-      const promptAlreadySent = prAgentPromptSentTaskIdsRef.current.has(taskId);
-
-      if (promptAlreadySent) {
-        createPrInflightTaskIdRef.current = taskId;
-        setPrLoadingTaskId(taskId);
-        setTaskPrError(null);
-        try {
-          await runDiscoverGithubPrForTask(taskId, 'lookup');
-        } catch (err) {
-          console.error('[tasks.refreshPullRequest] failed', err);
-          setTaskPrError(
-            err instanceof Error ? err.message : 'Could not refresh the pull request metadata.',
-          );
-        } finally {
-          createPrInflightTaskIdRef.current = null;
-          setPrLoadingTaskId(null);
-        }
-        return;
-      }
-
       createPrInflightTaskIdRef.current = taskId;
       setPrLoadingTaskId(taskId);
       setTaskPrError(null);
@@ -2081,7 +2061,7 @@ export default function App() {
         setPrLoadingTaskId(null);
       }
     },
-    [runDiscoverGithubPrForTask, schedulePrAgentFollowupDiscovery],
+    [schedulePrAgentFollowupDiscovery],
   );
 
   const cancelCleanupTask = useCallback(() => {
