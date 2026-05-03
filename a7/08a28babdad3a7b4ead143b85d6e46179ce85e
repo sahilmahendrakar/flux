@@ -1,0 +1,82 @@
+src/components/PlanningDocsView.tsx
+  dfb63eafe7f2a89b 49-51,55-56,60,62,67-72,75-78,80-83
+src/components/TaskSourceBranchPicker.tsx
+  a40426f9866c1b0e 105,109,117,123,129,136-137,171,182,189,198,209,220,225
+src/components/Sidebar.tsx
+  dfb63eafe7f2a89b 458
+src/components/PlanningPanel.tsx
+  a40426f9866c1b0e 64,501,510-511,521,524,531,539,542-543,555,558,561,565,569,579,586,592,613,623,628-629,634,637-638,640,651-652,656,660,675,680,685,695,707,715,726,738,747
+  dfb63eafe7f2a89b 757,772,777,780-781,784,805-806,812-813,820
+src/components/TabBar.tsx
+  a40426f9866c1b0e 91,106,129,144
+  dfb63eafe7f2a89b 53-54,82,119,157
+src/components/TeamView.tsx
+  a40426f9866c1b0e 96,99,106,108,117,122,128,133,138,148,152,156,160,171,176,185,191,200,214,227,230,236
+src/components/ProjectSettingsView.tsx
+  a40426f9866c1b0e 65,98,103,115,130,132,636-637,711-712,715-716,725,729,734,746,756,761,789,812,819,831,835,837,842,854,864,869,897,920,927,940,943,956,997,1003,1008,1130,1135,1141,1150,1158,1168,1174
+src/components/Terminal.tsx
+  a40426f9866c1b0e 322
+src/components/SignInCard.tsx
+  a40426f9866c1b0e 17-20,27,57,69,72,77,80,86,100,105,111
+src/components/ConfirmDialog.tsx
+  dfb63eafe7f2a89b 34-35,64
+  a40426f9866c1b0e 39,43,48-49,51,54,60
+src/components/TaskLabelsField.tsx
+  a40426f9866c1b0e 15,21,24,210-211,228,230-231,245,280,285,294,320,323,327-329,344,347,357
+src/components/NewTaskModal.tsx
+  a40426f9866c1b0e 117,124,127
+  dfb63eafe7f2a89b 121,125,139,163,176-177,188,195,200,205,209,213,223,230-231,245-246,259,263,271
+src/components/TaskCard.tsx
+  dfb63eafe7f2a89b 112,129,138,148-149,188,300,304-305,321-323,366,405,424,445-446,477,492,500,513,523
+  a40426f9866c1b0e 202-203
+src/components/TaskDetailPanel.tsx
+  a40426f9866c1b0e 76-77,79-82,158,162,822-823,827,829,831,834,836,851,857,867,873,882,914,929,951,966,1013,1025,1031,1036,1039,1046-1049,1056,1059,1066-1068,1074,1084,1106,1126,1129,1136,1140,1145,1152,1158,1162,1166,1176-1177,1192,1211,1221,1225,1230,1250,1262,1299-1300,1311,1325,1328,1331,1337,1347,1358,1363,1366,1368,1377,1389,1391-1392,1397,1413,1424,1435,1438,1445,1457,1465,1469,1472,1478,1485,1494,1503-1504,1518,1527,1532,1535,1540,1546-1548,1559,1564,1567,1587,1591
+src/components/Column.tsx
+  dfb63eafe7f2a89b 96,108,143
+  a40426f9866c1b0e 66-67,74-75
+src/components/openWorkspaceTargetIcons.tsx
+  a40426f9866c1b0e 86,92
+src/App.tsx
+  dfb63eafe7f2a89b 2342,2348,2357,2363,2580,2625,2629
+src/components/Board.tsx
+  dfb63eafe7f2a89b 150-151,159,167,174
+  a40426f9866c1b0e 137
+src/components/BoardFilterBar.tsx
+  dfb63eafe7f2a89b 35,40,94,99,111,165,174,183,188,194,197,202,205,210,213,222,234,246,258,270,282,294,305,317
+  a40426f9866c1b0e 34
+src/components/SessionTerminalView.tsx
+  a40426f9866c1b0e 111,116,119,133,187,216-217,227,242,304,306,310,337-338
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "a708a28babdad3a7b4ead143b85d6e46179ce85e",
+  "prompts": {
+    "a40426f9866c1b0e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "53dbfd70-5d30-43ff-a6a6-34d36bdbcb67",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 302,
+      "total_deletions": 300,
+      "accepted_lines": 201,
+      "overriden_lines": 0
+    },
+    "dfb63eafe7f2a89b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5cd74158-9541-414f-b62d-2eed02c9fade",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 196,
+      "total_deletions": 196,
+      "accepted_lines": 122,
+      "overriden_lines": 0
+    }
+  }
+}
