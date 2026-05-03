@@ -1,0 +1,23 @@
+README.md
+  2dc08f41021d87da 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "00a96485f9e731b5b390343ed30550f26c89570c",
+  "prompts": {
+    "2dc08f41021d87da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce58562a-9918-4b0b-bab8-3b8792892e96",
+        "model": "claude-haiku-4-5-20251001"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
