@@ -7,6 +7,7 @@ import type {
   AgentSpawnDefaultsPatch,
   LocalProject,
   RepoConfig,
+  RepoSettingsPatch,
 } from '../types';
 import {
   deriveRepoIdForRootPath,
@@ -53,6 +54,10 @@ function errnoCode(err: unknown): string | undefined {
   return err && typeof err === 'object' && 'code' in err
     ? (err as NodeJS.ErrnoException).code
     : undefined;
+}
+
+async function assertGitRepoRoot(rootPath: string): Promise<void> {
+  await fs.access(path.join(path.resolve(rootPath), '.git'));
 }
 
 function parseAgentSessionModelDefaultsField(raw: unknown): AgentSessionModelDefaults | undefined {
@@ -467,27 +472,15 @@ export class ProjectStore {
   async updateRepoAt(
     projectDir: string,
     rootPath: string,
-    patch: Partial<Pick<RepoConfig, 'baseBranch' | 'setupScript' | 'env'>>,
+    patch: RepoSettingsPatch,
   ): Promise<RepoConfig[]> {
     const configPath = path.join(projectDir, 'config.json');
     const raw = await fs.readFile(configPath, 'utf8');
     const parsed = parseConfig(raw);
     if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
     const repos = parsed.repos.map((r) => {
-      if (r.rootPath !== rootPath) return r;
-      const next: RepoConfig = { ...r };
-      if (patch.baseBranch !== undefined) {
-        const trimmed = patch.baseBranch.trim();
-        next.baseBranch = trimmed.length > 0 ? trimmed : DEFAULT_BASE_BRANCH;
-      }
-      if (patch.setupScript !== undefined) {
-        next.setupScript =
-          patch.setupScript.length > 0 ? patch.setupScript : undefined;
-      }
-      if (patch.env !== undefined) {
-        next.env = patch.env.length > 0 ? patch.env : undefined;
-      }
-      return next;
+      if (path.resolve(r.rootPath) !== path.resolve(rootPath)) return r;
+      return ProjectStore.applyRepoSettingsPatch(r, patch);
     });
     const next: ConfigFile = { ...parsed, repos };
     await atomicWriteFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
@@ -495,6 +488,155 @@ export class ProjectStore {
       this.project = configToLocalProject(next);
     }
     return repos;
+  }
+
+  /**
+   * Persist repo settings for the entry identified by {@link RepoConfig.id}.
+   */
+  async updateRepoByIdAt(
+    projectDir: string,
+    repoId: string,
+    patch: RepoSettingsPatch,
+  ): Promise<RepoConfig[]> {
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    let found = false;
+    const repos = parsed.repos.map((r) => {
+      if (r.id !== repoId) return r;
+      found = true;
+      return ProjectStore.applyRepoSettingsPatch(r, patch);
+    });
+    if (!found) {
+      throw new Error(`Unknown repository id: ${repoId}`);
+    }
+    const next: ConfigFile = { ...parsed, repos };
+    await atomicWriteFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
+    if (this.projectDir === projectDir && this.project) {
+      this.project = configToLocalProject(next);
+    }
+    return repos;
+  }
+
+  private static applyRepoSettingsPatch(
+    r: RepoConfig,
+    patch: RepoSettingsPatch,
+  ): RepoConfig {
+    const next: RepoConfig = { ...r };
+    if (patch.baseBranch !== undefined) {
+      const trimmed = patch.baseBranch.trim();
+      next.baseBranch = trimmed.length > 0 ? trimmed : DEFAULT_BASE_BRANCH;
+    }
+    if (patch.setupScript !== undefined) {
+      next.setupScript =
+        patch.setupScript.length > 0 ? patch.setupScript : undefined;
+    }
+    if (patch.env !== undefined) {
+      next.env = patch.env.length > 0 ? patch.env : undefined;
+    }
+    if (patch.name !== undefined) {
+      const trimmed = patch.name.trim();
+      if (trimmed.length === 0) {
+        delete next.name;
+      } else {
+        next.name = trimmed;
+      }
+    }
+    return next;
+  }
+
+  /**
+   * Append a git working tree to `repos[]`. Id/name are assigned via
+   * {@link backfillRepoIdentities}.
+   */
+  async addRepoAt(projectDir: string, rootPath: string): Promise<RepoConfig[]> {
+    const resolved = path.resolve(rootPath);
+    await assertGitRepoRoot(resolved);
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    if (parsed.repos.some((r) => path.resolve(r.rootPath) === resolved)) {
+      throw new Error('That git repository is already part of this project');
+    }
+    const extra: ParsedRepoConfig = {
+      rootPath: resolved,
+      baseBranch: DEFAULT_BASE_BRANCH,
+    };
+    const { repos } = backfillRepoIdentities({
+      projectId: parsed.id,
+      primaryRootPath: parsed.rootPath,
+      repos: [...parsed.repos, extra],
+    });
+    const next: ConfigFile = { ...parsed, repos };
+    await atomicWriteFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
+    if (this.projectDir === projectDir && this.project) {
+      this.project = configToLocalProject(next);
+    }
+    return repos;
+  }
+
+  /**
+   * Removes a repo from `repos[]` and updates {@link ConfigFile.rootPath}
+   * when the primary entry was removed.
+   */
+  async removeRepoAt(projectDir: string, repoId: string): Promise<RepoConfig[]> {
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    const idx = parsed.repos.findIndex((r) => r.id === repoId);
+    if (idx === -1) {
+      throw new Error(`Unknown repository id: ${repoId}`);
+    }
+    if (parsed.repos.length <= 1) {
+      throw new Error('Cannot remove the last repository from a project');
+    }
+    const nextRepos = parsed.repos.filter((r) => r.id !== repoId);
+    const primaryWasRemoved = idx === 0;
+    const nextRoot = primaryWasRemoved ? nextRepos[0].rootPath : parsed.rootPath;
+    const next: ConfigFile = {
+      ...parsed,
+      rootPath: nextRoot,
+      repos: nextRepos,
+    };
+    await atomicWriteFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
+    if (this.projectDir === projectDir && this.project) {
+      this.project = configToLocalProject(next);
+    }
+    return nextRepos;
+  }
+
+  /** Moves the chosen repo to index 0 and syncs project `rootPath` to its clone. */
+  async setPrimaryRepoAt(projectDir: string, repoId: string): Promise<RepoConfig[]> {
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    const idx = parsed.repos.findIndex((r) => r.id === repoId);
+    if (idx === -1) {
+      throw new Error(`Unknown repository id: ${repoId}`);
+    }
+    if (idx === 0) {
+      return parsed.repos;
+    }
+    const chosen = parsed.repos[idx];
+    const nextRepos = [
+      chosen,
+      ...parsed.repos.slice(0, idx),
+      ...parsed.repos.slice(idx + 1),
+    ];
+    const next: ConfigFile = {
+      ...parsed,
+      rootPath: chosen.rootPath,
+      repos: nextRepos,
+    };
+    await atomicWriteFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
+    if (this.projectDir === projectDir && this.project) {
+      this.project = configToLocalProject(next);
+    }
+    return nextRepos;
   }
 
   async getAutoStartSessionOnInProgressAt(projectDir: string): Promise<boolean> {

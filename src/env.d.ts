@@ -6,8 +6,10 @@ import type {
   CloudProjectLocalBinding,
   LocalProject,
   OpenWorkspaceTarget,
+  RepoBranchDiscoveryRequest,
   RepoBranchDiscoveryResponse,
   RepoConfig,
+  RepoSettingsPatch,
   Session,
   SessionStartOptions,
   SessionStartResult,
@@ -102,8 +104,36 @@ declare global {
         getRepos: () => Promise<RepoConfig[]>;
         updateRepo: (payload: {
           rootPath: string;
-          patch: Partial<Pick<RepoConfig, 'baseBranch' | 'setupScript' | 'env'>>;
+          patch: RepoSettingsPatch;
         }) => Promise<{ ok: true; repos: RepoConfig[] } | { error: string }>;
+        updateRepoById: (payload: {
+          repoId: string;
+          patch: RepoSettingsPatch;
+        }) => Promise<
+          | { ok: true; repos: RepoConfig[] }
+          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        >;
+        addRepo: (payload: {
+          rootPath: string;
+        }) => Promise<
+          | { ok: true; repos: RepoConfig[] }
+          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        >;
+        removeRepo: (payload: {
+          repoId: string;
+        }) => Promise<
+          | { ok: true; repos: RepoConfig[] }
+          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        >;
+        setPrimaryRepo: (payload: {
+          repoId: string;
+        }) => Promise<
+          | { ok: true; repos: RepoConfig[] }
+          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        >;
+        getPrimaryRepoId: () => Promise<
+          { ok: true; repoId: string | null } | { error: string }
+        >;
         getAutoStartSessionOnInProgress: () => Promise<boolean>;
         setAutoStartSessionOnInProgress: (
           enabled: boolean,
@@ -158,7 +188,7 @@ declare global {
       };
       repo: {
         getBranchDiscovery: (
-          requestedBranch?: string,
+          arg?: string | RepoBranchDiscoveryRequest,
         ) => Promise<RepoBranchDiscoveryResponse | { error: string }>;
       };
       tasks: {

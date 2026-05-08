@@ -9,7 +9,7 @@
 
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import type { LocalProject, RepoConfig } from './types';
+import type { LocalProject, RepoConfig, Task } from './types';
 
 /**
  * Deterministic stable id for the **primary** repo of a project that was
@@ -71,6 +71,15 @@ export function resolvePrimaryRepoId(
   return getPrimaryRepo(repos)?.id;
 }
 
+/** Resolved {@link RepoConfig.id} for a task row (missing / blank → primary repo). */
+export function effectiveTaskRepoId(
+  task: Pick<Task, 'repoId'>,
+  primaryRepoId: string,
+): string {
+  const r = task.repoId?.trim();
+  return r && r.length > 0 ? r : primaryRepoId;
+}
+
 /** True when `repoId` matches some repo in the project (or `repoId` is undefined → caller meant primary). */
 export function repoIdBelongsToProject(
   repos: ReadonlyArray<RepoConfig>,
@@ -88,6 +97,21 @@ export function findRepoByIdOrPrimary(
   if (repoId != null && repoId !== '') {
     const exact = repos.find((r) => r.id === repoId);
     if (exact) return exact;
+  }
+  return getPrimaryRepo(repos);
+}
+
+/**
+ * Like {@link findRepoByIdOrPrimary}, but when `repoId` is non-empty and missing
+ * from `repos[]`, returns `undefined` (caller surfaces “unknown id”).
+ */
+export function resolveRepoForBranchDiscovery(
+  repos: ReadonlyArray<RepoConfig>,
+  repoId: string | undefined,
+): RepoConfig | undefined {
+  if (repoId != null && repoId.trim() !== '') {
+    const trimmed = repoId.trim();
+    return repos.find((r) => r.id === trimmed);
   }
   return getPrimaryRepo(repos);
 }

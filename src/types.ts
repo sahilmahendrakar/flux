@@ -57,6 +57,20 @@ export type RepoBranchDiscoveryResponse = RepoBranchDiscovery & {
 };
 
 /**
+ * IPC payload for `repo:getBranchDiscovery`.
+ * Back-compat: main still accepts a bare string meaning `classifyBranch` only (primary repo).
+ */
+export type RepoBranchDiscoveryRequest = {
+  repoId?: string;
+  classifyBranch?: string;
+};
+
+/** Fields editable through project repo settings IPC (by root path or repo id). */
+export type RepoSettingsPatch = Partial<
+  Pick<RepoConfig, 'baseBranch' | 'setupScript' | 'env' | 'name'>
+>;
+
+/**
  * Per-repo configuration stored locally. The schema supports multiple repos
  * per project (see `multi-repo2` feature flag); today the list always has
  * length 1 (matching `Project.rootPath`).
