@@ -4,7 +4,21 @@
  * attribution pattern as `openWorkspaceTargetIcons.tsx`.
  */
 import type { Agent } from '../types';
+import type { ThemeMode } from '../renderer/theme';
+import { useFluxTheme } from '../renderer/FluxThemeProvider';
 import { CursorBrandIcon } from './openWorkspaceTargetIcons';
+
+function mergeIconClass(agent: Agent, theme: ThemeMode, className?: string): string {
+  const tone =
+    theme === 'light'
+      ? agent === 'claude-code'
+        ? 'text-orange-700'
+        : agent === 'codex'
+          ? 'text-zinc-900'
+          : 'text-zinc-900'
+      : 'text-zinc-200';
+  return [tone, className].filter(Boolean).join(' ');
+}
 
 export function AgentProviderIcon({
   agent,
@@ -13,11 +27,14 @@ export function AgentProviderIcon({
   agent: Agent;
   className?: string;
 }) {
+  const { theme } = useFluxTheme();
+  const merged = mergeIconClass(agent, theme, className);
+
   switch (agent) {
     case 'claude-code':
       return (
         <svg
-          className={className}
+          className={merged}
           viewBox="0 0 24 24"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden
@@ -31,7 +48,7 @@ export function AgentProviderIcon({
     case 'codex':
       return (
         <svg
-          className={className}
+          className={merged}
           viewBox="0 0 24 24"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden
@@ -43,6 +60,6 @@ export function AgentProviderIcon({
         </svg>
       );
     case 'cursor':
-      return <CursorBrandIcon className={className} />;
+      return <CursorBrandIcon className={merged} />;
   }
 }

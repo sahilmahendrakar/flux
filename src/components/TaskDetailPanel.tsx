@@ -63,31 +63,55 @@ import {
   planTaskSourceBranchFieldsForCreate,
   taskSourceBranchPersistIsNoOp,
 } from '../taskBranches';
+import type { ThemeMode } from '../renderer/theme';
 
 function taskAgentSupportsCliResume(agent: Agent): boolean {
   return agent === 'cursor' || agent === 'claude-code' || agent === 'codex';
 }
 
 /** Prose for markdown description read mode (aligned with PlanningDocsView, panel density). */
-const MD_READ_CLASS = [
-  'min-w-0 text-[13px] leading-relaxed text-zinc-300',
-  '[&_a]:text-sky-400 [&_a]:underline [&_a]:decoration-sky-400/40 [&_a]:underline-offset-2 hover:[&_a]:text-sky-300',
-  '[&_h1]:mb-2 [&_h1]:mt-0 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:text-zinc-100',
-  '[&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-medium [&_h2]:text-zinc-100 first:[&_h2]:mt-0',
-  '[&_h3]:mb-1.5 [&_h3]:mt-3 [&_h3]:text-[14px] [&_h3]:font-medium [&_h3]:text-zinc-200',
-  '[&_p]:my-2.5 [&_p]:text-zinc-300 first:[&_p]:mt-0 last:[&_p]:mb-0',
-  '[&_ul]:my-2.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2.5 [&_ol]:list-decimal [&_ol]:pl-5',
-  '[&_li]:my-0.5',
-  '[&_blockquote]:my-2.5 [&_blockquote]:border-l-2 [&_blockquote]:border-zinc-600 [&_blockquote]:pl-3 [&_blockquote]:text-zinc-400',
-  '[&_code]:rounded [&_code]:bg-zinc-800/80 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px] [&_code]:text-emerald-200/90',
-  '[&_pre]:my-2.5 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-white/[0.08] [&_pre]:bg-[#0a0a0c] [&_pre]:p-2.5',
-  '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[12px] [&_pre_code]:text-zinc-300',
-  '[&_table]:my-3 [&_table]:w-full [&_table]:border-collapse text-[12px]',
-  '[&_th]:border [&_th]:border-white/[0.08] [&_th]:bg-white/[0.04] [&_th]:px-2 [&_th]:py-1 [&_th]:font-medium [&_th]:text-zinc-200',
-  '[&_td]:border [&_td]:border-white/[0.06] [&_td]:px-2 [&_td]:py-1',
-  '[&_hr]:my-4 [&_hr]:border-white/[0.08]',
-  '[&_strong]:font-semibold [&_strong]:text-zinc-100',
-].join(' ');
+function mdReadClass(theme: ThemeMode): string {
+  if (theme === 'light') {
+    return [
+      'min-w-0 text-[13px] leading-relaxed text-flux-fg-muted',
+      '[&_a]:text-sky-600 [&_a]:underline [&_a]:decoration-sky-500/35 [&_a]:underline-offset-2 hover:[&_a]:text-sky-700',
+      '[&_h1]:mb-2 [&_h1]:mt-0 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:text-flux-fg',
+      '[&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-medium [&_h2]:text-flux-fg first:[&_h2]:mt-0',
+      '[&_h3]:mb-1.5 [&_h3]:mt-3 [&_h3]:text-[14px] [&_h3]:font-medium [&_h3]:text-flux-fg-muted',
+      '[&_p]:my-2.5 [&_p]:text-flux-fg-muted first:[&_p]:mt-0 last:[&_p]:mb-0',
+      '[&_ul]:my-2.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2.5 [&_ol]:list-decimal [&_ol]:pl-5',
+      '[&_li]:my-0.5',
+      '[&_blockquote]:my-2.5 [&_blockquote]:border-l-2 [&_blockquote]:border-flux-border/30 [&_blockquote]:pl-3 [&_blockquote]:text-flux-fg-muted',
+      '[&_code]:rounded [&_code]:bg-flux-hover/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px] [&_code]:text-emerald-800',
+      '[&_pre]:my-2.5 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-flux-border/12 [&_pre]:bg-flux-surface [&_pre]:p-2.5',
+      '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[12px] [&_pre_code]:text-flux-fg-muted',
+      '[&_table]:my-3 [&_table]:w-full [&_table]:border-collapse text-[12px]',
+      '[&_th]:border [&_th]:border-flux-border/12 [&_th]:bg-flux-hover/8 [&_th]:px-2 [&_th]:py-1 [&_th]:font-medium [&_th]:text-flux-fg-muted',
+      '[&_td]:border [&_td]:border-flux-border/10 [&_td]:px-2 [&_td]:py-1',
+      '[&_hr]:my-4 [&_hr]:border-flux-border/12',
+      '[&_strong]:font-semibold [&_strong]:text-flux-fg',
+    ].join(' ');
+  }
+  return [
+    'min-w-0 text-[13px] leading-relaxed text-flux-fg-muted',
+    '[&_a]:text-sky-400 [&_a]:underline [&_a]:decoration-sky-400/40 [&_a]:underline-offset-2 hover:[&_a]:text-sky-300',
+    '[&_h1]:mb-2 [&_h1]:mt-0 [&_h1]:text-lg [&_h1]:font-semibold [&_h1]:text-flux-fg',
+    '[&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-medium [&_h2]:text-flux-fg first:[&_h2]:mt-0',
+    '[&_h3]:mb-1.5 [&_h3]:mt-3 [&_h3]:text-[14px] [&_h3]:font-medium [&_h3]:text-flux-fg-muted',
+    '[&_p]:my-2.5 [&_p]:text-flux-fg-muted first:[&_p]:mt-0 last:[&_p]:mb-0',
+    '[&_ul]:my-2.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2.5 [&_ol]:list-decimal [&_ol]:pl-5',
+    '[&_li]:my-0.5',
+    '[&_blockquote]:my-2.5 [&_blockquote]:border-l-2 [&_blockquote]:border-zinc-600 [&_blockquote]:pl-3 [&_blockquote]:text-flux-fg-muted',
+    '[&_code]:rounded [&_code]:bg-zinc-800/80 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px] [&_code]:text-emerald-200/90',
+    '[&_pre]:my-2.5 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-flux-border/12 [&_pre]:bg-flux-surface [&_pre]:p-2.5',
+    '[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[12px] [&_pre_code]:text-flux-fg-muted',
+    '[&_table]:my-3 [&_table]:w-full [&_table]:border-collapse text-[12px]',
+    '[&_th]:border [&_th]:border-flux-border/12 [&_th]:bg-flux-hover/8 [&_th]:px-2 [&_th]:py-1 [&_th]:font-medium [&_th]:text-flux-fg-muted',
+    '[&_td]:border [&_td]:border-flux-border/10 [&_td]:px-2 [&_td]:py-1',
+    '[&_hr]:my-4 [&_hr]:border-flux-border/12',
+    '[&_strong]:font-semibold [&_strong]:text-flux-fg',
+  ].join(' ');
+}
 
 export interface TaskDetailPanelProps {
   task: Task | null;
@@ -173,13 +197,173 @@ function readStoredDetailWidth(): number | null {
   }
 }
 
-const STATUS_CHIP: Record<TaskStatus, string> = {
-  backlog: 'bg-white/[0.04] text-zinc-400 ring-1 ring-inset ring-white/[0.06]',
+const STATUS_CHIP_DARK: Record<TaskStatus, string> = {
+  backlog: 'bg-flux-hover/8 text-flux-fg-muted ring-1 ring-inset ring-flux-border/10',
   'in-progress': 'bg-emerald-500/[0.12] text-emerald-200/95 ring-1 ring-inset ring-emerald-500/15',
   'needs-input': 'bg-amber-500/[0.12] text-amber-200/90 ring-1 ring-inset ring-amber-500/18',
   review: 'bg-sky-500/[0.12] text-sky-200/95 ring-1 ring-inset ring-sky-500/18',
-  done: 'bg-white/[0.03] text-zinc-500 ring-1 ring-inset ring-white/[0.05]',
+  done: 'bg-flux-hover/6 text-flux-fg-subtle ring-1 ring-inset ring-flux-border/10',
 };
+
+const STATUS_CHIP_LIGHT: Record<TaskStatus, string> = {
+  backlog: 'bg-flux-hover/10 text-flux-fg-muted ring-1 ring-inset ring-flux-border/12',
+  'in-progress':
+    'bg-emerald-100 text-emerald-900 ring-1 ring-inset ring-emerald-200/90',
+  'needs-input': 'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-200/90',
+  review: 'bg-sky-100 text-sky-900 ring-1 ring-inset ring-sky-200/90',
+  done: 'bg-flux-hover/8 text-flux-fg-subtle ring-1 ring-inset ring-flux-border/10',
+};
+
+function statusChip(status: TaskStatus, theme: ThemeMode): string {
+  return theme === 'light' ? STATUS_CHIP_LIGHT[status] : STATUS_CHIP_DARK[status];
+}
+
+/** Theme-aware class bundles for task detail chrome (light: flux tokens; dark: existing panel look). */
+function taskDetailChrome(theme: ThemeMode) {
+  const L = theme === 'light';
+  const ringOff = L
+    ? 'focus-visible:ring-offset-2 focus-visible:ring-offset-flux-canvas'
+    : 'focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0b]';
+  return {
+    shellAside: L
+      ? 'absolute inset-y-0 right-0 z-20 flex min-w-0 flex-col border-l border-flux-border/10 bg-flux-elevated shadow-[0_0_0_1px_rgba(0,0,0,0.04),-12px_0_32px_rgba(0,0,0,0.07)]'
+      : 'absolute inset-y-0 right-0 z-20 flex min-w-0 flex-col border-l border-white/[0.04] bg-[#0a0a0b] shadow-[0_0_0_1px_rgba(255,255,255,0.04),-12px_0_40px_rgba(0,0,0,0.45)]',
+    shellWorkspace: L
+      ? 'flex h-full min-h-0 min-w-0 flex-col bg-flux-elevated'
+      : 'flex h-full min-h-0 min-w-0 flex-col bg-[#0a0a0b]',
+    resizeHandle: L
+      ? "absolute bottom-0 left-0 top-0 z-30 w-3 -translate-x-1/2 cursor-col-resize touch-none outline-none before:pointer-events-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-flux-border/25 before:content-[''] hover:before:bg-flux-border/45 focus-visible:ring-1 focus-visible:ring-flux-ring/30"
+      : "absolute bottom-0 left-0 top-0 z-30 w-3 -translate-x-1/2 cursor-col-resize touch-none outline-none before:pointer-events-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-white/[0.08] before:content-[''] hover:before:bg-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/20",
+    headerBottom: L ? 'border-b border-flux-border/10' : 'border-b border-white/[0.05]',
+    mutedXs: L ? 'text-xs text-flux-fg-subtle' : 'text-xs text-zinc-500',
+    iconSubtle: L ? 'text-flux-fg-subtle' : 'text-zinc-500',
+    sessionError: L ? 'min-w-0 text-xs leading-snug text-red-600' : 'min-w-0 text-xs leading-snug text-red-300/90',
+    startPrimary: `rounded-lg bg-emerald-500/90 px-4 py-2 text-[13px] font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-400/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 ${ringOff} disabled:cursor-not-allowed`,
+    startIdleSuffix: L
+      ? 'disabled:bg-flux-hover/50 disabled:text-flux-fg-subtle disabled:shadow-none'
+      : 'disabled:bg-zinc-800/80 disabled:text-zinc-500 disabled:shadow-none',
+    startError: L
+      ? 'rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-[13px] font-medium text-red-800 transition hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/35'
+      : 'rounded-lg border border-red-500/35 bg-red-500/[0.12] px-4 py-2 text-[13px] font-medium text-red-200/90 transition hover:bg-red-500/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40',
+    startLoading: L
+      ? 'cursor-wait rounded-lg bg-flux-hover/20 px-4 py-2 text-[13px] font-medium text-flux-fg-subtle'
+      : 'cursor-wait rounded-lg bg-zinc-800/90 px-4 py-2 text-[13px] font-medium text-zinc-500',
+    markDone: L
+      ? 'rounded-lg bg-flux-hover/10 px-4 py-2 text-[13px] font-medium text-flux-fg ring-1 ring-inset ring-flux-border/12 transition hover:bg-flux-hover/16 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flux-ring/30'
+      : 'rounded-lg bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25',
+    markDoneDisabled: L
+      ? 'cursor-not-allowed rounded-lg bg-flux-hover/8 px-4 py-2 text-[13px] font-medium text-flux-fg-subtle ring-1 ring-inset ring-flux-border/10'
+      : 'cursor-not-allowed rounded-lg bg-zinc-800/50 px-4 py-2 text-[13px] font-medium text-zinc-500 ring-1 ring-inset ring-white/[0.06]',
+    blockedStart: L
+      ? 'cursor-not-allowed rounded-lg bg-flux-hover/8 px-4 py-2 text-[13px] font-medium text-flux-fg-subtle ring-1 ring-inset ring-flux-border/10'
+      : 'cursor-not-allowed rounded-lg bg-zinc-800/50 px-4 py-2 text-[13px] font-medium text-zinc-500 ring-1 ring-inset ring-white/[0.06]',
+    propertySelect: L
+      ? 'w-full min-w-0 max-w-full cursor-pointer appearance-none rounded-lg border-0 bg-flux-hover/10 py-1.5 pl-2.5 pr-8 text-[12px] font-medium text-flux-fg ring-1 ring-inset ring-flux-border/12 outline-none transition hover:bg-flux-hover/14 focus-visible:ring-2 focus-visible:ring-flux-ring/25'
+      : 'w-full min-w-0 max-w-full cursor-pointer appearance-none rounded-lg border-0 bg-white/[0.04] py-1.5 pl-2.5 pr-8 text-[12px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.06] outline-none transition hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/20',
+    assigneeTrigger: L
+      ? 'flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg border-0 bg-flux-hover/10 py-1.5 pl-2.5 pr-2 text-left text-[12px] font-medium text-flux-fg ring-1 ring-inset ring-flux-border/12 outline-none transition hover:bg-flux-hover/14 focus-visible:ring-2 focus-visible:ring-flux-ring/25'
+      : 'flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg border-0 bg-white/[0.04] py-1.5 pl-2.5 pr-2 text-left text-[12px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.06] outline-none transition hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/20',
+    iconBtn: L
+      ? 'shrink-0 rounded-lg p-2 text-flux-fg-subtle transition hover:bg-flux-hover/12 hover:text-flux-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flux-ring/25'
+      : 'shrink-0 rounded-lg p-2 text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
+    iconBtnSq: L
+      ? 'flex h-8 w-8 items-center justify-center rounded-lg text-flux-fg-subtle transition hover:bg-flux-hover/12 hover:text-flux-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flux-ring/25'
+      : 'flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
+    titleInput: L
+      ? 'w-full resize-none bg-transparent text-2xl font-semibold leading-tight tracking-tight text-flux-fg placeholder:text-flux-fg-subtle outline-none focus:outline-none focus-visible:ring-0'
+      : 'w-full resize-none bg-transparent text-2xl font-semibold leading-tight tracking-tight text-zinc-50 placeholder:text-zinc-600 outline-none focus:outline-none focus-visible:ring-0',
+    popoverSurface: L
+      ? 'absolute right-0 z-40 mt-1.5 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-flux-border/12 bg-flux-elevated p-3 text-[12px] shadow-xl shadow-black/10'
+      : 'absolute right-0 z-40 mt-1.5 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-white/[0.08] bg-[#111113] p-3 text-[12px] shadow-xl shadow-black/50',
+    formLabelMuted: L ? 'flex cursor-pointer items-start gap-2 text-flux-fg' : 'flex cursor-pointer items-start gap-2 text-zinc-200',
+    checkbox: L
+      ? 'mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-flux-border/35 bg-flux-canvas'
+      : 'mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-white/[0.2] bg-[#09090b]',
+    strongLabel: L ? 'font-medium text-flux-fg' : 'font-medium text-zinc-100',
+    helperProse: L ? 'mt-1 block text-[11px] text-flux-fg-subtle' : 'mt-1 block text-[11px] text-zinc-500',
+    codeMuted: L ? 'text-flux-fg-muted' : 'text-zinc-400',
+    emptyPopover: L ? 'leading-relaxed text-flux-fg-subtle' : 'leading-relaxed text-zinc-500',
+    assigneeMenu: L
+      ? 'absolute left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto rounded-xl border border-flux-border/12 bg-flux-elevated py-1 shadow-xl shadow-black/10'
+      : 'absolute left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#111113] py-1 shadow-xl shadow-black/50',
+    assigneeMenuItem: L
+      ? 'flex w-full items-center gap-2 px-2.5 py-2 text-left text-[12px] text-flux-fg hover:bg-flux-hover/12 focus-visible:bg-flux-hover/12 focus-visible:outline-none'
+      : 'flex w-full items-center gap-2 px-2.5 py-2 text-left text-[12px] text-zinc-200 hover:bg-white/[0.06] focus-visible:bg-white/[0.06] focus-visible:outline-none',
+    assigneeMenuItemSelected: L ? 'bg-flux-hover/10 text-flux-fg' : 'bg-white/[0.04] text-zinc-50',
+    assigneeMenuItemIdle: L ? 'text-flux-fg' : 'text-zinc-200',
+    unknownAvatar: L
+      ? 'flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-flux-hover/20 text-[10px] font-medium text-flux-fg-muted'
+      : 'flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-zinc-500/[0.15] text-[10px] font-medium text-zinc-400',
+    assigneeSecondary: L ? 'min-w-0 flex-1 truncate text-flux-fg-muted' : 'min-w-0 flex-1 truncate text-zinc-400',
+    branchSectionTop: L ? 'border-t border-flux-border/10 pt-4' : 'border-t border-white/[0.04] pt-4',
+    branchHint: L ? 'mt-2 text-[11px] text-flux-fg-muted' : 'mt-2 text-[11px] text-zinc-600',
+    branchLockedNote: L ? 'mt-2 text-[11px] leading-snug text-amber-900/90' : 'mt-2 text-[11px] leading-snug text-amber-200/85',
+    descriptionSection: L
+      ? 'border-t border-flux-border/10 bg-flux-hover/5 px-5 py-5'
+      : 'border-t border-white/[0.04] bg-white/[0.02] px-5 py-5',
+    sectionHeading: L ? 'text-sm font-medium text-flux-fg-muted' : 'text-sm font-medium text-zinc-300',
+    ghostTextBtn: L
+      ? 'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-flux-fg-muted transition hover:bg-flux-hover/12 hover:text-flux-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flux-ring/25'
+      : 'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-zinc-400 transition hover:bg-white/[0.06] hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
+    descriptionTextarea: L
+      ? 'min-h-[8rem] w-full resize-y rounded-xl bg-flux-canvas px-3.5 py-3.5 text-[13px] leading-[1.65] text-flux-fg ring-1 ring-inset ring-flux-border/12 outline-none placeholder:text-flux-fg-subtle focus-visible:ring-2 focus-visible:ring-flux-ring/30'
+      : 'min-h-[8rem] w-full resize-y rounded-xl bg-[#0c0c0e] px-3.5 py-3.5 text-[13px] leading-[1.65] text-zinc-200 ring-1 ring-inset ring-white/[0.06] outline-none placeholder:text-zinc-600 focus-visible:ring-2 focus-visible:ring-white/20',
+    dashedEmpty: L
+      ? 'w-full rounded-xl border border-dashed border-flux-border/18 bg-transparent py-8 text-left text-sm text-flux-fg-subtle transition hover:border-flux-border/28 hover:bg-flux-hover/6 hover:text-flux-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flux-ring/25'
+      : 'w-full rounded-xl border border-dashed border-white/[0.1] bg-transparent py-8 text-left text-sm text-zinc-500 transition hover:border-white/[0.14] hover:bg-white/[0.02] hover:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
+    blockingBanner: L
+      ? 'rounded-xl border border-amber-300/50 bg-amber-50 px-3.5 py-2.5 text-sm leading-relaxed text-amber-950'
+      : 'rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3.5 py-2.5 text-sm leading-relaxed text-amber-100/90',
+    blockingBannerStrong: L ? 'font-medium text-amber-950' : 'font-medium text-amber-200/95',
+    blockingBannerBody: L ? 'text-amber-950/85' : 'text-amber-100/85',
+    blockingBannerFoot: L ? 'text-xs text-amber-900/75' : 'text-xs text-amber-200/75',
+    depsHelp: L ? 'text-xs leading-relaxed text-flux-fg-subtle' : 'text-xs leading-relaxed text-zinc-500',
+    depsEmpty: L ? 'text-sm text-flux-fg-muted' : 'text-sm text-zinc-600',
+    autoStartBox: L
+      ? 'flex items-start gap-2.5 rounded-lg border border-flux-border/12 bg-flux-hover/6 px-3 py-2.5'
+      : 'flex items-start gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5',
+    checkboxLg: L
+      ? 'mt-0.5 h-4 w-4 shrink-0 rounded border-flux-border/35 bg-flux-canvas disabled:cursor-not-allowed'
+      : 'mt-0.5 h-4 w-4 shrink-0 rounded border-white/[0.2] bg-[#09090b] disabled:cursor-not-allowed',
+    autoStartTitle: L ? 'text-[13px] font-medium text-flux-fg' : 'text-[13px] font-medium text-zinc-200',
+    autoStartSub: L ? 'mt-0.5 block text-[11px] leading-snug text-flux-fg-subtle' : 'mt-0.5 block text-[11px] leading-snug text-zinc-500',
+    depCard: L
+      ? 'flex min-h-[2.75rem] items-stretch gap-0 overflow-hidden rounded-lg bg-flux-hover/8 ring-1 ring-inset ring-flux-border/10 transition hover:bg-flux-hover/12'
+      : 'flex min-h-[2.75rem] items-stretch gap-0 overflow-hidden rounded-lg bg-white/[0.03] ring-1 ring-inset ring-white/[0.06] transition hover:bg-white/[0.04]',
+    depCardBtn: L
+      ? 'min-w-0 flex-1 px-3 py-2.5 text-left text-sm text-flux-fg transition hover:text-flux-fg'
+      : 'min-w-0 flex-1 px-3 py-2.5 text-left text-sm text-zinc-200 transition hover:text-white',
+    depCardDivider: L ? 'flex shrink-0 items-center gap-1 border-l border-flux-border/12 pl-1 pr-1.5' : 'flex shrink-0 items-center gap-1 border-l border-white/[0.05] pl-1 pr-1.5',
+    ghostXs: L
+      ? 'rounded-md px-2 py-1 text-xs text-flux-fg-subtle transition hover:bg-flux-hover/12 hover:text-flux-fg'
+      : 'rounded-md px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/[0.08] hover:text-zinc-200',
+    ghostXsShrink: L
+      ? 'shrink-0 rounded-md px-2 py-1 text-xs text-flux-fg-subtle transition hover:bg-flux-hover/12 hover:text-flux-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flux-ring/25'
+      : 'shrink-0 rounded-md px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/[0.08] hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
+    missingCard: L
+      ? 'flex items-center justify-between gap-2 rounded-lg bg-flux-hover/8 px-3 py-2 ring-1 ring-inset ring-amber-300/35'
+      : 'flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2 ring-1 ring-inset ring-amber-500/15',
+    missingText: L ? 'min-w-0 text-sm text-flux-fg-subtle' : 'min-w-0 text-sm text-zinc-500',
+    depSearch: L
+      ? 'w-full rounded-lg bg-flux-hover/10 px-3 py-2 text-sm text-flux-fg ring-1 ring-inset ring-flux-border/12 outline-none transition placeholder:text-flux-fg-subtle focus-visible:ring-2 focus-visible:ring-flux-ring/25'
+      : 'w-full rounded-lg bg-white/[0.04] px-3 py-2 text-sm text-zinc-200 ring-1 ring-inset ring-white/[0.06] outline-none transition placeholder:text-zinc-600 focus-visible:ring-2 focus-visible:ring-white/20',
+    depPickerList: L
+      ? 'max-h-40 overflow-y-auto rounded-lg bg-flux-canvas py-1 ring-1 ring-inset ring-flux-border/12'
+      : 'max-h-40 overflow-y-auto rounded-lg bg-[#0c0c0e] py-1 ring-1 ring-inset ring-white/[0.06]',
+    depPickerRow: L
+      ? 'flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm text-flux-fg transition hover:bg-flux-hover/10'
+      : 'flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm text-zinc-200 transition hover:bg-white/[0.05]',
+    noMatch: L ? 'text-xs text-flux-fg-muted' : 'text-xs text-zinc-600',
+    dashedAddBtn: L
+      ? 'w-full rounded-lg border border-dashed border-flux-border/18 bg-transparent px-3 py-2.5 text-left text-sm text-flux-fg-muted transition hover:border-flux-border/28 hover:bg-flux-hover/6 hover:text-flux-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flux-ring/25'
+      : 'w-full rounded-lg border border-dashed border-white/[0.1] bg-transparent px-3 py-2.5 text-left text-sm text-zinc-400 transition hover:border-white/[0.14] hover:bg-white/[0.02] hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20',
+    depErr: L ? 'text-xs text-red-600' : 'text-xs text-red-300/90',
+    deleteTask: L
+      ? `text-sm text-flux-fg-subtle transition hover:text-flux-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/35 rounded ${ringOff}`
+      : `text-sm text-zinc-500 transition hover:text-red-400/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40 rounded ${ringOff}`,
+    backdrop: L ? 'absolute inset-0 z-10 bg-black/15' : 'absolute inset-0 z-10 bg-black/30',
+  };
+}
 
 function formatCreatedLabel(iso: string): string {
   const d = new Date(iso);
@@ -863,23 +1047,8 @@ export default function TaskDetailPanel({
     : sessionError
       ? 'Retry'
       : 'Start session';
-  const startBtnPrimary =
-    'rounded-lg bg-emerald-500/90 px-4 py-2 text-[13px] font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-400/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0b] disabled:cursor-not-allowed';
-  const startBtnIdle = `${startBtnPrimary} disabled:bg-zinc-800/80 disabled:text-zinc-500 disabled:shadow-none`;
-  const startBtnError =
-    'rounded-lg border border-red-500/35 bg-red-500/[0.12] px-4 py-2 text-[13px] font-medium text-red-200/90 transition hover:bg-red-500/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40';
-  const startBtnLoading =
-    'cursor-wait rounded-lg bg-zinc-800/90 px-4 py-2 text-[13px] font-medium text-zinc-500';
-  const markDoneBtn =
-    'rounded-lg bg-white/[0.04] px-4 py-2 text-[13px] font-medium text-zinc-100 ring-1 ring-inset ring-white/[0.08] transition hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25';
-  const markDoneBtnDisabled =
-    'cursor-not-allowed rounded-lg bg-zinc-800/50 px-4 py-2 text-[13px] font-medium text-zinc-500 ring-1 ring-inset ring-white/[0.06]';
-
-  const propertySelectClass =
-    'w-full min-w-0 max-w-full cursor-pointer appearance-none rounded-lg border-0 bg-white/[0.04] py-1.5 pl-2.5 pr-8 text-[12px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.06] outline-none transition hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/20';
-  const assigneeTriggerClass =
-    'flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg border-0 bg-white/[0.04] py-1.5 pl-2.5 pr-2 text-left text-[12px] font-medium text-zinc-200 ring-1 ring-inset ring-white/[0.06] outline-none transition hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-white/20';
-
+  const td = taskDetailChrome(theme);
+  const startBtnIdle = `${td.startPrimary} ${td.startIdleSuffix}`;
   /** Any local session (running or after exit) — keep embedded terminal for buffer continuity. */
   const hasLocalSession = Boolean(session?.id);
   const sessionIdleAfterRun = hasLocalSession && !sessionRunning;
@@ -897,23 +1066,23 @@ export default function TaskDetailPanel({
           aria-orientation="vertical"
           aria-label="Resize task details"
           title="Drag to resize. Double-click to reset."
-          className="absolute bottom-0 left-0 top-0 z-30 w-3 -translate-x-1/2 cursor-col-resize touch-none outline-none before:pointer-events-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-white/[0.08] before:content-[''] hover:before:bg-white/[0.2] focus-visible:ring-1 focus-visible:ring-white/20"
+          className={td.resizeHandle}
           onPointerDown={handleResizePointerDown}
           onDoubleClick={handleResizeDoubleClick}
         />
       ) : null}
 
       {/* Top bar: metadata + primary CTA + optional close (board overlay only) */}
-      <header className="flex shrink-0 items-start gap-3 border-b border-white/[0.05] px-5 py-4">
+      <header className={`flex shrink-0 items-start gap-3 px-5 py-4 ${td.headerBottom}`}>
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className={`inline-flex rounded-md px-2.5 py-0.5 text-xs font-medium ${STATUS_CHIP[task.status]}`}
+                className={`inline-flex rounded-md px-2.5 py-0.5 text-xs font-medium ${statusChip(task.status, theme)}`}
               >
                 {statusLabel}
               </span>
               {task.createdAt ? (
-                <span className="text-xs text-zinc-500">Created {formatCreatedLabel(task.createdAt)}</span>
+                <span className={td.mutedXs}>Created {formatCreatedLabel(task.createdAt)}</span>
               ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -927,7 +1096,7 @@ export default function TaskDetailPanel({
                       ? 'Finish blocking tasks before marking this task done'
                       : undefined
                   }
-                  className={markDoneDisabled ? markDoneBtnDisabled : markDoneBtn}
+                  className={markDoneDisabled ? td.markDoneDisabled : td.markDone}
                 >
                   Mark as done
                 </button>
@@ -955,11 +1124,11 @@ export default function TaskDetailPanel({
                       }
                       className={
                         startInFlight
-                          ? startBtnLoading
+                          ? td.startLoading
                           : sessionError
-                            ? startBtnError
+                            ? td.startError
                             : blocked
-                              ? 'cursor-not-allowed rounded-lg bg-zinc-800/50 px-4 py-2 text-[13px] font-medium text-zinc-500 ring-1 ring-inset ring-white/[0.06]'
+                              ? td.blockedStart
                               : startBtnIdle
                       }
                     >
@@ -976,10 +1145,10 @@ export default function TaskDetailPanel({
                       }
                       className={
                         startInFlight
-                          ? startBtnLoading
+                          ? td.startLoading
                           : blocked
-                            ? 'cursor-not-allowed rounded-lg bg-zinc-800/50 px-4 py-2 text-[13px] font-medium text-zinc-500 ring-1 ring-inset ring-white/[0.06]'
-                            : markDoneBtn
+                            ? td.blockedStart
+                            : td.markDone
                       }
                     >
                       {blocked ? 'Blocked' : 'New session'}
@@ -993,11 +1162,11 @@ export default function TaskDetailPanel({
                     title={blocked ? 'Blocked by incomplete dependencies' : undefined}
                     className={
                       startInFlight
-                        ? startBtnLoading
+                        ? td.startLoading
                         : sessionError
-                          ? startBtnError
+                          ? td.startError
                           : blocked
-                            ? 'cursor-not-allowed rounded-lg bg-zinc-800/50 px-4 py-2 text-[13px] font-medium text-zinc-500 ring-1 ring-inset ring-white/[0.06]'
+                            ? td.blockedStart
                             : startBtnIdle
                     }
                   >
@@ -1006,7 +1175,7 @@ export default function TaskDetailPanel({
                 )
               ) : null}
               {sessionError && !sessionRunning ? (
-                <p className="min-w-0 text-xs leading-snug text-red-300/90">{sessionError}</p>
+                <p className={td.sessionError}>{sessionError}</p>
               ) : null}
             </div>
           </div>
@@ -1014,7 +1183,7 @@ export default function TaskDetailPanel({
             <button
               type="button"
               onClick={onClose}
-              className="shrink-0 rounded-lg p-2 text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+              className={td.iconBtn}
               aria-label="Close"
             >
               <X className="h-5 w-5" strokeWidth={1.75} aria-hidden />
@@ -1037,7 +1206,7 @@ export default function TaskDetailPanel({
                   onUpdate(task.id, { title: e.target.value });
                   titleArea.resize();
                 }}
-                className="w-full resize-none bg-transparent text-2xl font-semibold leading-tight tracking-tight text-zinc-50 placeholder:text-zinc-600 outline-none focus:outline-none focus-visible:ring-0"
+                className={td.titleInput}
                 placeholder="Task title"
               />
 
@@ -1052,7 +1221,7 @@ export default function TaskDetailPanel({
               {/* Properties: compact row */}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
                 <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-xs text-zinc-500">Agent & model</p>
+                  <p className={td.mutedXs}>Agent & model</p>
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <select
                       value={task.agent}
@@ -1065,7 +1234,7 @@ export default function TaskDetailPanel({
                         }
                         onUpdate(task.id, patch);
                       }}
-                      className={`max-w-full shrink-0 ${propertySelectClass} ${agentChipStyles(task.agent, theme)}`}
+                      className={`max-w-full shrink-0 ${td.propertySelect} ${agentChipStyles(task.agent, theme)}`}
                       style={{ colorScheme: nativeFormColorScheme }}
                       aria-label="Agent provider"
                     >
@@ -1099,7 +1268,7 @@ export default function TaskDetailPanel({
                       </div>
                     ) : (
                       <span
-                        className="text-xs text-zinc-500"
+                        className={td.mutedXs}
                         title="Model selection is not wired for Codex in this version."
                       >
                         Default model
@@ -1111,56 +1280,56 @@ export default function TaskDetailPanel({
                         aria-label="Agent spawn settings"
                         aria-expanded={agentSettingsOpen}
                         onClick={() => setAgentSettingsOpen((o) => !o)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                        className={td.iconBtnSq}
                       >
                         <Settings className="h-4 w-4" strokeWidth={1.75} aria-hidden />
                       </button>
                       {agentSettingsOpen ? (
                         <div
-                          className="absolute right-0 z-40 mt-1.5 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-white/[0.08] bg-[#111113] p-3 text-[12px] shadow-xl shadow-black/50"
+                          className={td.popoverSurface}
                           role="dialog"
                           aria-label="Agent settings"
                         >
                           {task.agent === 'cursor' ? (
-                            <label className="flex cursor-pointer items-start gap-2 text-zinc-200">
+                            <label className={td.formLabelMuted}>
                               <input
                                 type="checkbox"
-                                className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-white/[0.2] bg-[#09090b]"
+                                className={td.checkbox}
                                 checked={task.agentYolo === true}
                                 onChange={(e) =>
                                   onUpdate(task.id, { agentYolo: e.target.checked })
                                 }
                               />
                               <span className="leading-snug">
-                                <span className="font-medium text-zinc-100">YOLO (Run Everything)</span>
-                                <span className="mt-1 block text-[11px] text-zinc-500">
-                                  Matches Cursor Agent <code className="text-zinc-400">--yolo</code> /{' '}
-                                  <code className="text-zinc-400">--force</code>: fewer confirmation
+                                <span className={td.strongLabel}>YOLO (Run Everything)</span>
+                                <span className={td.helperProse}>
+                                  Matches Cursor Agent <code className={td.codeMuted}>--yolo</code> /{' '}
+                                  <code className={td.codeMuted}>--force</code>: fewer confirmation
                                   prompts; tools and shell commands run more freely unless explicitly
                                   denied.
                                 </span>
                               </span>
                             </label>
                           ) : task.agent === 'claude-code' ? (
-                            <label className="flex cursor-pointer items-start gap-2 text-zinc-200">
+                            <label className={td.formLabelMuted}>
                               <input
                                 type="checkbox"
-                                className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-white/[0.2] bg-[#09090b]"
+                                className={td.checkbox}
                                 checked={task.agentYolo === true}
                                 onChange={(e) =>
                                   onUpdate(task.id, { agentYolo: e.target.checked })
                                 }
                               />
                               <span className="leading-snug">
-                                <span className="font-medium text-zinc-100">Skip permission checks</span>
-                                <span className="mt-1 block text-[11px] text-zinc-500">
-                                  Passes <code className="text-zinc-400">--dangerously-skip-permissions</code> to
+                                <span className={td.strongLabel}>Skip permission checks</span>
+                                <span className={td.helperProse}>
+                                  Passes <code className={td.codeMuted}>--dangerously-skip-permissions</code> to
                                   Claude Code. Anthropic recommends this only for trusted sandboxes.
                                 </span>
                               </span>
                             </label>
                           ) : (
-                            <p className="leading-relaxed text-zinc-500">
+                            <p className={td.emptyPopover}>
                               No spawn toggles for Codex in this version.
                             </p>
                           )}
@@ -1170,14 +1339,14 @@ export default function TaskDetailPanel({
                   </div>
                 </div>
                 <div className="w-full min-w-0 sm:w-44 sm:shrink-0">
-                  <label htmlFor="task-status-select" className="mb-1.5 block text-xs text-zinc-500">
+                  <label htmlFor="task-status-select" className={`mb-1.5 block ${td.mutedXs}`}>
                     Status
                   </label>
                   <select
                     id="task-status-select"
                     value={task.status}
                     onChange={(e) => onUpdate(task.id, { status: e.target.value as TaskStatus })}
-                    className={propertySelectClass}
+                    className={td.propertySelect}
                     style={{ colorScheme: nativeFormColorScheme }}
                     aria-label="Change status"
                   >
@@ -1192,7 +1361,7 @@ export default function TaskDetailPanel({
 
               {projectMembers !== undefined ? (
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                  <p className="shrink-0 text-xs text-zinc-500">Assignee</p>
+                  <p className={`shrink-0 ${td.mutedXs}`}>Assignee</p>
                   <div ref={assigneeMenuWrapRef} className="relative min-w-0 sm:max-w-[min(18rem,100%)] sm:flex-1">
                     <button
                       type="button"
@@ -1201,7 +1370,7 @@ export default function TaskDetailPanel({
                       aria-haspopup="listbox"
                       aria-expanded={assigneeMenuOpen}
                       aria-controls="task-assignee-listbox"
-                      className={assigneeTriggerClass}
+                      className={td.assigneeTrigger}
                     >
                       {task.assigneeId && selectedAssigneeMember ? (
                         <>
@@ -1212,47 +1381,45 @@ export default function TaskDetailPanel({
                         </>
                       ) : task.assigneeId ? (
                         <>
-                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-zinc-500/[0.15] text-[10px] font-medium text-zinc-400">
-                            ?
-                          </div>
-                          <span className="min-w-0 flex-1 truncate text-zinc-400">
+                          <div className={td.unknownAvatar}>?</div>
+                          <span className={td.assigneeSecondary}>
                             Unknown member
                           </span>
                         </>
                       ) : (
                         <>
                           <UserCircle2
-                            className="h-5 w-5 shrink-0 text-zinc-500"
+                            className={`h-5 w-5 shrink-0 ${td.iconSubtle}`}
                             strokeWidth={1.5}
                             aria-hidden
                           />
-                          <span className="min-w-0 flex-1 truncate text-zinc-400">
+                          <span className={td.assigneeSecondary}>
                             Unassigned
                           </span>
                         </>
                       )}
-                      <ChevronDown className="h-4 w-4 shrink-0 text-zinc-500" strokeWidth={2} aria-hidden />
+                      <ChevronDown className={`h-4 w-4 shrink-0 ${td.iconSubtle}`} strokeWidth={2} aria-hidden />
                     </button>
                     {assigneeMenuOpen ? (
                       <div
                         id="task-assignee-listbox"
                         role="listbox"
                         aria-labelledby="task-assignee-trigger"
-                        className="absolute left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto rounded-xl border border-white/[0.08] bg-[#111113] py-1 shadow-xl shadow-black/50"
+                        className={td.assigneeMenu}
                       >
                         <button
                           type="button"
                           role="option"
                           aria-selected={!task.assigneeId}
-                          className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-[12px] text-zinc-200 hover:bg-white/[0.06] focus-visible:bg-white/[0.06] focus-visible:outline-none"
+                          className={td.assigneeMenuItem}
                           onClick={() => requestAssigneeChange(null)}
                         >
                           <UserCircle2
-                            className="h-5 w-5 shrink-0 text-zinc-500"
+                            className={`h-5 w-5 shrink-0 ${td.iconSubtle}`}
                             strokeWidth={1.5}
                             aria-hidden
                           />
-                          <span className="truncate text-zinc-400">Unassigned</span>
+                          <span className={`truncate ${td.assigneeSecondary}`}>Unassigned</span>
                         </button>
                         {projectMembers.map((m) => {
                           const selected = task.assigneeId === m.uid;
@@ -1262,8 +1429,8 @@ export default function TaskDetailPanel({
                               type="button"
                               role="option"
                               aria-selected={selected}
-                              className={`flex w-full items-center gap-2 px-2.5 py-2 text-left text-[12px] hover:bg-white/[0.06] focus-visible:bg-white/[0.06] focus-visible:outline-none ${
-                                selected ? 'bg-white/[0.04] text-zinc-50' : 'text-zinc-200'
+                              className={`${td.assigneeMenuItem} ${
+                                selected ? td.assigneeMenuItemSelected : td.assigneeMenuItemIdle
                               }`}
                               onClick={() => requestAssigneeChange(m.uid)}
                             >
@@ -1278,7 +1445,7 @@ export default function TaskDetailPanel({
                 </div>
               ) : null}
 
-              <div className="border-t border-white/[0.04] pt-4">
+              <div className={td.branchSectionTop}>
                 <TaskSourceBranchPicker
                   variant="panel"
                   idPrefix={`task-${task.id}-branch`}
@@ -1291,13 +1458,13 @@ export default function TaskDetailPanel({
                   onInputBlur={persistBranchDraft}
                 />
                 {branchSourceLocked ? (
-                  <p className="mt-2 text-[11px] leading-snug text-amber-200/85">
+                  <p className={td.branchLockedNote}>
                     This branch is fixed once there is a worktree or any agent session for the task
                     (including after the session ends), or while a session is starting. Metadata is
                     shared on cloud projects; git availability is always evaluated on this computer.
                   </p>
                 ) : (
-                  <p className="mt-2 text-[11px] text-zinc-600">
+                  <p className={td.branchHint}>
                     Updates when you leave the branch field. If session start fails locally, check
                     the error message and your clone.
                   </p>
@@ -1307,16 +1474,16 @@ export default function TaskDetailPanel({
 
             {/* Description: read-first, edit on demand */}
             <section
-              className="border-t border-white/[0.04] bg-white/[0.02] px-5 py-5"
+              className={td.descriptionSection}
               aria-label="Description"
             >
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-sm font-medium text-zinc-300">Description</h2>
+                <h2 className={td.sectionHeading}>Description</h2>
                 {!descriptionEditing ? (
                   <button
                     type="button"
                     onClick={() => setDescriptionEditing(true)}
-                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-zinc-400 transition hover:bg-white/[0.06] hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                    className={td.ghostTextBtn}
                   >
                     <Pencil className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
                     {hasDescription ? 'Edit' : 'Add details'}
@@ -1336,19 +1503,19 @@ export default function TaskDetailPanel({
                   autoFocus
                   rows={4}
                   placeholder="Write a plan, acceptance criteria, or notes — Markdown is supported."
-                  className="min-h-[8rem] w-full resize-y rounded-xl bg-[#0c0c0e] px-3.5 py-3.5 text-[13px] leading-[1.65] text-zinc-200 ring-1 ring-inset ring-white/[0.06] outline-none placeholder:text-zinc-600 focus-visible:ring-2 focus-visible:ring-white/20"
+                  className={td.descriptionTextarea}
                 />
               ) : (
                 <div className="group relative min-h-[3rem]">
                   {hasDescription ? (
-                    <article className={MD_READ_CLASS}>
+                    <article className={mdReadClass(theme)}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{descriptionRaw}</ReactMarkdown>
                     </article>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setDescriptionEditing(true)}
-                      className="w-full rounded-xl border border-dashed border-white/[0.1] bg-transparent py-8 text-left text-sm text-zinc-500 transition hover:border-white/[0.14] hover:bg-white/[0.02] hover:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                      className={td.dashedEmpty}
                     >
                       No description yet. Click to add plan, criteria, or notes.
                     </button>
@@ -1359,14 +1526,11 @@ export default function TaskDetailPanel({
 
             <div className="space-y-4 px-5 py-5">
               {(blockingTasks.length > 0 || staleMissingIds.length > 0) && (
-                <div
-                  className="rounded-xl border border-amber-500/20 bg-amber-500/[0.06] px-3.5 py-2.5 text-sm leading-relaxed text-amber-100/90"
-                  role="status"
-                >
+                <div className={td.blockingBanner} role="status">
                   {blockingTasks.length > 0 ? (
                     <p>
-                      <span className="font-medium text-amber-200/95">Waiting on other work</span>
-                      <span className="text-amber-100/85">
+                      <span className={td.blockingBannerStrong}>Waiting on other work</span>
+                      <span className={td.blockingBannerBody}>
                         {' '}
                         — complete {blockingTasks.length === 1 ? 'this task' : 'these tasks'} first:{' '}
                         {blockingTasks.map((b) => b.title || '(Untitled)').join(', ')}
@@ -1375,7 +1539,7 @@ export default function TaskDetailPanel({
                   ) : null}
                   {staleMissingIds.length > 0 ? (
                     <p
-                      className={`text-xs text-amber-200/75 ${blockingTasks.length > 0 ? 'mt-1.5' : ''}`}
+                      className={`${td.blockingBannerFoot} ${blockingTasks.length > 0 ? 'mt-1.5' : ''}`}
                     >
                       {staleMissingIds.length} reference{staleMissingIds.length === 1 ? '' : 's'} missing
                       from the board — remove {staleMissingIds.length === 1 ? 'it' : 'them'} below.
@@ -1385,8 +1549,8 @@ export default function TaskDetailPanel({
               )}
 
               <section className="space-y-2" aria-label="Dependencies">
-                <h2 className="text-sm font-medium text-zinc-300">Blockers & dependencies</h2>
-                <p className="text-xs leading-relaxed text-zinc-500">
+                <h2 className={td.sectionHeading}>Blockers & dependencies</h2>
+                <p className={td.depsHelp}>
                   This task stays blocked until every listed dependency is done. Missing task ids are ignored
                   for blocking logic.
                 </p>
@@ -1397,7 +1561,7 @@ export default function TaskDetailPanel({
                         ? 'Only the assignee can change this setting for this task'
                         : undefined
                     }
-                    className={`flex items-start gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 ${
+                    className={`${td.autoStartBox} ${
                       unblockAutoStartCheckboxLocked
                         ? 'cursor-not-allowed opacity-70'
                         : 'cursor-pointer'
@@ -1411,19 +1575,19 @@ export default function TaskDetailPanel({
                         if (unblockAutoStartCheckboxLocked) return;
                         onUpdate(task.id, { autoStartOnUnblock: e.target.checked });
                       }}
-                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/[0.2] bg-[#09090b] disabled:cursor-not-allowed"
+                      className={td.checkboxLg}
                     />
                     <span className="min-w-0">
-                      <span className="text-[13px] font-medium text-zinc-200">
+                      <span className={td.autoStartTitle}>
                         Auto-start when unblocked
                       </span>
-                      <span className="mt-0.5 block text-[11px] leading-snug text-zinc-500">
+                      <span className={td.autoStartSub}>
                         Start a session when the last dependency is completed
                         {autoStartWhenUnblockedProject
                           ? ' (this project can also auto-start from settings).'
                           : ' (or enable the project default in settings).'}
                         {unblockAutoStartCheckboxLocked ? (
-                          <span className="mt-1 block text-zinc-500">
+                          <span className={`mt-1 block ${td.mutedXs}`}>
                             Only the assignee can edit this while the task is assigned to someone
                             else.
                           </span>
@@ -1433,7 +1597,7 @@ export default function TaskDetailPanel({
                   </label>
                 ) : null}
                 {(task.blockedByTaskIds ?? []).length === 0 ? (
-                  <p className="text-sm text-zinc-600">No dependencies — this task is not waiting on other work.</p>
+                  <p className={td.depsEmpty}>No dependencies — this task is not waiting on other work.</p>
                 ) : (
                   <ul className="flex flex-col gap-1.5">
                     {(task.blockedByTaskIds ?? []).map((bid) => {
@@ -1442,28 +1606,25 @@ export default function TaskDetailPanel({
                         const stLabel =
                           COLUMNS.find((c) => c.id === other.status)?.label ?? other.status;
                         return (
-                          <li
-                            key={bid}
-                            className="flex min-h-[2.75rem] items-stretch gap-0 overflow-hidden rounded-lg bg-white/[0.03] ring-1 ring-inset ring-white/[0.06] transition hover:bg-white/[0.04]"
-                          >
+                          <li key={bid} className={td.depCard}>
                             <button
                               type="button"
                               onClick={() => onSelectTask(bid)}
-                              className="min-w-0 flex-1 px-3 py-2.5 text-left text-sm text-zinc-200 transition hover:text-white"
+                              className={td.depCardBtn}
                             >
                               <span className="line-clamp-2 font-medium">{other.title || '(Untitled)'}</span>
-                              <span className="ml-2 inline-block align-middle text-xs text-zinc-500">Open →</span>
+                              <span className={`ml-2 inline-block align-middle ${td.mutedXs}`}>Open →</span>
                             </button>
-                            <div className="flex shrink-0 items-center gap-1 border-l border-white/[0.05] pl-1 pr-1.5">
+                            <div className={td.depCardDivider}>
                               <span
-                                className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${STATUS_CHIP[other.status]}`}
+                                className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${statusChip(other.status, theme)}`}
                               >
                                 {stLabel}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => removeBlocker(bid)}
-                                className="rounded-md px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/[0.08] hover:text-zinc-200"
+                                className={td.ghostXs}
                                 aria-label={`Remove dependency on ${other.title || bid}`}
                               >
                                 Remove
@@ -1473,17 +1634,14 @@ export default function TaskDetailPanel({
                         );
                       }
                       return (
-                        <li
-                          key={bid}
-                          className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-2 ring-1 ring-inset ring-amber-500/15"
-                        >
-                          <span className="min-w-0 text-sm text-zinc-500">
-                            Missing on board <code className="text-zinc-400">{bid}</code>
+                        <li key={bid} className={td.missingCard}>
+                          <span className={td.missingText}>
+                            Missing on board <code className={td.codeMuted}>{bid}</code>
                           </span>
                           <button
                             type="button"
                             onClick={() => removeBlocker(bid)}
-                            className="shrink-0 rounded-md px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/[0.08] hover:text-zinc-200"
+                            className={td.ghostXsShrink}
                           >
                             Remove
                           </button>
@@ -1497,7 +1655,7 @@ export default function TaskDetailPanel({
                   {dependencyAddOpen ? (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-zinc-500">Add a blocker or dependency</span>
+                        <span className={td.mutedXs}>Add a blocker or dependency</span>
                         <button
                           type="button"
                           onClick={() => {
@@ -1505,7 +1663,7 @@ export default function TaskDetailPanel({
                             setDepSearch('');
                             setDependencyError(null);
                           }}
-                          className="shrink-0 rounded-md px-2 py-1 text-xs text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                          className={td.ghostXsShrink}
                         >
                           Cancel
                         </button>
@@ -1515,17 +1673,17 @@ export default function TaskDetailPanel({
                         value={depSearch}
                         onChange={(e) => setDepSearch(e.target.value)}
                         placeholder="Add dependency by search…"
-                        className="w-full rounded-lg bg-white/[0.04] px-3 py-2 text-sm text-zinc-200 ring-1 ring-inset ring-white/[0.06] outline-none transition placeholder:text-zinc-600 focus-visible:ring-2 focus-visible:ring-white/20"
+                        className={td.depSearch}
                         aria-label="Search tasks to add as dependencies"
                       />
                       {dependencyError ? (
-                        <p className="text-xs text-red-300/90" role="alert">
+                        <p className={td.depErr} role="alert">
                           {dependencyError}
                         </p>
                       ) : null}
                       {pickCandidates.length > 0 ? (
                         <ul
-                          className="max-h-40 overflow-y-auto rounded-lg bg-[#0c0c0e] py-1 ring-1 ring-inset ring-white/[0.06]"
+                          className={td.depPickerList}
                           role="listbox"
                           aria-label="Tasks matching your search"
                         >
@@ -1537,24 +1695,24 @@ export default function TaskDetailPanel({
                                 <button
                                   type="button"
                                   onClick={() => addBlocker(t.id)}
-                                  className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm text-zinc-200 transition hover:bg-white/[0.05]"
+                                  className={td.depPickerRow}
                                 >
                                   <span className="min-w-0 truncate">{t.title || '(Untitled)'}</span>
-                                  <span className="shrink-0 text-xs text-zinc-500">{stLabel}</span>
+                                  <span className={`shrink-0 ${td.mutedXs}`}>{stLabel}</span>
                                 </button>
                               </li>
                             );
                           })}
                         </ul>
                       ) : depSearch.trim() ? (
-                        <p className="text-xs text-zinc-600">No matching tasks.</p>
+                        <p className={td.noMatch}>No matching tasks.</p>
                       ) : null}
                     </div>
                   ) : (
                     <button
                       type="button"
                       onClick={() => setDependencyAddOpen(true)}
-                      className="w-full rounded-lg border border-dashed border-white/[0.1] bg-transparent px-3 py-2.5 text-left text-sm text-zinc-400 transition hover:border-white/[0.14] hover:bg-white/[0.02] hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                      className={td.dashedAddBtn}
                     >
                       Add dependency
                     </button>
@@ -1706,11 +1864,7 @@ export default function TaskDetailPanel({
         </div>
 
         <div className="shrink-0 border-t border-flux-border/10 px-5 py-3">
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="text-sm text-zinc-500 transition hover:text-red-400/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0b] rounded"
-          >
+          <button type="button" onClick={handleDelete} className={td.deleteTask}>
             Delete task
           </button>
         </div>
@@ -1724,7 +1878,7 @@ export default function TaskDetailPanel({
           type="button"
           tabIndex={-1}
           aria-label="Close task details"
-          className="absolute inset-0 z-10 bg-black/30"
+          className={td.backdrop}
           onClick={onClose}
         />
       ) : null}
@@ -1732,15 +1886,14 @@ export default function TaskDetailPanel({
         sessionWorkspace ? 'div' : 'aside',
         sessionWorkspace
           ? {
-              className: 'flex h-full min-h-0 min-w-0 flex-col bg-[#0a0a0b]',
+              className: td.shellWorkspace,
               role: 'region' as const,
               'aria-label': 'Task details',
             }
           : {
               ref: asideRef,
               style: { width: detailWidth } as CSSProperties,
-              className:
-                'absolute inset-y-0 right-0 z-20 flex min-w-0 flex-col border-l border-white/[0.04] bg-[#0a0a0b] shadow-[0_0_0_1px_rgba(255,255,255,0.04),-12px_0_40px_rgba(0,0,0,0.45)]',
+              className: td.shellAside,
               role: 'dialog' as const,
               'aria-modal': true as const,
               'aria-labelledby': 'task-detail-title',
