@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   deriveRepoIdForRootPath,
   deriveStablePrimaryRepoIdForProject,
+  effectiveTaskRepoId,
   findRepoByIdOrPrimary,
   getPrimaryRepo,
   getPrimaryRepoForProject,
   repoDisplayLabel,
   repoIdBelongsToProject,
   resolvePrimaryRepoId,
+  resolveRepoForBranchDiscovery,
 } from './repoIdentity';
 import type { LocalProject, RepoConfig } from './types';
 
@@ -100,6 +102,20 @@ describe('repoIdentity (multi-repo2)', () => {
     expect(findRepoByIdOrPrimary(repos, 'r2')?.id).toBe('r2');
     expect(findRepoByIdOrPrimary(repos, undefined)?.id).toBe('r1');
     expect(findRepoByIdOrPrimary(repos, 'missing')?.id).toBe('r1');
+  });
+
+  it('resolveRepoForBranchDiscovery returns undefined when id is unknown', () => {
+    const repos = [makeRepo({ id: 'r1' }), makeRepo({ id: 'r2', rootPath: '/abs/r2' })];
+    expect(resolveRepoForBranchDiscovery(repos, 'missing')).toBeUndefined();
+    expect(resolveRepoForBranchDiscovery(repos, 'r2')?.id).toBe('r2');
+    expect(resolveRepoForBranchDiscovery(repos, undefined)?.id).toBe('r1');
+  });
+
+  it('effectiveTaskRepoId falls back to primary when task.repoId is blank', () => {
+    expect(effectiveTaskRepoId({}, 'primary')).toBe('primary');
+    expect(effectiveTaskRepoId({ repoId: '' }, 'primary')).toBe('primary');
+    expect(effectiveTaskRepoId({ repoId: '  ' }, 'primary')).toBe('primary');
+    expect(effectiveTaskRepoId({ repoId: 'alt' }, 'primary')).toBe('alt');
   });
 
   it('repoDisplayLabel prefers name, falls back to basename, then to short id', () => {

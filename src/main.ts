@@ -7,8 +7,10 @@ import started from 'electron-squirrel-startup';
 import { TaskStore } from './main/TaskStore';
 import { ProjectStore } from './main/ProjectStore';
 import {
+  effectiveTaskRepoId,
   findRepoByIdOrPrimary,
   resolvePrimaryRepoId,
+  resolveRepoForBranchDiscovery,
 } from './repoIdentity';
 import { isMultiRepo2Enabled } from './featureFlags';
 import { McpServer } from './main/McpServer';
@@ -97,8 +99,10 @@ import type {
   ProjectTabState,
   LocalProject,
   Project,
+  RepoBranchDiscoveryRequest,
   RepoBranchDiscoveryResponse,
   RepoConfig,
+  RepoSettingsPatch,
   SessionStartOptions,
   SessionStartResult,
   Task,
@@ -842,32 +846,109 @@ app.whenReady().then(async () => {
     return projectStore.getReposAt(activeProjectDir());
   });
 
+  function multiRepo2DisabledError(): { error: string; code: 'MULTI_REPO2_DISABLED' } {
+    return {
+      error: 'This action requires the multi-repo2 feature flag.',
+      code: 'MULTI_REPO2_DISABLED',
+    };
+  }
+
+  function normalizeBranchDiscoveryArg(
+    raw: unknown,
+  ): { repoId?: string; classifyBranch?: string } {
+    if (raw == null) return {};
+    if (typeof raw === 'string') {
+      return { classifyBranch: raw };
+    }
+    if (typeof raw === 'object') {
+      const o = raw as RepoBranchDiscoveryRequest;
+      const repoId =
+        typeof o.repoId === 'string' && o.repoId.trim() !== ''
+          ? o.repoId.trim()
+          : undefined;
+      const classifyBranch =
+        typeof o.classifyBranch === 'string' ? o.classifyBranch : undefined;
+      return { ...(repoId !== undefined ? { repoId } : {}), classifyBranch };
+    }
+    return {};
+  }
+
+  async function assertRepoUnusedForRemoval(params: {
+    configProjectId: string;
+    repoId: string;
+    repos: RepoConfig[];
+  }): Promise<void> {
+    const primaryRepoId = params.repos[0]?.id;
+    if (!primaryRepoId) {
+      throw new Error('No repositories configured');
+    }
+
+    const localProject = projectStore.get();
+    const tasks =
+      localProject?.id === params.configProjectId
+        ? taskStore.getAll(params.configProjectId)
+        : [];
+
+    const blockingTasks = tasks.filter(
+      (t) => effectiveTaskRepoId(t, primaryRepoId) === params.repoId,
+    );
+    if (blockingTasks.length > 0) {
+      throw new Error(
+        `Cannot remove repository: ${blockingTasks.length} task(s) still reference it.`,
+      );
+    }
+
+    const sessions = await daemonClient.listSessions();
+    for (const s of sessions) {
+      if (s.projectId !== params.configProjectId) continue;
+
+      let effectiveRepo = s.repoId?.trim();
+      if (!effectiveRepo || effectiveRepo.length === 0) {
+        const task = tasks.find((x) => x.id === s.taskId);
+        effectiveRepo = task
+          ? effectiveTaskRepoId(task, primaryRepoId)
+          : primaryRepoId;
+      }
+      if (effectiveRepo === params.repoId) {
+        throw new Error(
+          'Cannot remove repository: a task session still references it.',
+        );
+      }
+    }
+  }
+
   ipcMain.handle(
     'repo:getBranchDiscovery',
     async (
       _e,
-      requestedBranch?: string,
+      arg?: string | RepoBranchDiscoveryRequest,
     ): Promise<RepoBranchDiscoveryResponse | { error: string }> => {
       try {
         const projectDir = activeProjectDir();
         const repos = await projectStore.getReposAt(projectDir);
-        const repo = repos[0];
+        const { repoId, classifyBranch } = normalizeBranchDiscoveryArg(arg);
+        const repo = resolveRepoForBranchDiscovery(repos, repoId);
         if (!repo?.rootPath) {
-          return { error: 'No repository root configured for this project' };
+          return {
+            error:
+              repoId != null && repoId.trim().length > 0
+                ? 'Unknown repository id for this project'
+                : 'No repository root configured for this project',
+          };
         }
         const base = await collectRepoBranchDiscovery(repo.rootPath, repo.baseBranch);
-        if (requestedBranch == null || requestedBranch.trim() === '') {
+        if (classifyBranch == null || classifyBranch.trim() === '') {
           return base;
         }
         const { normalizedShort, presence } = classifyGitBranchPresence(
-          requestedBranch,
+          classifyBranch,
           base.localBranches,
           base.remoteBranches,
         );
         return {
           ...base,
           classification: {
-            raw: requestedBranch,
+            raw: classifyBranch,
             normalizedShort,
             presence,
           },
@@ -884,7 +965,7 @@ app.whenReady().then(async () => {
       _e,
       payload: {
         rootPath: string;
-        patch: Partial<Pick<RepoConfig, 'baseBranch' | 'setupScript' | 'env'>>;
+        patch: RepoSettingsPatch;
       },
     ): Promise<{ ok: true; repos: RepoConfig[] } | { error: string }> => {
       try {
@@ -894,6 +975,146 @@ app.whenReady().then(async () => {
           payload.patch,
         );
         return { ok: true, repos };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+  );
+  ipcMain.handle(
+    'project:updateRepoById',
+    async (
+      _e,
+      payload: { repoId: string; patch: RepoSettingsPatch },
+    ): Promise<
+      | { ok: true; repos: RepoConfig[] }
+      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+    > => {
+      if (!isMultiRepo2Enabled()) {
+        return multiRepo2DisabledError();
+      }
+      try {
+        const rid = (payload.repoId ?? '').trim();
+        if (!rid) {
+          return { error: 'repoId is required' };
+        }
+        const repos = await projectStore.updateRepoByIdAt(
+          activeProjectDir(),
+          rid,
+          payload.patch,
+        );
+        return { ok: true, repos };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+  );
+  ipcMain.handle(
+    'project:addRepo',
+    async (
+      _e,
+      payload: { rootPath: string },
+    ): Promise<
+      | { ok: true; repos: RepoConfig[] }
+      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+    > => {
+      if (!isMultiRepo2Enabled()) {
+        return multiRepo2DisabledError();
+      }
+      try {
+        const root = (payload.rootPath ?? '').trim();
+        if (!root) {
+          return { error: 'rootPath is required' };
+        }
+        const repos = await projectStore.addRepoAt(activeProjectDir(), root);
+        return { ok: true, repos };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+  );
+  ipcMain.handle(
+    'project:removeRepo',
+    async (
+      _e,
+      payload: { repoId: string },
+    ): Promise<
+      | { ok: true; repos: RepoConfig[] }
+      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+    > => {
+      if (!isMultiRepo2Enabled()) {
+        return multiRepo2DisabledError();
+      }
+      try {
+        const rid = (payload.repoId ?? '').trim();
+        if (!rid) {
+          return { error: 'repoId is required' };
+        }
+        const projectDir = activeProjectDir();
+        const reposBefore = await projectStore.getReposAt(projectDir);
+        let projectId = projectStore.get()?.id ?? '';
+        if (!projectId) {
+          try {
+            const parsed = JSON.parse(
+              await fs.readFile(path.join(projectDir, 'config.json'), 'utf8'),
+            ) as { id?: string };
+            if (typeof parsed.id === 'string') projectId = parsed.id;
+          } catch {
+            return { error: 'Invalid project configuration' };
+          }
+        }
+        if (!projectId) {
+          return { error: 'Invalid project configuration' };
+        }
+        await assertRepoUnusedForRemoval({
+          configProjectId: projectId,
+          repoId: rid,
+          repos: reposBefore,
+        });
+        const repos = await projectStore.removeRepoAt(projectDir, rid);
+        return { ok: true, repos };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+  );
+  ipcMain.handle(
+    'project:setPrimaryRepo',
+    async (
+      _e,
+      payload: { repoId: string },
+    ): Promise<
+      | { ok: true; repos: RepoConfig[] }
+      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+    > => {
+      if (!isMultiRepo2Enabled()) {
+        return multiRepo2DisabledError();
+      }
+      try {
+        const rid = (payload.repoId ?? '').trim();
+        if (!rid) {
+          return { error: 'repoId is required' };
+        }
+        const repos = await projectStore.setPrimaryRepoAt(
+          activeProjectDir(),
+          rid,
+        );
+        return { ok: true, repos };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+  );
+  ipcMain.handle(
+    'project:getPrimaryRepoId',
+    async (): Promise<{ ok: true; repoId: string | null } | { error: string }> => {
+      try {
+        const repos = await projectStore.getReposAt(activeProjectDir());
+        return { ok: true, repoId: repos[0]?.id ?? null };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return { error: message };

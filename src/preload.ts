@@ -8,8 +8,10 @@ import type {
   OpenWorkspaceTarget,
   PlanningSession,
   ProjectTabState,
+  RepoBranchDiscoveryRequest,
   RepoBranchDiscoveryResponse,
   RepoConfig,
+  RepoSettingsPatch,
   Session,
   SessionStartOptions,
   SessionStartResult,
@@ -103,12 +105,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
       >,
     getRepos: () =>
       ipcRenderer.invoke('project:getRepos') as Promise<RepoConfig[]>,
-    updateRepo: (payload: {
-      rootPath: string;
-      patch: Partial<Pick<RepoConfig, 'baseBranch' | 'setupScript' | 'env'>>;
-    }) =>
+    updateRepo: (payload: { rootPath: string; patch: RepoSettingsPatch }) =>
       ipcRenderer.invoke('project:updateRepo', payload) as Promise<
         { ok: true; repos: RepoConfig[] } | { error: string }
+      >,
+    updateRepoById: (payload: { repoId: string; patch: RepoSettingsPatch }) =>
+      ipcRenderer.invoke('project:updateRepoById', payload) as Promise<
+        | { ok: true; repos: RepoConfig[] }
+        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      >,
+    addRepo: (payload: { rootPath: string }) =>
+      ipcRenderer.invoke('project:addRepo', payload) as Promise<
+        | { ok: true; repos: RepoConfig[] }
+        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      >,
+    removeRepo: (payload: { repoId: string }) =>
+      ipcRenderer.invoke('project:removeRepo', payload) as Promise<
+        | { ok: true; repos: RepoConfig[] }
+        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      >,
+    setPrimaryRepo: (payload: { repoId: string }) =>
+      ipcRenderer.invoke('project:setPrimaryRepo', payload) as Promise<
+        | { ok: true; repos: RepoConfig[] }
+        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      >,
+    getPrimaryRepoId: () =>
+      ipcRenderer.invoke('project:getPrimaryRepoId') as Promise<
+        { ok: true; repoId: string | null } | { error: string }
       >,
     getAutoStartSessionOnInProgress: () =>
       ipcRenderer.invoke('project:getAutoStartSessionOnInProgress') as Promise<boolean>,
@@ -175,8 +198,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('projects:clearLocalBinding', cloudProjectId) as Promise<void      >,
   },
   repo: {
-    getBranchDiscovery: (requestedBranch?: string) =>
-      ipcRenderer.invoke('repo:getBranchDiscovery', requestedBranch) as Promise<
+    getBranchDiscovery: (arg?: string | RepoBranchDiscoveryRequest) =>
+      ipcRenderer.invoke('repo:getBranchDiscovery', arg) as Promise<
         RepoBranchDiscoveryResponse | { error: string }
       >,
   },

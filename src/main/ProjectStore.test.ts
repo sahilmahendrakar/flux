@@ -161,3 +161,100 @@ describe('ProjectStore.init multi-repo2 migration', () => {
     expect(projectB.repos[0].id).not.toBe(idA);
   });
 });
+
+describe('ProjectStore repo-id operations', () => {
+  let tmp: string;
+
+  beforeEach(async () => {
+    tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'flux-projectstore-repos-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmp, { recursive: true, force: true });
+  });
+
+  async function touchGitRepo(dir: string): Promise<void> {
+    await fs.mkdir(path.join(dir, '.git'), { recursive: true });
+  }
+
+  it('updateRepoByIdAt updates fields by stable id', async () => {
+    const rootPath = path.join(tmp, 'repo-a');
+    const projectDir = path.join(tmp, 'project');
+    await fs.mkdir(rootPath, { recursive: true });
+    await touchGitRepo(rootPath);
+    await writeLegacyConfig(projectDir, rootPath);
+
+    const store = new ProjectStore(tmp);
+    await store.init(projectDir);
+    const id = store.get()?.repos[0].id;
+    if (!id) throw new Error('expected repo id');
+
+    const repos = await store.updateRepoByIdAt(projectDir, id, {
+      baseBranch: 'release',
+      name: 'Core',
+    });
+    expect(repos[0].baseBranch).toBe('release');
+    expect(repos[0].name).toBe('Core');
+  });
+
+  it('addRepoAt appends a git repo and rejects duplicates', async () => {
+    const rootA = path.join(tmp, 'a');
+    const rootB = path.join(tmp, 'b');
+    const projectDir = path.join(tmp, 'project');
+    await fs.mkdir(rootA, { recursive: true });
+    await fs.mkdir(rootB, { recursive: true });
+    await touchGitRepo(rootA);
+    await touchGitRepo(rootB);
+    await writeLegacyConfig(projectDir, rootA);
+
+    const store = new ProjectStore(tmp);
+    await store.init(projectDir);
+
+    const repos = await store.addRepoAt(projectDir, rootB);
+    expect(repos).toHaveLength(2);
+    await expect(store.addRepoAt(projectDir, rootB)).rejects.toThrow(/already part of this project/);
+  });
+
+  it('setPrimaryRepoAt moves repo to index 0 and syncs project rootPath', async () => {
+    const rootA = path.join(tmp, 'a');
+    const rootB = path.join(tmp, 'b');
+    const projectDir = path.join(tmp, 'project');
+    await fs.mkdir(rootA, { recursive: true });
+    await fs.mkdir(rootB, { recursive: true });
+    await touchGitRepo(rootA);
+    await touchGitRepo(rootB);
+    await writeLegacyConfig(projectDir, rootA);
+
+    const store = new ProjectStore(tmp);
+    await store.init(projectDir);
+    await store.addRepoAt(projectDir, rootB);
+    const loaded = store.get();
+    const secondId = loaded?.repos[1]?.id;
+    if (!secondId) throw new Error('expected second repo');
+
+    const repos = await store.setPrimaryRepoAt(projectDir, secondId);
+    expect(repos[0].rootPath).toBe(path.resolve(rootB));
+    expect(store.get()?.rootPath).toBe(path.resolve(rootB));
+  });
+
+  it('removeRepoAt drops a secondary repo', async () => {
+    const rootA = path.join(tmp, 'a');
+    const rootB = path.join(tmp, 'b');
+    const projectDir = path.join(tmp, 'project');
+    await fs.mkdir(rootA, { recursive: true });
+    await fs.mkdir(rootB, { recursive: true });
+    await touchGitRepo(rootA);
+    await touchGitRepo(rootB);
+    await writeLegacyConfig(projectDir, rootA);
+
+    const store = new ProjectStore(tmp);
+    await store.init(projectDir);
+    await store.addRepoAt(projectDir, rootB);
+    const rid = store.get()?.repos[1]?.id;
+    if (!rid) throw new Error('expected second repo');
+
+    const repos = await store.removeRepoAt(projectDir, rid);
+    expect(repos).toHaveLength(1);
+    expect(repos[0].rootPath).toBe(path.resolve(rootA));
+  });
+});
