@@ -86,7 +86,7 @@ export interface LocalProject {
   taskDefaultModels?: AgentSessionModelDefaults;
   /** New tasks inherit `agentYolo` when true unless explicitly overridden. */
   defaultTaskAgentYolo?: boolean;
-  /** Auto-start a task session when status transitions into in-progress. */
+  /** Auto-start a task session when status moves from Backlog to in-progress. */
   autoStartSessionOnInProgress: boolean;
   /** When on, a task in backlog (or in progress without a running session) may auto-start once its last blocker is completed. */
   autoStartWhenUnblocked: boolean;
@@ -97,9 +97,14 @@ export interface LocalProject {
   autoCleanupWorkspaceWhenDone: boolean;
   /**
    * When on, refreshing linked GitHub PR metadata that shows the PR merged can move the task
-   * to Done from In progress or Needs input (not backlog), if it is not dependency-blocked.
+   * to Done from In progress, Needs input, or Review (not backlog), if it is not dependency-blocked.
    */
   autoMarkDoneWhenPrMerged: boolean;
+  /**
+   * When on, refreshing PR metadata (or creating a PR) that shows an open GitHub PR for this
+   * task’s Flux branch may move the task from Backlog or In progress into Review.
+   */
+  autoMoveToReviewWhenPrOpen: boolean;
   repos: RepoConfig[];
 }
 
@@ -126,6 +131,7 @@ export interface CloudProjectLocalBinding {
   autoStartWhenUnblocked?: boolean;
   autoCleanupWorkspaceWhenDone?: boolean;
   autoMarkDoneWhenPrMerged?: boolean;
+  autoMoveToReviewWhenPrOpen?: boolean;
   /** @deprecated Read `autoCleanupWorkspaceWhenDone`; kept for localBindings migration. */
   autoDeleteTaskWhenDone?: boolean;
 }
@@ -148,6 +154,7 @@ export interface CloudProject {
   autoStartWhenUnblocked?: boolean;
   autoCleanupWorkspaceWhenDone?: boolean;
   autoMarkDoneWhenPrMerged?: boolean;
+  autoMoveToReviewWhenPrOpen?: boolean;
   /** @deprecated */
   autoDeleteTaskWhenDone?: boolean;
 }
@@ -168,10 +175,12 @@ export interface TaskGithubPr {
   updatedAt?: string;
 }
 
-/** Structured errors from `tasks:createPullRequest` / `tasks:refreshPullRequest`. */
+/** Structured errors from task PR IPC (`tasks:requestPullRequestFromAgent`, `tasks:refreshPullRequest`). */
 export type TaskPrErrorCode =
   | 'NO_PROJECT'
   | 'NO_WORKTREE'
+  | 'NO_AGENT_SESSION'
+  | 'AGENT_SESSION_NOT_RUNNING'
   | 'NO_PR_URL'
   | 'NO_OPEN_PR'
   | 'TASK_METADATA_REQUIRED'
@@ -194,6 +203,11 @@ export type TaskPullRequestIpcResult =
       /** Human-readable note when GitHub ref names differ from stored PR metadata (refresh only). */
       metadataMismatchWarning?: string;
     }
+  | { ok: false; code: TaskPrErrorCode; message: string };
+
+/** Result of `tasks:requestPullRequestFromAgent` (prompt injected; no `gh pr create` in main). */
+export type TaskRequestPullRequestFromAgentResult =
+  | { ok: true; sessionId: string }
   | { ok: false; code: TaskPrErrorCode; message: string };
 
 export interface Task {
@@ -273,6 +287,16 @@ export type SessionStartErrorCode =
   | 'TASK_BLOCKED'
   | 'NOT_TASK_ASSIGNEE'
   | 'INTERNAL';
+
+/** Optional flags for `session:start` / `sessions.start`. */
+export type SessionStartOptions = {
+  /**
+   * When true, Flux spawns the task agent with CLI `--resume` only (no full
+   * initial task prompt). Requires a stable worktree cwd matching the CLI’s
+   * on-disk session key.
+   */
+  resume?: boolean;
+};
 
 export type SessionStartResult =
   | Session

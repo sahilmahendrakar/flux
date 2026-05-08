@@ -10,6 +10,8 @@ import {
 } from '../types';
 import { defaultTaskAgentForProject } from '../cloudBindingPrefs';
 import AgentModelPicker from './AgentModelPicker';
+import { SettingsSwitch } from './SettingsSwitch';
+import { AGENT_SPAWN_AGENT_SELECT_CLASS } from './AgentSessionPrefsMenu';
 import { TeamView } from './TeamView';
 import { ThemeAppearanceControl } from './ThemeAppearanceControl';
 
@@ -26,46 +28,6 @@ interface Props {
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type Category = 'project' | 'team';
-
-function SettingsSwitch({
-  checked,
-  onCheckedChange,
-  disabled,
-  ariaLabelledBy,
-  ariaBusy,
-}: {
-  checked: boolean;
-  onCheckedChange: (next: boolean) => void;
-  disabled?: boolean;
-  /** Prefer wiring the row title via `id` + this prop for a concise switch name in assistive tech. */
-  ariaLabelledBy?: string;
-  /** True while loading prefs or persisting so assistive tech can announce activity. */
-  ariaBusy?: boolean;
-}) {
-  const busy = !!disabled;
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-labelledby={ariaLabelledBy}
-      aria-busy={ariaBusy || undefined}
-      disabled={busy}
-      onClick={() => {
-        if (busy) return;
-        onCheckedChange(!checked);
-      }}
-      className={[
-        'relative inline-flex h-6 w-10 shrink-0 items-center rounded-full p-0.5 transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-flux-ring/25 focus-visible:ring-offset-2 focus-visible:ring-offset-flux-canvas',
-        checked ? 'justify-end bg-emerald-600' : 'justify-start bg-zinc-700',
-        busy ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
-      ].join(' ')}
-    >
-      <span className="pointer-events-none block h-5 w-5 rounded-full bg-zinc-100 shadow-sm" />
-    </button>
-  );
-}
 
 function AutomationSettingRow({
   title,
@@ -95,12 +57,12 @@ function AutomationSettingRow({
     <div className="py-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h3 id={titleId} className="text-[13px] font-medium text-zinc-200">
+          <h3 id={titleId} className="text-[13px] font-medium text-flux-fg-muted">
             {title}
           </h3>
           <button
             type="button"
-            className="mt-1.5 text-left text-[11px] text-zinc-500 transition-colors hover:text-zinc-300"
+            className="mt-1.5 text-left text-[11px] text-flux-fg-subtle transition-colors hover:text-flux-fg-muted"
             aria-expanded={detailsOpen}
             aria-controls={detailsId}
             onClick={() => setDetailsOpen((o) => !o)}
@@ -112,7 +74,7 @@ function AutomationSettingRow({
             role="region"
             aria-labelledby={titleId}
             hidden={!detailsOpen}
-            className="mt-2 text-[12px] leading-snug text-zinc-500"
+            className="mt-2 text-[12px] leading-snug text-flux-fg-subtle"
           >
             {description}
           </div>
@@ -127,9 +89,9 @@ function AutomationSettingRow({
       </div>
       <div className="mt-2 min-h-4 text-[11px]">
         {loading ? (
-          <span className="text-zinc-600">Loading…</span>
+          <span className="text-flux-fg-subtle">Loading…</span>
         ) : saveState === 'saving' ? (
-          <span className="text-zinc-500">Saving…</span>
+          <span className="text-flux-fg-subtle">Saving…</span>
         ) : saveState === 'saved' ? (
           <span className="text-emerald-400">Saved</span>
         ) : error ? (
@@ -252,6 +214,10 @@ function ProjectConfigPane({
   const [autoDoneOnPrMergeLoading, setAutoDoneOnPrMergeLoading] = useState(true);
   const [autoDoneOnPrMergeSaveState, setAutoDoneOnPrMergeSaveState] = useState<SaveState>('idle');
   const [autoDoneOnPrMergeError, setAutoDoneOnPrMergeError] = useState<string | null>(null);
+  const [autoReviewOnOpenPrEnabled, setAutoReviewOnOpenPrEnabled] = useState(false);
+  const [autoReviewOnOpenPrLoading, setAutoReviewOnOpenPrLoading] = useState(true);
+  const [autoReviewOnOpenPrSaveState, setAutoReviewOnOpenPrSaveState] = useState<SaveState>('idle');
+  const [autoReviewOnOpenPrError, setAutoReviewOnOpenPrError] = useState<string | null>(null);
   const [planningAgentSaveState, setPlanningAgentSaveState] = useState<SaveState>('idle');
   const [planningAgentError, setPlanningAgentError] = useState<string | null>(null);
   const [defaultTaskAgentSaveState, setDefaultTaskAgentSaveState] = useState<SaveState>('idle');
@@ -427,6 +393,31 @@ function ProjectConfigPane({
     };
   }, [project.id]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setAutoReviewOnOpenPrLoading(true);
+    setAutoReviewOnOpenPrError(null);
+    void window.electronAPI.project
+      .getAutoMoveToReviewWhenPrOpen()
+      .then((enabled) => {
+        if (!cancelled) {
+          setAutoReviewOnOpenPrEnabled(enabled);
+          setAutoReviewOnOpenPrSaveState('idle');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setAutoReviewOnOpenPrError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAutoReviewOnOpenPrLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+
   const handleWhenUnblockedChange = useCallback(async (enabled: boolean) => {
     setWhenUnblockedEnabled(enabled);
     setWhenUnblockedSaveState('saving');
@@ -584,6 +575,24 @@ function ProjectConfigPane({
     }, 1500);
   }, []);
 
+  const handleAutoReviewOnOpenPrChange = useCallback(async (enabled: boolean) => {
+    setAutoReviewOnOpenPrEnabled(enabled);
+    setAutoReviewOnOpenPrSaveState('saving');
+    setAutoReviewOnOpenPrError(null);
+    const result = await window.electronAPI.project.setAutoMoveToReviewWhenPrOpen(enabled);
+    if ('error' in result) {
+      setAutoReviewOnOpenPrSaveState('error');
+      setAutoReviewOnOpenPrError(result.error);
+      setAutoReviewOnOpenPrEnabled((prev) => !prev);
+      return;
+    }
+    setAutoReviewOnOpenPrEnabled(result.enabled);
+    setAutoReviewOnOpenPrSaveState('saved');
+    window.setTimeout(() => {
+      setAutoReviewOnOpenPrSaveState((state) => (state === 'saved' ? 'idle' : state));
+    }, 1500);
+  }, []);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto w-full max-w-2xl px-8 py-10">
@@ -622,19 +631,20 @@ function ProjectConfigPane({
               Automations
             </h2>
             <p className="mt-1 text-[12px] leading-snug text-flux-fg-muted">
-              Choose when sessions start automatically, when merged PRs update the board, and when
-              finished workspaces are cleaned up.
+              Choose when sessions start automatically, when merged or open pull requests update the
+              board, and when finished workspaces are cleaned up.
             </p>
           </div>
           <div className="divide-y divide-flux-border/10">
             <AutomationSettingRow
               key={`${project.id}-auto-start-in-progress`}
-              title="Auto-start sessions when tasks enter In progress"
+              title="Auto-start sessions when tasks move from Backlog to In progress"
               description={
                 <>
-                  Applies to status transitions from board drag, task detail status updates, and MCP{' '}
-                  <code className="text-zinc-400">flux__update_task</code>.{' '}
-                  <code className="text-zinc-400">flux__start_task</code> always starts a session
+                  Applies when a task leaves Backlog for In progress (board drag, task detail, MCP{' '}
+                  <code className="text-flux-fg-muted">flux__update_task</code>). Other columns into In
+                  progress do not auto-start from this setting.{' '}
+                  <code className="text-flux-fg-muted">flux__start_task</code> always starts a session
                   regardless of this setting.
                 </>
               }
@@ -704,16 +714,36 @@ function ProjectConfigPane({
               saveState={autoDoneOnPrMergeSaveState}
               error={autoDoneOnPrMergeError}
             />
+            <AutomationSettingRow
+              key={`${project.id}-auto-review-open-pr`}
+              title="Move to Review when pull request is open"
+              description={
+                <>
+                  After Flux refreshes PR metadata from GitHub, if the linked PR is open and the task
+                  is in Backlog or In progress, move it to Review. When GitHub reports a head
+                  branch, it must match this task&apos;s Flux work branch. Merged or closed PRs are
+                  ignored. For cloud projects this preference is stored per machine.
+                </>
+              }
+              checked={autoReviewOnOpenPrEnabled}
+              onCheckedChange={(next) => void handleAutoReviewOnOpenPrChange(next)}
+              switchDisabled={
+                autoReviewOnOpenPrLoading || autoReviewOnOpenPrSaveState === 'saving'
+              }
+              loading={autoReviewOnOpenPrLoading}
+              saveState={autoReviewOnOpenPrSaveState}
+              error={autoReviewOnOpenPrError}
+            />
           </div>
         </section>
 
         <section className="mt-4 rounded-xl border border-flux-border/10 bg-flux-hover/4 px-4 py-3">
-          <h2 className="text-[13px] font-medium text-zinc-200">Default agents</h2>
-          <p className="mt-0.5 text-[12px] leading-snug text-zinc-500">
+          <h2 className="text-[13px] font-medium text-flux-fg-muted">Default agents</h2>
+          <p className="mt-0.5 text-[12px] leading-snug text-flux-fg-subtle">
             These apply to this project on this machine. Each row sets the default agent, the same
             model dropdown as tasks (choices follow the selected provider), and optional YOLO (
-            <span className="font-mono text-zinc-400">--yolo</span> /{' '}
-            <span className="font-mono text-zinc-400">--dangerously-skip-permissions</span>). Agent
+            <span className="font-mono text-flux-fg-muted">--yolo</span> /{' '}
+            <span className="font-mono text-flux-fg-muted">--dangerously-skip-permissions</span>). Agent
             changes save immediately; use Save on the same row to persist models and YOLO for that
             flow.
           </p>
@@ -722,16 +752,16 @@ function ProjectConfigPane({
             <div>
               <label
                 htmlFor="project-settings-planning-agent"
-                className="text-[12px] font-medium text-zinc-300"
+                className="text-[12px] font-medium text-flux-fg-muted"
               >
                 Planning assistant
               </label>
-              <p className="mt-0.5 text-[11px] leading-snug text-zinc-600">
+              <p className="mt-0.5 text-[11px] leading-snug text-flux-fg-subtle">
                 Same defaults as the Planning panel. Codex ignores model/YOLO here.
               </p>
               <div className="mt-2 flex flex-wrap items-end gap-2">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-flux-fg-subtle">
                     Agent
                   </span>
                   <select
@@ -743,7 +773,7 @@ function ProjectConfigPane({
                       const next = e.target.value as Agent;
                       void handlePlanningAgentChange(next);
                     }}
-                    className="h-[34px] min-w-[9.5rem] cursor-pointer rounded-md border border-flux-border/12 bg-flux-surface py-0 pl-2.5 pr-7 text-[13px] text-zinc-100 outline-none focus:border-flux-border/20 focus:ring-1 focus:ring-flux-ring/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    className={AGENT_SPAWN_AGENT_SELECT_CLASS}
                   >
                     {AGENTS.map((a) => (
                       <option key={a.id} value={a.id}>
@@ -753,12 +783,12 @@ function ProjectConfigPane({
                   </select>
                 </div>
                 <div className="flex min-w-0 flex-1 basis-[8rem] flex-col gap-0.5 sm:max-w-xs">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-flux-fg-subtle">
                     Model
                   </span>
                   {planningAgentValue === 'codex' ? (
                     <span
-                      className="flex min-h-[2rem] items-center rounded-md border border-flux-border/10 bg-flux-surface/60 px-2 text-[12px] text-zinc-500"
+                      className="flex min-h-[2rem] items-center rounded-md border border-flux-border/10 bg-flux-surface/60 px-2 text-[12px] text-flux-fg-subtle"
                       title="Model selection is not wired for Codex in this version."
                     >
                       Default model
@@ -786,7 +816,7 @@ function ProjectConfigPane({
                 </div>
                 <div className="flex h-[34px] shrink-0 items-center gap-1.5 self-end pb-0.5">
                   <span
-                    className="text-[10px] text-zinc-500"
+                    className="text-[10px] text-flux-fg-subtle"
                     title="Fewer permission prompts for planning spawns (Cursor --yolo; Claude --dangerously-skip-permissions)"
                   >
                     YOLO?
@@ -809,14 +839,14 @@ function ProjectConfigPane({
               </div>
               <div className="mt-1.5 flex min-h-4 flex-wrap gap-x-4 gap-y-0.5 text-[11px]">
                 {planningAgentSaveState === 'saving' ? (
-                  <span className="text-zinc-500">Agent: saving…</span>
+                  <span className="text-flux-fg-subtle">Agent: saving…</span>
                 ) : planningAgentSaveState === 'saved' ? (
                   <span className="text-emerald-400">Agent: saved</span>
                 ) : planningAgentError ? (
                   <span className="text-red-400">Agent: {planningAgentError}</span>
                 ) : null}
                 {planSpawnSaveState === 'saving' ? (
-                  <span className="text-zinc-500">Models/YOLO: saving…</span>
+                  <span className="text-flux-fg-subtle">Models/YOLO: saving…</span>
                 ) : planSpawnSaveState === 'saved' ? (
                   <span className="text-emerald-400">Models/YOLO: saved</span>
                 ) : planSpawnError ? (
@@ -828,18 +858,18 @@ function ProjectConfigPane({
             <div className="border-t border-flux-border/10 pt-4">
               <label
                 htmlFor="project-settings-default-task-agent"
-                className="text-[12px] font-medium text-zinc-300"
+                className="text-[12px] font-medium text-flux-fg-muted"
               >
                 Default task agent
               </label>
-              <p className="mt-0.5 text-[11px] leading-snug text-zinc-600">
+              <p className="mt-0.5 text-[11px] leading-snug text-flux-fg-subtle">
                 New tasks and MCP{' '}
-                <code className="font-mono text-zinc-500">flux__create_task</code> when no agent is
+                <code className="font-mono text-flux-fg-subtle">flux__create_task</code> when no agent is
                 given. Codex ignores model/YOLO here.
               </p>
               <div className="mt-2 flex flex-wrap items-end gap-2">
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-flux-fg-subtle">
                     Agent
                   </span>
                   <select
@@ -851,7 +881,7 @@ function ProjectConfigPane({
                       const next = e.target.value as Agent;
                       void handleDefaultTaskAgentChange(next);
                     }}
-                    className="h-[34px] min-w-[9.5rem] cursor-pointer rounded-md border border-flux-border/12 bg-flux-surface py-0 pl-2.5 pr-7 text-[13px] text-zinc-100 outline-none focus:border-flux-border/20 focus:ring-1 focus:ring-flux-ring/15 disabled:cursor-not-allowed disabled:opacity-50"
+                    className={AGENT_SPAWN_AGENT_SELECT_CLASS}
                   >
                     {AGENTS.map((a) => (
                       <option key={a.id} value={a.id}>
@@ -861,12 +891,12 @@ function ProjectConfigPane({
                   </select>
                 </div>
                 <div className="flex min-w-0 flex-1 basis-[8rem] flex-col gap-0.5 sm:max-w-xs">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-flux-fg-subtle">
                     Model
                   </span>
                   {defaultTaskAgentValue === 'codex' ? (
                     <span
-                      className="flex min-h-[2rem] items-center rounded-md border border-flux-border/10 bg-flux-surface/60 px-2 text-[12px] text-zinc-500"
+                      className="flex min-h-[2rem] items-center rounded-md border border-flux-border/10 bg-flux-surface/60 px-2 text-[12px] text-flux-fg-subtle"
                       title="Model selection is not wired for Codex in this version."
                     >
                       Default model
@@ -894,7 +924,7 @@ function ProjectConfigPane({
                 </div>
                 <div className="flex h-[34px] shrink-0 items-center gap-1.5 self-end pb-0.5">
                   <span
-                    className="text-[10px] text-zinc-500"
+                    className="text-[10px] text-flux-fg-subtle"
                     title="Default for new tasks when YOLO is not set on the task (Cursor --yolo; Claude --dangerously-skip-permissions)"
                   >
                     YOLO?
@@ -917,14 +947,14 @@ function ProjectConfigPane({
               </div>
               <div className="mt-1.5 flex min-h-4 flex-wrap gap-x-4 gap-y-0.5 text-[11px]">
                 {defaultTaskAgentSaveState === 'saving' ? (
-                  <span className="text-zinc-500">Agent: saving…</span>
+                  <span className="text-flux-fg-subtle">Agent: saving…</span>
                 ) : defaultTaskAgentSaveState === 'saved' ? (
                   <span className="text-emerald-400">Agent: saved</span>
                 ) : defaultTaskAgentError ? (
                   <span className="text-red-400">Agent: {defaultTaskAgentError}</span>
                 ) : null}
                 {taskSpawnSaveState === 'saving' ? (
-                  <span className="text-zinc-500">Models/YOLO: saving…</span>
+                  <span className="text-flux-fg-subtle">Models/YOLO: saving…</span>
                 ) : taskSpawnSaveState === 'saved' ? (
                   <span className="text-emerald-400">Models/YOLO: saved</span>
                 ) : taskSpawnError ? (
@@ -937,10 +967,10 @@ function ProjectConfigPane({
 
         <section className="mt-8">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-[13px] font-medium uppercase tracking-[0.12em] text-zinc-500">
+            <h2 className="text-[13px] font-medium uppercase tracking-[0.12em] text-flux-fg-subtle">
               Repositories
             </h2>
-            <span className="text-[11px] text-zinc-600">
+            <span className="text-[11px] text-flux-fg-subtle">
               {repos?.length ?? 0} {repos?.length === 1 ? 'repo' : 'repos'}
             </span>
           </div>
@@ -953,7 +983,7 @@ function ProjectConfigPane({
 
           <div className="mt-3 flex flex-col gap-2">
             {repos === null && !loadError ? (
-              <p className="px-3 py-4 text-[12px] text-zinc-600">Loading…</p>
+              <p className="px-3 py-4 text-[12px] text-flux-fg-subtle">Loading…</p>
             ) : (
               repos?.map((repo) => (
                 <RepoCard
@@ -994,18 +1024,18 @@ function RepoCard({ repo, expanded, onToggle, onSaved }: RepoCardProps) {
         aria-expanded={expanded}
       >
         <ChevronRight
-          className={`shrink-0 text-zinc-500 transition-transform ${
+          className={`shrink-0 text-flux-fg-subtle transition-transform ${
             expanded ? 'rotate-90' : ''
           }`}
         />
         <div className="min-w-0 flex-1">
           <div
-            className="truncate font-mono text-[12px] text-zinc-200"
+            className="truncate font-mono text-[12px] text-flux-fg-muted"
             title={repo.rootPath}
           >
             {repo.rootPath}
           </div>
-          <div className="mt-0.5 truncate text-[11px] text-zinc-600">
+          <div className="mt-0.5 truncate text-[11px] text-flux-fg-subtle">
             base: {repo.baseBranch}
             {repo.setupScript ? ' · setup script' : ''}
             {repo.env ? ' · .env' : ''}
@@ -1127,18 +1157,18 @@ function FieldEditor({
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3">
-        <label className="text-[12px] font-medium text-zinc-300">{label}</label>
+        <label className="text-[12px] font-medium text-flux-fg-muted">{label}</label>
         {sensitive ? (
           <button
             type="button"
             onClick={() => setRevealed((r) => !r)}
-            className="text-[11px] text-zinc-500 transition hover:text-zinc-300"
+            className="text-[11px] text-flux-fg-subtle transition hover:text-flux-fg-muted"
           >
             {revealed ? 'Hide' : 'Reveal'}
           </button>
         ) : null}
       </div>
-      <p className="mt-0.5 text-[11px] leading-snug text-zinc-600">{description}</p>
+      <p className="mt-0.5 text-[11px] leading-snug text-flux-fg-subtle">{description}</p>
       <div className="mt-2">
         {multiline ? (
           <textarea
@@ -1147,7 +1177,7 @@ function FieldEditor({
             placeholder={placeholder}
             disabled={showMasked}
             rows={Math.min(10, Math.max(4, value.split('\n').length + 1))}
-            className="block w-full rounded-md border border-flux-border/12 bg-flux-surface px-3 py-2 font-mono text-[12px] leading-relaxed text-zinc-100 outline-none focus-visible:border-flux-border/20 focus-visible:ring-1 focus-visible:ring-flux-ring/15 disabled:opacity-60"
+            className="block w-full rounded-md border border-flux-border/12 bg-flux-surface px-3 py-2 font-mono text-[12px] leading-relaxed text-flux-fg outline-none focus-visible:border-flux-border/20 focus-visible:ring-1 focus-visible:ring-flux-ring/15 disabled:opacity-60"
           />
         ) : (
           <input
@@ -1155,7 +1185,7 @@ function FieldEditor({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
-            className="block w-full rounded-md border border-flux-border/12 bg-flux-surface px-3 py-2 text-[13px] text-zinc-100 outline-none focus-visible:border-flux-border/20 focus-visible:ring-1 focus-visible:ring-flux-ring/15"
+            className="block w-full rounded-md border border-flux-border/12 bg-flux-surface px-3 py-2 text-[13px] text-flux-fg outline-none focus-visible:border-flux-border/20 focus-visible:ring-1 focus-visible:ring-flux-ring/15"
           />
         )}
       </div>
@@ -1165,13 +1195,13 @@ function FieldEditor({
         ) : state === 'saved' ? (
           <span className="text-[11px] text-emerald-400">Saved</span>
         ) : dirty ? (
-          <span className="text-[11px] text-zinc-500">Unsaved changes</span>
+          <span className="text-[11px] text-flux-fg-subtle">Unsaved changes</span>
         ) : null}
         <button
           type="button"
           onClick={() => void handleSave()}
           disabled={!dirty || state === 'saving' || showMasked}
-          className="rounded-md bg-white px-3 py-1 text-[12px] font-medium text-zinc-950 transition hover:bg-zinc-100 disabled:pointer-events-none disabled:opacity-40"
+          className="rounded-md bg-flux-fg px-3 py-1 text-[12px] font-medium text-flux-canvas transition hover:bg-flux-fg/90 disabled:pointer-events-none disabled:opacity-40"
         >
           {state === 'saving' ? 'Saving…' : 'Save'}
         </button>

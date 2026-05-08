@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Droppable } from '@hello-pangea/dnd';
 import { Session, Task, TaskStatus } from '../types';
 import TaskCard from './TaskCard';
+import type { TaskAgentSpawnPatch } from './TaskCardAgentSpawnMenu';
 import type { ProjectMember } from '../renderer/projects/members';
 
 interface Props {
@@ -24,10 +25,12 @@ interface Props {
   onTaskAssigneeChange?: (taskId: string, assigneeId: string | null) => void;
   onTaskPrClick?: (taskId: string) => void;
   prLoadingTaskId?: string | null;
+  prAgentAwaitingByTaskId?: Record<string, boolean>;
   repoDefaultBranchShort: string;
   cloudUnblockAutostartClientUid?: string;
   sessions: Session[];
   taskHasWorktreeById: Record<string, boolean>;
+  onTaskAgentSpawnPrefsChange: (taskId: string, patch: TaskAgentSpawnPatch) => void;
 }
 
 export default function Column({
@@ -49,10 +52,12 @@ export default function Column({
   onTaskAssigneeChange,
   onTaskPrClick,
   prLoadingTaskId,
+  prAgentAwaitingByTaskId,
   repoDefaultBranchShort,
   cloudUnblockAutostartClientUid,
   sessions,
   taskHasWorktreeById,
+  onTaskAgentSpawnPrefsChange,
 }: Props) {
   const isNeedsInput = id === 'needs-input';
   const isReview = id === 'review';
@@ -63,19 +68,19 @@ export default function Column({
     : isReview
       ? 'text-sky-400/90'
       : isDone
-        ? 'text-zinc-500'
-        : 'text-zinc-400';
+        ? 'text-flux-fg-subtle'
+        : 'text-flux-fg-muted';
 
   const countClass = isNeedsInput
     ? 'bg-amber-500/10 text-amber-400/90 ring-1 ring-amber-500/15'
     : isReview
       ? 'bg-sky-500/10 text-sky-300/95 ring-1 ring-sky-500/18'
       : isDone
-        ? 'bg-zinc-800/80 text-zinc-500 ring-1 ring-white/[0.05]'
-        : 'bg-zinc-800/80 text-zinc-500 ring-1 ring-white/[0.05]';
+        ? 'bg-flux-hover/10 text-flux-fg-subtle ring-1 ring-flux-border/10'
+        : 'bg-flux-hover/10 text-flux-fg-subtle ring-1 ring-flux-border/10';
 
   return (
-    <div className="flex min-w-[272px] flex-1 flex-col rounded-lg border border-flux-border/10 bg-flux-elevated/80">
+    <div className="flex min-h-0 min-w-[272px] flex-1 flex-col rounded-lg border border-flux-border/10 bg-flux-elevated/80">
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <h2
@@ -93,7 +98,7 @@ export default function Column({
           <button
             type="button"
             onClick={onNewTask}
-            className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-zinc-500 transition hover:bg-white/[0.05] hover:text-zinc-200"
+            className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-flux-fg-subtle transition hover:bg-flux-hover/6 hover:text-flux-fg"
           >
             + New
           </button>
@@ -104,46 +109,52 @@ export default function Column({
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`flex flex-1 flex-col gap-1.5 overflow-y-auto px-2 pb-3 transition-colors ${
-              snapshot.isDraggingOver ? 'bg-white/[0.02]' : ''
-            }`}
+            className="flex min-h-0 flex-1 flex-col"
           >
-            {tasks.map((task, index) => {
-              const sessionWorktree = sessions.some(
-                (s) => s.taskId === task.id && Boolean(s.worktreePath?.trim()),
-              );
-              const diskWorktree = taskHasWorktreeById[task.id] === true;
-              const hasWorktree = sessionWorktree || diskWorktree;
-              return (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  allTasks={allTasks}
-                  index={index}
-                  onDelete={onDeleteTask}
-                  onRequestCleanupTask={onRequestCleanupTask}
-                  cleanupLoading={cleanupLoadingTaskId === task.id}
-                  onCardClick={onCardClick}
-                  onLabelClick={onLabelClick}
-                  autoStartWhenUnblockedProject={autoStartWhenUnblockedProject}
-                  onToggleTaskAutoStartOnUnblock={onToggleTaskAutoStartOnUnblock}
-                  assigneeMember={task.assigneeId ? membersMap?.get(task.assigneeId) : undefined}
-                  cloudProjectMembers={projectMembers}
-                  onTaskAssigneeChange={onTaskAssigneeChange}
-                  onTaskPrClick={onTaskPrClick}
-                  prLoading={prLoadingTaskId === task.id}
-                  repoDefaultBranchShort={repoDefaultBranchShort}
-                  cloudUnblockAutostartClientUid={cloudUnblockAutostartClientUid}
-                  hasWorktree={hasWorktree}
-                />
-              );
-            })}
-            {provided.placeholder}
-            {tasks.length === 0 && emptyState ? (
-              <div className="flex flex-1 items-center justify-center px-3 py-10 text-center text-[13px] leading-relaxed text-zinc-600">
-                {emptyState}
-              </div>
-            ) : null}
+            <div
+              className={`flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-2 pb-3 transition-colors ${
+                snapshot.isDraggingOver ? 'bg-flux-hover/4' : ''
+              }`}
+            >
+              {tasks.map((task, index) => {
+                const sessionWorktree = sessions.some(
+                  (s) => s.taskId === task.id && Boolean(s.worktreePath?.trim()),
+                );
+                const diskWorktree = taskHasWorktreeById[task.id] === true;
+                const hasWorktree = sessionWorktree || diskWorktree;
+                return (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    allTasks={allTasks}
+                    index={index}
+                    onDelete={onDeleteTask}
+                    onRequestCleanupTask={onRequestCleanupTask}
+                    cleanupLoading={cleanupLoadingTaskId === task.id}
+                    onCardClick={onCardClick}
+                    onLabelClick={onLabelClick}
+                    autoStartWhenUnblockedProject={autoStartWhenUnblockedProject}
+                    onToggleTaskAutoStartOnUnblock={onToggleTaskAutoStartOnUnblock}
+                    assigneeMember={task.assigneeId ? membersMap?.get(task.assigneeId) : undefined}
+                    cloudProjectMembers={projectMembers}
+                    onTaskAssigneeChange={onTaskAssigneeChange}
+                    onTaskPrClick={onTaskPrClick}
+                    prLoading={prLoadingTaskId === task.id}
+                    prAgentAwaiting={Boolean(prAgentAwaitingByTaskId?.[task.id])}
+                    repoDefaultBranchShort={repoDefaultBranchShort}
+                    cloudUnblockAutostartClientUid={cloudUnblockAutostartClientUid}
+                    hasWorktree={hasWorktree}
+                    onTaskAgentSpawnPrefsChange={onTaskAgentSpawnPrefsChange}
+                  />
+                );
+              })}
+              {provided.placeholder}
+              {tasks.length === 0 && emptyState ? (
+                <div className="flex flex-1 items-center justify-center px-3 py-10 text-center text-[13px] leading-relaxed text-flux-fg-subtle">
+                  {emptyState}
+                </div>
+              ) : null}
+            </div>
           </div>
         )}
       </Droppable>

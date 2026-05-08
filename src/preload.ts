@@ -11,11 +11,13 @@ import type {
   RepoBranchDiscoveryResponse,
   RepoConfig,
   Session,
+  SessionStartOptions,
   SessionStartResult,
   Shell,
   Task,
   TaskGithubPr,
   TaskPullRequestIpcResult,
+  TaskRequestPullRequestFromAgentResult,
   TaskSessionStartProgress,
 } from './types';
 import type {
@@ -114,6 +116,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('project:getAutoMarkDoneWhenPrMerged') as Promise<boolean>,
     setAutoMarkDoneWhenPrMerged: (enabled: boolean) =>
       ipcRenderer.invoke('project:setAutoMarkDoneWhenPrMerged', enabled) as Promise<
+        { ok: true; enabled: boolean } | { error: string }
+      >,
+    getAutoMoveToReviewWhenPrOpen: () =>
+      ipcRenderer.invoke('project:getAutoMoveToReviewWhenPrOpen') as Promise<boolean>,
+    setAutoMoveToReviewWhenPrOpen: (enabled: boolean) =>
+      ipcRenderer.invoke('project:setAutoMoveToReviewWhenPrOpen', enabled) as Promise<
         { ok: true; enabled: boolean } | { error: string }
       >,
   },
@@ -223,8 +231,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ) as Promise<{ ok: true } | { ok: false; message: string }>,
     delete: (id: string) =>
       ipcRenderer.invoke('tasks:delete', id) as Promise<void>,
-    createPullRequest: (payload: { taskId: string; title?: string; description?: string }) =>
-      ipcRenderer.invoke('tasks:createPullRequest', payload) as Promise<TaskPullRequestIpcResult>,
+    requestPullRequestFromAgent: (payload: {
+      taskId: string;
+      title?: string;
+      description?: string;
+    }) =>
+      ipcRenderer.invoke('tasks:requestPullRequestFromAgent', payload) as Promise<
+        TaskRequestPullRequestFromAgentResult
+      >,
     refreshPullRequest: (payload: { taskId: string; githubPr?: TaskGithubPr }) =>
       ipcRenderer.invoke('tasks:refreshPullRequest', payload) as Promise<TaskPullRequestIpcResult>,
     resolveWorktrees: (taskIds: string[]) =>
@@ -245,8 +259,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
   sessions: {
-    start: (task: Task, projectTasks?: Task[], requesterUid?: string | null) =>
-      ipcRenderer.invoke('session:start', task, projectTasks, requesterUid) as Promise<SessionStartResult>,
+    start: (
+      task: Task,
+      projectTasks?: Task[],
+      requesterUid?: string | null,
+      options?: SessionStartOptions,
+    ) =>
+      ipcRenderer.invoke(
+        'session:start',
+        task,
+        projectTasks,
+        requesterUid,
+        options,
+      ) as Promise<SessionStartResult>,
     archive: (sessionId: string) =>
       ipcRenderer.invoke('session:archive', sessionId) as Promise<void>,
     deleteWorkspace: (sessionId: string) =>

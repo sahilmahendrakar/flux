@@ -23,6 +23,7 @@ import {
   type ProjectTabState,
   type TaskPrErrorCode,
   type TaskPullRequestIpcResult,
+  type TaskRequestPullRequestFromAgentResult,
 } from './types';
 import Board from './components/Board';
 import { PlanningPanel } from './components/PlanningPanel';
@@ -51,6 +52,13 @@ import type { TaskPatch, TaskProvider } from './renderer/tasks/TaskProvider';
 import { LocalTaskProvider } from './renderer/tasks/LocalTaskProvider';
 import { FirestoreTaskProvider } from './renderer/tasks/FirestoreTaskProvider';
 import { useGithubPrBoardRefresh } from './renderer/tasks/useGithubPrBoardRefresh';
+import { applyGithubPrRefreshFromRenderer } from './renderer/tasks/applyGithubPrRefreshFromRenderer';
+import {
+  formatGithubPrDiscoveryFailure,
+  isBenignPrDiscoveryWhileAgentWorking,
+  shouldStopPrAgentFollowupDiscovery,
+  type GithubPrDiscoveryMessageContext,
+} from './githubPrDiscoveryMessages';
 import {
   reconcileCloudSilenceFromDaemon,
   useCloudSilenceReconciliation,
@@ -82,6 +90,8 @@ import {
 type ActiveProject = LocalProject | CloudProject;
 
 const UPDATE_DEBOUNCE_MS = 300;
+/** Minimum spacing between suppressed `pending-agent` PR discoveries (silence + timed retries). */
+const PENDING_AGENT_PR_DISCOVERY_MIN_GAP_MS = 4500;
 const STATIC_TAB_IDS = new Set(['board', 'plan', 'docs']);
 const PLAN_TAB_PREFIX = 'plan:';
 
@@ -172,7 +182,11 @@ function mergeServerTaskWithPendingPatchOntoLocal(
 const TASK_PR_ERROR_HINTS: Partial<Record<TaskPrErrorCode, string>> = {
   NO_PROJECT: 'Open a project workspace in Flux, then try again.',
   NO_WORKTREE:
-    'Start a session for this task (or ensure a git worktree exists) so Flux has a branch to open a PR from.',
+    "Start this task's agent session so Flux has a live worktree, then try opening the PR again.",
+  NO_AGENT_SESSION:
+    'Open the task and start its agent session from the board or task panel, then click the PR icon again.',
+  AGENT_SESSION_NOT_RUNNING:
+    "Return to the task's session tab and start or resume the agent, then try opening the PR again.",
   GH_NOT_INSTALLED: 'Install the GitHub CLI (`gh`) and ensure it is on your PATH.',
   GH_AUTH_FAILED: 'Run `gh auth login` in a terminal, then try again.',
   NO_GITHUB_REMOTE: 'Point `origin` at GitHub or add a `github.com` remote, then try again.',
@@ -181,7 +195,12 @@ const TASK_PR_ERROR_HINTS: Partial<Record<TaskPrErrorCode, string>> = {
   TASK_METADATA_REQUIRED: 'Ensure this task has a title (edit the task if needed), then try again.',
 };
 
-function formatTaskPullRequestError(result: Extract<TaskPullRequestIpcResult, { ok: false }>): string {
+type TaskPrIpcFailure = Extract<
+  TaskPullRequestIpcResult | TaskRequestPullRequestFromAgentResult,
+  { ok: false }
+>;
+
+function formatTaskPullRequestError(result: TaskPrIpcFailure): string {
   const hint = TASK_PR_ERROR_HINTS[result.code];
   return hint ? `${result.message}\n${hint}` : result.message;
 }
@@ -259,6 +278,8 @@ export default function App() {
   const boardRowRef = useRef<HTMLDivElement>(null);
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
+  const openTabIdsRef = useRef(openTabIds);
+  openTabIdsRef.current = openTabIds;
   const tasksRef = useRef<Task[]>([]);
   tasksRef.current = tasks;
   const uidRef = useRef<string | null>(null);
@@ -267,6 +288,21 @@ export default function App() {
   /** Skips duplicate unblock handling in the cloud snapshot effect while we finalize Done inline. */
   const cloudInlineDoneFollowUpTaskIdsRef = useRef<Set<string>>(new Set());
   const createPrInflightTaskIdRef = useRef<string | null>(null);
+  /** Task ids that already received `tasks:requestPullRequestFromAgent` without a linked PR yet. */
+  const prAgentPromptSentTaskIdsRef = useRef<Set<string>>(new Set());
+  const prAgentFollowupTimersByTaskIdRef = useRef<Map<string, number[]>>(new Map());
+  /** Cancels in-flight bounded discovery when bumped per task id. */
+  const taskPrDiscoveryGenRef = useRef<Map<string, number>>(new Map());
+  const [prAgentAwaitingByTaskId, setPrAgentAwaitingByTaskId] = useState<Record<string, boolean>>({});
+  const runDiscoverGithubPrForTaskRef = useRef<
+    | ((
+        taskId: string,
+        context: GithubPrDiscoveryMessageContext,
+        opts?: { suppressBenignErrors?: boolean },
+      ) => Promise<boolean>)
+    | null
+  >(null);
+  const pendingAgentPrDiscoveryLastAtRef = useRef<Map<string, number>>(new Map());
   const worktreeResolveGenRef = useRef(0);
   const memberPhotoRefreshKeyRef = useRef('');
   const [autoStartWhenUnblockedProject, setAutoStartWhenUnblockedProject] = useState(false);
@@ -736,6 +772,56 @@ export default function App() {
       setSessions((prev) =>
         prev.map((s) => (s.id === exited.id ? { ...s, status: exited.status } : s)),
       );
+
+      // Cloud projects: clean exit (code 0 → 'stopped') moves task to needs-input.
+      if (exited.status !== 'stopped' || !exited.taskId) {
+        if (exited.status === 'error' && exited.taskId) {
+          console.warn('[task:status] agent exited with error, not transitioning task (cloud)', {
+            taskId: exited.taskId,
+            sessionId: exited.id,
+          });
+        }
+        return;
+      }
+
+      if (projectRef.current?.kind !== 'cloud') return;
+
+      const task = tasksRef.current.find((t) => t.id === exited.taskId);
+      if (!task || task.status !== 'in-progress') {
+        if (task) {
+          console.log('[task:status] session exit skip: task not in-progress', {
+            taskId: exited.taskId,
+            status: task.status,
+          });
+        }
+        return;
+      }
+
+      const currentUid = uidRef.current;
+      if (!currentUid || task.assigneeId !== currentUid) {
+        console.log('[task:status] session exit skip: assignee mismatch', {
+          taskId: exited.taskId,
+          assigneeId: task.assigneeId,
+          currentUid,
+        });
+        return;
+      }
+
+      console.log('[task:status] in-progress → needs-input (agent exited cleanly, cloud)', {
+        taskId: exited.taskId,
+        assigneeId: task.assigneeId,
+      });
+      setTasks((prev) =>
+        prev.map((t) => (t.id === exited.taskId ? { ...t, status: 'needs-input' } : t)),
+      );
+      void providerRef.current
+        ?.update(exited.taskId, { status: 'needs-input' })
+        .catch((err) => {
+          console.error('[task:status] Firestore write failed (needs-input, exit)', {
+            taskId: exited.taskId,
+            err,
+          });
+        });
     });
     return () => unsub();
   }, []);
@@ -789,15 +875,47 @@ export default function App() {
         // listener below.
         if (state !== 'silent') return;
 
+        if (prAgentPromptSentTaskIdsRef.current.has(taskId)) {
+          const row = tasksRef.current.find((x) => x.id === taskId);
+          if (!row?.githubPr?.url?.trim()) {
+            void runDiscoverGithubPrForTaskRef
+              .current?.(taskId, 'pending-agent', {
+                suppressBenignErrors: true,
+              })
+              .catch((err) => {
+                console.warn('[github-pr] silence discovery failed', taskId, err);
+              });
+          }
+        }
+
         // Cloud-only feature for now.
-        if (projectRef.current?.kind !== 'cloud') return;
+        if (projectRef.current?.kind !== 'cloud') {
+          return;
+        }
 
         const task = tasksRef.current.find((t) => t.id === taskId);
-        if (!task || task.status !== 'in-progress') return;
+        if (!task || task.status !== 'in-progress') {
+          if (task) {
+            console.log('[task:status] silence skip: task not in-progress', {
+              taskId,
+              status: task.status,
+            });
+          } else {
+            console.log('[task:status] silence skip: task not found', { taskId });
+          }
+          return;
+        }
 
         // Only the assignee may mutate task status.
         const currentUid = uidRef.current;
-        if (!currentUid || task.assigneeId !== currentUid) return;
+        if (!currentUid || task.assigneeId !== currentUid) {
+          console.log('[task:status] silence skip: assignee mismatch', {
+            taskId,
+            assigneeId: task.assigneeId,
+            currentUid,
+          });
+          return;
+        }
 
         console.log('[task:status] in-progress → needs-input (silence detected)', {
           taskId,
@@ -874,15 +992,40 @@ export default function App() {
       if ('error' in p.outcome) return;
       const s = p.outcome;
       if (s.projectId !== project.id) return;
+
+      // Replacing a session for the same task (e.g. Resume / New session) creates a new
+      // daemon id. Drop prior rows for this taskId and migrate tab strip + focus so we
+      // do not open a duplicate workspace tab or leave the active tab pointing at a dead id.
+      const replacedIds = sessionsRef.current
+        .filter((x) => x.taskId === s.taskId)
+        .map((x) => x.id);
+      for (const id of replacedIds) {
+        if (id !== s.id) invalidateSessionAttachCache(id);
+      }
+
       setSessions((prev) => {
-        const i = prev.findIndex((x) => x.id === s.id);
+        const withoutTask = prev.filter((x) => x.taskId !== s.taskId);
+        const i = withoutTask.findIndex((x) => x.id === s.id);
         if (i >= 0) {
-          const next = prev.slice();
+          const next = withoutTask.slice();
           next[i] = s;
           return next;
         }
-        return [...prev, s];
+        return [...withoutTask, s];
       });
+
+      const hadOpenReplaced = replacedIds.some((id) => openTabIdsRef.current.has(id));
+      if (hadOpenReplaced) {
+        setOpenTabIds((prev) => {
+          const next = new Set(prev);
+          for (const id of replacedIds) {
+            next.delete(id);
+          }
+          next.add(s.id);
+          return next;
+        });
+        setActiveTabId((prev) => (replacedIds.includes(prev) ? s.id : prev));
+      }
     });
   }, [project?.id]);
 
@@ -1108,7 +1251,7 @@ export default function App() {
           updated,
           allAfter,
           provider,
-          actorUid: null,
+          actorUid: uidRef.current,
           unblockInFlight: cloudUnblockInFlightRef.current,
           getTasks: () => tasksRef.current.map((t) => (t.id === updated.id ? updated : t)),
           setCleanupLoadingTaskId: (tid) => setCleanupLoadingTaskId(tid),
@@ -1136,6 +1279,143 @@ export default function App() {
     [project?.kind, provider, stripLocalSessionStateForTask, maybeStripSessionsAfterNewWorkspaceClean],
   );
 
+  const cancelPrAgentFollowupTimersForTask = useCallback((taskId: string) => {
+    const timers = prAgentFollowupTimersByTaskIdRef.current.get(taskId);
+    if (!timers) return;
+    for (const t of timers) window.clearTimeout(t);
+    prAgentFollowupTimersByTaskIdRef.current.delete(taskId);
+  }, []);
+
+  const runDiscoverGithubPrForTask = useCallback(
+    async (
+      taskId: string,
+      messageContext: GithubPrDiscoveryMessageContext,
+      opts?: { suppressBenignErrors?: boolean },
+    ): Promise<boolean> => {
+      const task = tasksRef.current.find((t) => t.id === taskId);
+      if (!task) return false;
+      const prov = providerRef.current;
+      const proj = projectRef.current;
+      if (!prov || !proj) return false;
+
+      if (messageContext === 'pending-agent' && opts?.suppressBenignErrors) {
+        const last = pendingAgentPrDiscoveryLastAtRef.current.get(taskId) ?? 0;
+        const now = Date.now();
+        if (now - last < PENDING_AGENT_PR_DISCOVERY_MIN_GAP_MS) {
+          return false;
+        }
+        pendingAgentPrDiscoveryLastAtRef.current.set(taskId, now);
+      }
+
+      const result = await window.electronAPI.tasks.refreshPullRequest({
+        taskId,
+        githubPr: task.githubPr,
+      });
+
+      if (!result.ok) {
+        if (opts?.suppressBenignErrors && isBenignPrDiscoveryWhileAgentWorking(result.code)) {
+          return false;
+        }
+        if (
+          opts?.suppressBenignErrors &&
+          shouldStopPrAgentFollowupDiscovery(result.code, result.message)
+        ) {
+          cancelPrAgentFollowupTimersForTask(taskId);
+          console.warn('[github-pr] discovery paused after error', taskId, result.code, result.message);
+          return false;
+        }
+        setTaskPrError(formatGithubPrDiscoveryFailure(result, messageContext));
+        return false;
+      }
+
+      await applyGithubPrRefreshFromRenderer({
+        projectKind: proj.kind,
+        taskId,
+        live: task,
+        snapshot: tasksRef.current,
+        result,
+        provider: prov,
+        autoMarkDoneWhenPrMerged: proj.autoMarkDoneWhenPrMerged === true,
+        autoMoveToReviewWhenPrOpen: proj.autoMoveToReviewWhenPrOpen === true,
+        onCloudPrMergedAutoDone: handleCloudPrRefreshMergedAutoDone,
+      });
+
+      const linked = Boolean(result.githubPr.url?.trim());
+      if (linked) {
+        cancelPrAgentFollowupTimersForTask(taskId);
+        pendingAgentPrDiscoveryLastAtRef.current.delete(taskId);
+        taskPrDiscoveryGenRef.current.set(
+          taskId,
+          (taskPrDiscoveryGenRef.current.get(taskId) ?? 0) + 1,
+        );
+        prAgentPromptSentTaskIdsRef.current.delete(taskId);
+        setPrAgentAwaitingByTaskId((prev) => {
+          if (!prev[taskId]) return prev;
+          const rest = { ...prev };
+          delete rest[taskId];
+          return rest;
+        });
+      }
+      return linked;
+    },
+    [cancelPrAgentFollowupTimersForTask, handleCloudPrRefreshMergedAutoDone],
+  );
+
+  runDiscoverGithubPrForTaskRef.current = runDiscoverGithubPrForTask;
+
+  const schedulePrAgentFollowupDiscovery = useCallback(
+    (taskId: string) => {
+      cancelPrAgentFollowupTimersForTask(taskId);
+      const nextGen = (taskPrDiscoveryGenRef.current.get(taskId) ?? 0) + 1;
+      taskPrDiscoveryGenRef.current.set(taskId, nextGen);
+      const delays = [3200, 10_000, 26_000];
+      const timers: number[] = [];
+      for (const delay of delays) {
+        timers.push(
+          window.setTimeout(() => {
+            if (taskPrDiscoveryGenRef.current.get(taskId) !== nextGen) return;
+            const t = tasksRef.current.find((x) => x.id === taskId);
+            if (t?.githubPr?.url?.trim()) return;
+            void runDiscoverGithubPrForTask(taskId, 'pending-agent', { suppressBenignErrors: true }).catch(
+              (err) => {
+                console.warn('[github-pr] follow-up discovery failed', taskId, err);
+              },
+            );
+          }, delay),
+        );
+      }
+      prAgentFollowupTimersByTaskIdRef.current.set(taskId, timers);
+    },
+    [cancelPrAgentFollowupTimersForTask, runDiscoverGithubPrForTask],
+  );
+
+  useEffect(() => {
+    setPrAgentAwaitingByTaskId((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const taskId of Object.keys(prev)) {
+        if (!prev[taskId]) continue;
+        const t = tasks.find((x) => x.id === taskId);
+        if (t?.githubPr?.url?.trim()) {
+          delete next[taskId];
+          changed = true;
+          cancelPrAgentFollowupTimersForTask(taskId);
+          prAgentPromptSentTaskIdsRef.current.delete(taskId);
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [tasks, cancelPrAgentFollowupTimersForTask]);
+
+  const isFullscreenPlanTab = useMemo(
+    () => activeTabId === 'plan' || parsePlanTabId(activeTabId) !== null,
+    [activeTabId],
+  );
+  const isBoardOrPlanTab = useMemo(
+    () => activeTabId === 'board' || isFullscreenPlanTab,
+    [activeTabId, isFullscreenPlanTab],
+  );
+
   useGithubPrBoardRefresh({
     projectId: project?.id,
     projectKind: project?.kind,
@@ -1143,6 +1423,8 @@ export default function App() {
     tasks,
     enabled: Boolean(project && !activationLoading && provider),
     autoMarkDoneWhenPrMerged: project?.autoMarkDoneWhenPrMerged === true,
+    autoMoveToReviewWhenPrOpen: project?.autoMoveToReviewWhenPrOpen === true,
+    surfaceActive: isBoardOrPlanTab,
     onCloudPrMergedAutoDone: handleCloudPrRefreshMergedAutoDone,
   });
 
@@ -1746,17 +2028,18 @@ export default function App() {
         void window.electronAPI.openExternalUrl(existingUrl);
         return;
       }
-      if (!provider) {
+      if (!providerRef.current) {
         setTaskPrError('Task list is not ready yet. Try again in a moment.');
         return;
       }
       if (createPrInflightTaskIdRef.current === taskId) return;
+
       createPrInflightTaskIdRef.current = taskId;
       setPrLoadingTaskId(taskId);
       setTaskPrError(null);
       try {
         const title = task.title.trim();
-        const result = await window.electronAPI.tasks.createPullRequest({
+        const result = await window.electronAPI.tasks.requestPullRequestFromAgent({
           taskId,
           ...(title ? { title } : {}),
           ...(task.description !== undefined ? { description: task.description } : {}),
@@ -1765,23 +2048,11 @@ export default function App() {
           setTaskPrError(formatTaskPullRequestError(result));
           return;
         }
-        if (!result.persisted) {
-          try {
-            const updated = await provider.update(taskId, { githubPr: result.githubPr });
-            setTasks((prev) =>
-              prev.map((t) => (t.id === taskId ? mergeTaskRowPreserveMissing(t, updated) : t)),
-            );
-          } catch (err) {
-            console.error('[tasks.update] githubPr after createPullRequest failed', err);
-            setTaskPrError(
-              'The pull request was created, but saving its link on this task failed. Open the repo on GitHub to find the PR.',
-            );
-            return;
-          }
-        }
-        void window.electronAPI.openExternalUrl(result.githubPr.url);
+        prAgentPromptSentTaskIdsRef.current.add(taskId);
+        setPrAgentAwaitingByTaskId((prev) => ({ ...prev, [taskId]: true }));
+        schedulePrAgentFollowupDiscovery(taskId);
       } catch (err) {
-        console.error('[tasks.createPullRequest] failed', err);
+        console.error('[tasks.requestPullRequestFromAgent] failed', err);
         setTaskPrError(
           err instanceof Error ? err.message : 'Could not create the pull request.',
         );
@@ -1790,7 +2061,7 @@ export default function App() {
         setPrLoadingTaskId(null);
       }
     },
-    [provider],
+    [schedulePrAgentFollowupDiscovery],
   );
 
   const cancelCleanupTask = useCallback(() => {
@@ -1835,6 +2106,12 @@ export default function App() {
     setCleanupError(null);
     setPrLoadingTaskId(null);
     setTaskPrError(null);
+    for (const timers of prAgentFollowupTimersByTaskIdRef.current.values()) {
+      for (const t of timers) window.clearTimeout(t);
+    }
+    prAgentFollowupTimersByTaskIdRef.current.clear();
+    prAgentPromptSentTaskIdsRef.current.clear();
+    setPrAgentAwaitingByTaskId({});
     setPlanPanelOpen(false);
     replaceProjectWorkspaceRoute();
     setActiveTabId('board');
@@ -1858,6 +2135,12 @@ export default function App() {
     setCleanupError(null);
     setPrLoadingTaskId(null);
     setTaskPrError(null);
+    for (const timers of prAgentFollowupTimersByTaskIdRef.current.values()) {
+      for (const t of timers) window.clearTimeout(t);
+    }
+    prAgentFollowupTimersByTaskIdRef.current.clear();
+    prAgentPromptSentTaskIdsRef.current.clear();
+    setPrAgentAwaitingByTaskId({});
     setPlanPanelOpen(false);
     replaceProjectWorkspaceRoute();
     setDocsSidebarExpanded(false);
@@ -2250,12 +2533,6 @@ export default function App() {
     });
   }, [openPlanningMainTabIds, planningSessions]);
 
-  const isFullscreenPlanTab =
-    activeTabId === 'plan' || parsePlanTabId(activeTabId) !== null;
-
-  const isBoardOrPlanTab =
-    activeTabId === 'board' || isFullscreenPlanTab;
-
   const planningPanelActiveSessionId = useMemo(() => {
     const sid = parsePlanTabId(activeTabId);
     if (sid) return sid;
@@ -2339,13 +2616,13 @@ export default function App() {
         {cleanupError ? (
           <div
             role="alert"
-            className="flex shrink-0 items-start gap-2 border-b border-amber-500/20 bg-amber-500/[0.08] px-4 py-2 text-[13px] text-amber-100/95"
+            className="flex shrink-0 items-start gap-2 border-b border-flux-warning/25 bg-flux-warning/10 px-4 py-2 text-[13px] text-flux-warning"
           >
             <p className="min-w-0 flex-1 whitespace-pre-wrap leading-snug">{cleanupError}</p>
             <button
               type="button"
               onClick={() => setCleanupError(null)}
-              className="shrink-0 rounded px-2 py-0.5 text-[12px] font-medium text-amber-200/90 hover:bg-amber-500/15"
+              className="shrink-0 rounded px-2 py-0.5 text-[12px] font-medium text-flux-warning hover:bg-flux-warning/15"
             >
               Dismiss
             </button>
@@ -2354,13 +2631,13 @@ export default function App() {
         {taskPrError ? (
           <div
             role="alert"
-            className="flex shrink-0 items-start gap-2 border-b border-rose-500/20 bg-rose-500/[0.08] px-4 py-2 text-[13px] text-rose-100/95"
+            className="flex shrink-0 items-start gap-2 border-b border-flux-danger/25 bg-flux-danger/10 px-4 py-2 text-[13px] text-flux-danger"
           >
             <p className="min-w-0 flex-1 whitespace-pre-wrap leading-snug">{taskPrError}</p>
             <button
               type="button"
               onClick={() => setTaskPrError(null)}
-              className="shrink-0 rounded px-2 py-0.5 text-[12px] font-medium text-rose-200/90 hover:bg-rose-500/15"
+              className="shrink-0 rounded px-2 py-0.5 text-[12px] font-medium text-flux-danger hover:bg-flux-danger/15"
             >
               Dismiss
             </button>
@@ -2436,10 +2713,83 @@ export default function App() {
                     session={item.session}
                     visible={isActive && !settingsRouteActive}
                     task={tabTask}
+                    agentSessionLifecycle={
+                      tabTask
+                        ? {
+                            projectTasks: tasks,
+                            requesterUid: project.kind === 'cloud' ? uid : undefined,
+                          }
+                        : undefined
+                    }
+                    onAgentSessionStartSuccess={
+                      tabTask
+                        ? (taskId: string) => {
+                            const t = tasks.find((x) => x.id === taskId);
+                            if (!t) return;
+                            const patch: TaskPatch = { status: 'in-progress' };
+                            if (project.kind === 'cloud' && uid && !t.assigneeId) {
+                              patch.assigneeId = uid;
+                            }
+                            void handleUpdateTask(taskId, patch);
+                          }
+                        : undefined
+                    }
                     markAsDoneBlocked={tabTaskBlocked}
                     onMarkAsDone={
                       tabTask && tabTask.status !== 'done' && !tabTaskBlocked
                         ? () => void handleMarkTaskDone(item.session.taskId, { goToBoard: true })
+                        : undefined
+                    }
+                    onTaskPrClick={(id) => void handleTaskPrClick(id)}
+                    prLoading={prLoadingTaskId === item.session.taskId}
+                    prAgentAwaiting={Boolean(prAgentAwaitingByTaskId[item.session.taskId])}
+                    taskDetailPanel={
+                      tabTask
+                        ? {
+                            projectTasks: tasks,
+                            taskSessionStartPending: sessionStartPendingTaskIds.has(
+                              tabTask.id,
+                            ),
+                            implicitSessionAssigneeUid:
+                              project.kind === 'cloud' ? uid : undefined,
+                            onSelectTask: (id) => {
+                              leaveSettingsIfActive();
+                              setSelectedTaskId(id);
+                              setActiveTabId('board');
+                            },
+                            onClose: () => {
+                              /* Session workspace Details tab is not a dismissible overlay. */
+                            },
+                            onUpdate: handleUpdateTask,
+                            onDelete: handleDeleteTask,
+                            remoteRunner:
+                              tabTask && cloudProjectId
+                                ? findRemoteRunner(
+                                    runners.byTask.get(tabTask.id),
+                                    uid,
+                                    projectMembers,
+                                  )
+                                : null,
+                            onOpenSessionTab: handleOpenSessionTab,
+                            onArchiveSession: (id) => void handleArchiveSession(id),
+                            onMarkAsDone:
+                              tabTask.status !== 'done' && !tabTaskBlocked
+                                ? () =>
+                                    void handleMarkTaskDone(item.session.taskId, {
+                                      goToBoard: true,
+                                    })
+                                : undefined,
+                            markAsDoneBlocked: tabTaskBlocked,
+                            autoStartWhenUnblockedProject,
+                            projectMembers,
+                            cloudActiveRunnerSession:
+                              project.kind === 'cloud'
+                                ? runners.isRunningFresh(tabTask.id)
+                                : false,
+                            onTaskPrClick: (id) => void handleTaskPrClick(id),
+                            prLoading: prLoadingTaskId === item.session.taskId,
+                            prAgentAwaiting: Boolean(prAgentAwaitingByTaskId[item.session.taskId]),
+                          }
                         : undefined
                     }
                   />
@@ -2505,6 +2855,7 @@ export default function App() {
                         }
                         onTaskPrClick={(id) => void handleTaskPrClick(id)}
                         prLoadingTaskId={prLoadingTaskId}
+                        prAgentAwaitingByTaskId={prAgentAwaitingByTaskId}
                         planPanelOpen={planPanelOpen}
                         onTogglePlanPanel={() => {
                           leaveSettingsIfActive();
@@ -2521,6 +2872,9 @@ export default function App() {
                         }
                         sessions={sessions}
                         taskHasWorktreeById={taskHasWorktreeById}
+                        onTaskAgentSpawnPrefsChange={(id, patch) =>
+                          void handleUpdateTask(id, patch)
+                        }
                       />
                       <TaskDetailPanel
                         task={selectedTask}
@@ -2553,6 +2907,15 @@ export default function App() {
                         onOpenSessionTab={handleOpenSessionTab}
                         onArchiveSession={(id) => void handleArchiveSession(id)}
                         projectMembers={projectMembers}
+                        onTaskPrClick={(id) => void handleTaskPrClick(id)}
+                        prLoading={
+                          selectedTask ? prLoadingTaskId === selectedTask.id : false
+                        }
+                        prAgentAwaiting={
+                          selectedTask
+                            ? Boolean(prAgentAwaitingByTaskId[selectedTask.id])
+                            : false
+                        }
                       />
                     </div>
                     <div
@@ -2577,7 +2940,7 @@ export default function App() {
                           aria-orientation="vertical"
                           aria-label="Resize planning panel"
                           title="Drag to resize. Double-click to reset."
-                          className="absolute bottom-0 left-0 top-0 z-10 w-3 -translate-x-1/2 cursor-col-resize touch-none outline-none before:pointer-events-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-white/[0.1] before:content-[''] hover:before:bg-white/[0.22] focus-visible:ring-1 focus-visible:ring-white/25"
+                          className="absolute bottom-0 left-0 top-0 z-10 w-3 -translate-x-1/2 cursor-col-resize touch-none outline-none before:pointer-events-none before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:bg-flux-border/15 before:content-[''] hover:before:bg-flux-border/30 focus-visible:ring-1 focus-visible:ring-flux-ring/30"
                           onPointerDown={handlePlanningResizePointerDown}
                           onDoubleClick={handlePlanningResizeDoubleClick}
                         />
@@ -2622,11 +2985,11 @@ export default function App() {
             </div>
             {settingsRouteActive ? (
               <div className="absolute inset-0 z-10 flex min-h-0 flex-col overflow-hidden bg-flux-canvas">
-                <div className="app-window-no-drag flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 py-2">
+                <div className="app-window-no-drag flex shrink-0 items-center gap-2 border-b border-flux-border/10 px-3 py-2">
                   <button
                     type="button"
                     onClick={() => replaceProjectWorkspaceRoute()}
-                    className="rounded-md px-2 py-1 text-[12px] font-medium text-zinc-400 transition hover:bg-white/[0.06] hover:text-zinc-100"
+                    className="rounded-md px-2 py-1 text-[12px] font-medium text-flux-fg-muted transition hover:bg-flux-hover/8 hover:text-flux-fg"
                   >
                     ← Workspace
                   </button>
