@@ -202,6 +202,7 @@ declare global {
           createSourceBranchIfMissing?: boolean;
           agentModel?: string;
           agentYolo?: boolean;
+          repoId?: string;
         }) => Promise<Task>;
         update: (
           id: string,
@@ -221,6 +222,7 @@ declare global {
             | 'autoStartOnUnblock'
             | 'sourceBranch'
             | 'createSourceBranchIfMissing'
+            | 'repoId'
           >
         > & { githubPr?: TaskGithubPr | null },
       ) => Promise<Task>;

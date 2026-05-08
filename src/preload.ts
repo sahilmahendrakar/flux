@@ -233,6 +233,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       createSourceBranchIfMissing?: boolean;
       agentModel?: string;
       agentYolo?: boolean;
+      repoId?: string;
     }) => ipcRenderer.invoke('tasks:create', input) as Promise<Task>,
     update: (
       id: string,
@@ -252,6 +253,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
           | 'autoStartOnUnblock'
           | 'sourceBranch'
           | 'createSourceBranchIfMissing'
+          | 'repoId'
         >
       > & { githubPr?: TaskGithubPr | null },
     ) => ipcRenderer.invoke('tasks:update', id, patch) as Promise<Task>,

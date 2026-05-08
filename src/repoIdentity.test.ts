@@ -6,10 +6,14 @@ import {
   findRepoByIdOrPrimary,
   getPrimaryRepo,
   getPrimaryRepoForProject,
+  nextPersistedRepoIdAfterPatch,
+  persistedRepoIdsEqual,
   repoDisplayLabel,
   repoIdBelongsToProject,
+  resolveLocalTaskRepoIdForCreate,
   resolvePrimaryRepoId,
   resolveRepoForBranchDiscovery,
+  validateTaskRepoIdPatchValue,
 } from './repoIdentity';
 import type { LocalProject, RepoConfig } from './types';
 
@@ -116,6 +120,50 @@ describe('repoIdentity (multi-repo2)', () => {
     expect(effectiveTaskRepoId({ repoId: '' }, 'primary')).toBe('primary');
     expect(effectiveTaskRepoId({ repoId: '  ' }, 'primary')).toBe('primary');
     expect(effectiveTaskRepoId({ repoId: 'alt' }, 'primary')).toBe('alt');
+  });
+
+  it('resolveLocalTaskRepoIdForCreate defaults to primary and rejects unknown ids', () => {
+    const repos = [
+      makeRepo({ id: 'r1' }),
+      makeRepo({ id: 'r2', rootPath: '/abs/r2' }),
+    ];
+    expect(resolveLocalTaskRepoIdForCreate(repos, undefined)).toEqual({
+      ok: true,
+      repoId: 'r1',
+    });
+    expect(resolveLocalTaskRepoIdForCreate(repos, '  ')).toEqual({
+      ok: true,
+      repoId: 'r1',
+    });
+    expect(resolveLocalTaskRepoIdForCreate(repos, 'r2')).toEqual({ ok: true, repoId: 'r2' });
+    expect(resolveLocalTaskRepoIdForCreate(repos, 'nope')).toMatchObject({
+      ok: false,
+      message: 'Unknown repository id: nope',
+    });
+    expect(resolveLocalTaskRepoIdForCreate([], undefined)).toMatchObject({
+      ok: false,
+      message: 'No repository identity configured for this project',
+    });
+  });
+
+  it('nextPersistedRepoIdAfterPatch and persistedRepoIdsEqual match TaskStore repoId semantics', () => {
+    expect(nextPersistedRepoIdAfterPatch('a', undefined)).toBe('a');
+    expect(nextPersistedRepoIdAfterPatch('a', '')).toBeUndefined();
+    expect(nextPersistedRepoIdAfterPatch(undefined, '  b  ')).toBe('b');
+    expect(persistedRepoIdsEqual(undefined, '')).toBe(true);
+    expect(persistedRepoIdsEqual('x', 'x')).toBe(true);
+    expect(persistedRepoIdsEqual('x', 'y')).toBe(false);
+  });
+
+  it('validateTaskRepoIdPatchValue accepts clears and known ids only', () => {
+    const repos = [makeRepo({ id: 'r1' })];
+    expect(validateTaskRepoIdPatchValue(repos, undefined)).toEqual({ ok: true });
+    expect(validateTaskRepoIdPatchValue(repos, '')).toEqual({ ok: true });
+    expect(validateTaskRepoIdPatchValue(repos, 'r1')).toEqual({ ok: true });
+    expect(validateTaskRepoIdPatchValue(repos, 'bad')).toMatchObject({
+      ok: false,
+      message: 'Unknown repository id: bad',
+    });
   });
 
   it('repoDisplayLabel prefers name, falls back to basename, then to short id', () => {
