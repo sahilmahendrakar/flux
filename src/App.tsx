@@ -211,6 +211,8 @@ const TASK_PR_ERROR_HINTS: Partial<Record<TaskPrErrorCode, string>> = {
   BRANCH_PUSH_FAILED: 'Fix the push error shown above (permissions, network, or diverged history), then retry.',
   PR_CREATE_FAILED: 'Check the GitHub CLI output for details, then retry.',
   TASK_METADATA_REQUIRED: 'Ensure this task has a title (edit the task if needed), then try again.',
+  PR_REPO_MISMATCH:
+    "This pull request is for a different GitHub repository than this task's clone. Check the task's repository and the linked PR URL, then try again.",
 };
 
 type TaskPrIpcFailure = Extract<

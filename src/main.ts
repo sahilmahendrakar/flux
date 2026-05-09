@@ -43,11 +43,14 @@ import {
   taskInitialPrompt,
 } from './main/agentSpawn';
 import { listCursorAgentModels } from './main/listCursorAgentModels';
-import { openWorkspacePath, resolveTaskWorktreePath } from './main/openWorkspacePath';
+import { openWorkspacePath, pickSessionForTaskWorktree, resolveTaskWorktreePath } from './main/openWorkspacePath';
 import {
   ghPrViewCurrentBranchOpen,
   ghPrViewJson,
   prMetadataRefMismatchWarning,
+  readOriginRemote,
+  resolveGithubPrGitOperationPaths,
+  validateGithubPrMatchesTaskRemote,
 } from './main/githubTaskPr';
 import { resolveProjectRepoDefaultBranchShort } from './main/resolveProjectRepoDefaultBranch';
 import {
@@ -2075,15 +2078,13 @@ app.whenReady().then(async () => {
         return { ok: false, code: 'NO_PROJECT', message: 'No git project open' };
       }
       const project = projectStore.get();
+      const taskRow = project ? taskStore.getAll(project.id).find((t) => t.id === taskId) : undefined;
       let title = typeof o.title === 'string' ? o.title.trim() : '';
       let description = typeof o.description === 'string' ? o.description : '';
-      if (project) {
-        const row = taskStore.getAll(project.id).find((t) => t.id === taskId);
-        if (row) {
-          if (!title) title = row.title.trim();
-          if (o.description === undefined && row.description) {
-            description = row.description;
-          }
+      if (taskRow) {
+        if (!title) title = taskRow.title.trim();
+        if (o.description === undefined && taskRow.description) {
+          description = taskRow.description;
         }
       }
       if (!title) {
@@ -2095,7 +2096,7 @@ app.whenReady().then(async () => {
       }
 
       const sessions = await daemonClient.listSessions();
-      const session = sessions.find((s) => s.taskId === taskId);
+      const session = pickSessionForTaskWorktree(sessions, taskId, taskRow?.repoId);
       if (!session) {
         return {
           ok: false,
@@ -2150,12 +2151,14 @@ app.whenReady().then(async () => {
         };
       }
 
+      const repos = project ? await projectStore.getReposAt(activeProjectDir()) : [];
+      const primaryRepoId = resolvePrimaryRepoId(repos) ?? '';
       const repoDefaultBranch = await resolveProjectRepoDefaultBranchShort({
         projectStore,
         activeProjectDir,
         rootPath,
+        repoId: taskRow ? effectiveTaskRepoId(taskRow, primaryRepoId) : undefined,
       });
-      const taskRow = project ? taskStore.getAll(project.id).find((t) => t.id === taskId) : undefined;
       const { baseBranch, headBranch } = resolveAgentPullRequestBranchContext({
         task: taskRow ?? {},
         projectDefaultBranchShort: repoDefaultBranch,
@@ -2185,6 +2188,7 @@ app.whenReady().then(async () => {
             'Could not write PR instructions for the agent. Ensure a Flux project directory is available.',
         };
       }
+      const repoCfg = resolveRepoForBranchDiscovery(repos, taskRow?.repoId);
       const payload = buildTaskAgentPullRequestPrompt({
         taskId,
         taskTitle: title,
@@ -2193,6 +2197,8 @@ app.whenReady().then(async () => {
         prTitle: title,
         prBody,
         instructionsAbsolutePath: instructionsPath,
+        repoDisplayLabel: repoCfg ? repoDisplayLabel(repoCfg) : undefined,
+        repoRootPath: repoCfg?.rootPath,
       });
       const pasteInput = wrapAsXtermBracketedPaste(payload);
       const submitInput = '\r';
@@ -2236,7 +2242,17 @@ app.whenReady().then(async () => {
         projectDir,
         row?.repoId,
       );
-      const ghCwd = worktreePath || rootPath || projectDir;
+      const repos = await projectStore.getReposAt(projectDir);
+      const resolvedPaths = await resolveGithubPrGitOperationPaths({
+        repos,
+        taskRepoId: row?.repoId,
+        worktreePath,
+      });
+      if (!resolvedPaths.ok) {
+        return resolvedPaths;
+      }
+      const { ghCwd, gitRootPath } = resolvedPaths;
+
       let prUrl = '';
       const fromPayload =
         o.githubPr && typeof o.githubPr === 'object' && typeof (o.githubPr as TaskGithubPr).url === 'string'
@@ -2262,6 +2278,11 @@ app.whenReady().then(async () => {
         console.warn('[tasks:refreshPullRequest] gh view failed', taskId, viewed.message);
         return viewed;
       }
+
+      const origin = await readOriginRemote(gitRootPath);
+      if (!origin.ok) return origin;
+      const mismatch = validateGithubPrMatchesTaskRemote(viewed.githubPr.url, origin.url);
+      if (mismatch) return mismatch;
 
       const metadataMismatchWarning = row?.githubPr
         ? prMetadataRefMismatchWarning(row.githubPr, viewed.githubPr)
