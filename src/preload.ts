@@ -50,6 +50,7 @@ import type {
   PlanningDocsListResult,
 } from './planningDocs/types';
 import { ipcSubscribe } from './ipcSubscribe';
+import type { MacGithubUpdateCheckResult } from './main/appUpdates';
 
 type PlanningStartResult = PlanningSession | { error: string; message?: string };
 
@@ -500,6 +501,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
           payload,
         ) as Promise<{ ok: true } | { error: string }>,
     },
+  },
+  /**
+   * macOS packaged builds only — uses `electron-updater` against GitHub Releases with downloads disabled.
+   */
+  updates: {
+    macGithubSupported: (): Promise<boolean> =>
+      ipcRenderer.invoke('app:updates:macGithubSupported'),
+    checkGithubMac: (): Promise<MacGithubUpdateCheckResult> =>
+      ipcRenderer.invoke('app:updates:checkGithubMac'),
   },
   mcpBridge: {
     signalReady: () => ipcRenderer.send(MCP_BRIDGE_READY_CHANNEL),

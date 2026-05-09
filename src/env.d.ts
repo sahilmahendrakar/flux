@@ -46,6 +46,7 @@ import type {
   PlanningDocsCloudMigrationPersistedV1,
   PlanningDocsListResult,
 } from './planningDocs/types';
+import type { MacGithubUpdateCheckResult } from './main/appUpdates';
 
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY?: string;
@@ -331,6 +332,13 @@ declare global {
             plan: FirestoreHydrationWritePlan;
           }) => Promise<{ ok: true } | { error: string }>;
         };
+      };
+      /**
+       * macOS packaged builds only — GitHub Releases metadata via `electron-updater` (no background downloads).
+       */
+      updates: {
+        macGithubSupported: () => Promise<boolean>;
+        checkGithubMac: () => Promise<MacGithubUpdateCheckResult>;
       };
       mcpBridge: {
         signalReady: () => void;

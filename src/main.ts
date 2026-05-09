@@ -115,6 +115,7 @@ import {
   taskSourceBranchSettingsWouldChange,
 } from './main/taskSourceBranchGuard';
 import { fluxTaskWorkBranchName } from './main/fluxTaskBranch';
+import { registerMacGithubUpdateIpcs } from './main/appUpdates';
 import {
   buildCreatePrInstructionsMarkdown,
   buildTaskAgentPullRequestPrompt,
@@ -674,6 +675,8 @@ app.whenReady().then(async () => {
     worktreeService.setRootPath('');
     worktreeService.setProjectDir('');
   }
+
+  registerMacGithubUpdateIpcs();
 
   // ---- Project (legacy single-project API; returns the active LOCAL project) ----
   ipcMain.handle('project:get', () => projectStore.get());
