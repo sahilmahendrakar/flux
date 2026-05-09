@@ -9,6 +9,7 @@ import type {
   RepoBranchDiscoveryRequest,
   RepoBranchDiscoveryResponse,
   RepoConfig,
+  RepoManagementState,
   RepoSettingsPatch,
   Session,
   SessionStartOptions,
@@ -78,6 +79,9 @@ declare global {
   interface Window {
     electronAPI: {
       platform: string;
+      featureFlags: {
+        multiRepo2: boolean;
+      };
       /** Opens http(s) URLs in the system default browser (not an in-app window). */
       openExternalUrl: (url: string) => Promise<void>;
       workspace: {
@@ -106,6 +110,16 @@ declare global {
           rootPath: string;
           patch: RepoSettingsPatch;
         }) => Promise<{ ok: true; repos: RepoConfig[] } | { error: string }>;
+        getRepoManagementStates: () => Promise<
+          | Record<string, RepoManagementState>
+          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        >;
+        pickRepoDirectory: () => Promise<
+          | { rootPath: string }
+          | { error: 'NOT_GIT_REPO' }
+          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+          | null
+        >;
         updateRepoById: (payload: {
           repoId: string;
           patch: RepoSettingsPatch;

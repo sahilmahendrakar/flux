@@ -11,6 +11,7 @@ import type {
   RepoBranchDiscoveryRequest,
   RepoBranchDiscoveryResponse,
   RepoConfig,
+  RepoManagementState,
   RepoSettingsPatch,
   Session,
   SessionStartOptions,
@@ -51,6 +52,7 @@ import type {
   PlanningDocsCloudMigrationPersistedV1,
   PlanningDocsListResult,
 } from './planningDocs/types';
+import { isMultiRepo2Enabled } from './featureFlags';
 import { ipcSubscribe } from './ipcSubscribe';
 
 type PlanningStartResult = PlanningSession | { error: string; message?: string };
@@ -73,6 +75,9 @@ type ActivateCloudResult =
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
+  featureFlags: {
+    multiRepo2: isMultiRepo2Enabled(),
+  },
   openExternalUrl: (url: string) =>
     ipcRenderer.invoke('openExternalUrl', url) as Promise<void>,
   workspace: {
@@ -105,6 +110,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       >,
     getRepos: () =>
       ipcRenderer.invoke('project:getRepos') as Promise<RepoConfig[]>,
+    getRepoManagementStates: () =>
+      ipcRenderer.invoke('project:getRepoManagementStates') as Promise<
+        | Record<string, RepoManagementState>
+        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      >,
+    pickRepoDirectory: () =>
+      ipcRenderer.invoke('project:pickRepoDirectory') as Promise<
+        | { rootPath: string }
+        | { error: 'NOT_GIT_REPO' }
+        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        | null
+      >,
     updateRepo: (payload: { rootPath: string; patch: RepoSettingsPatch }) =>
       ipcRenderer.invoke('project:updateRepo', payload) as Promise<
         { ok: true; repos: RepoConfig[] } | { error: string }

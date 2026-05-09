@@ -108,6 +108,7 @@ import type {
   RepoBranchDiscoveryRequest,
   RepoBranchDiscoveryResponse,
   RepoConfig,
+  RepoManagementState,
   RepoSettingsPatch,
   SessionStartOptions,
   SessionStartResult,
@@ -677,12 +678,13 @@ app.whenReady().then(async () => {
 
   async function pickDirectory(
     title: string,
+    buttonLabel = 'Open project',
   ): Promise<{ rootPath: string } | { error: 'NOT_GIT_REPO' } | null> {
     const win = mainWindow ?? BrowserWindow.getFocusedWindow();
     const dialogOpts = {
       properties: ['openDirectory' as const],
       title,
-      buttonLabel: 'Open project',
+      buttonLabel,
     };
     const result = win
       ? await dialog.showOpenDialog(win, dialogOpts)
@@ -862,6 +864,75 @@ app.whenReady().then(async () => {
     };
   }
 
+  async function repoPathStatus(rootPath: string): Promise<RepoManagementState['pathStatus']> {
+    const resolved = path.resolve(rootPath);
+    try {
+      await fs.access(resolved);
+    } catch {
+      return 'missing';
+    }
+    try {
+      await fs.access(path.join(resolved, '.git'));
+      return 'valid';
+    } catch {
+      return 'not_git';
+    }
+  }
+
+  async function activeConfigProjectId(projectDir: string): Promise<string> {
+    const loaded = projectStore.get()?.id ?? '';
+    if (loaded) return loaded;
+    try {
+      const parsed = JSON.parse(
+        await fs.readFile(path.join(projectDir, 'config.json'), 'utf8'),
+      ) as { id?: string };
+      if (typeof parsed.id === 'string') return parsed.id;
+    } catch {
+      // Fall through to the shared validation error below.
+    }
+    throw new Error('Invalid project configuration');
+  }
+
+  async function repoRemovalBlockers(params: {
+    configProjectId: string;
+    repoId: string;
+    repos: RepoConfig[];
+  }): Promise<{ taskCount: number; workspaceCount: number }> {
+    const primaryRepoId = params.repos[0]?.id;
+    if (!primaryRepoId) {
+      throw new Error('No repositories configured');
+    }
+
+    const localProject = projectStore.get();
+    const tasks =
+      localProject?.id === params.configProjectId
+        ? taskStore.getAll(params.configProjectId)
+        : [];
+
+    const taskCount = tasks.filter(
+      (t) => effectiveTaskRepoId(t, primaryRepoId) === params.repoId,
+    ).length;
+
+    const sessions = await daemonClient.listSessions();
+    let workspaceCount = 0;
+    for (const s of sessions) {
+      if (s.projectId !== params.configProjectId) continue;
+
+      let effectiveRepo = s.repoId?.trim();
+      if (!effectiveRepo || effectiveRepo.length === 0) {
+        const task = tasks.find((x) => x.id === s.taskId);
+        effectiveRepo = task
+          ? effectiveTaskRepoId(task, primaryRepoId)
+          : primaryRepoId;
+      }
+      if (effectiveRepo === params.repoId) {
+        workspaceCount += 1;
+      }
+    }
+
+    return { taskCount, workspaceCount };
+  }
+
   function normalizeBranchDiscoveryArg(
     raw: unknown,
   ): { repoId?: string; classifyBranch?: string } {
@@ -887,44 +958,76 @@ app.whenReady().then(async () => {
     repoId: string;
     repos: RepoConfig[];
   }): Promise<void> {
-    const primaryRepoId = params.repos[0]?.id;
-    if (!primaryRepoId) {
-      throw new Error('No repositories configured');
-    }
-
-    const localProject = projectStore.get();
-    const tasks =
-      localProject?.id === params.configProjectId
-        ? taskStore.getAll(params.configProjectId)
-        : [];
-
-    const blockingTasks = tasks.filter(
-      (t) => effectiveTaskRepoId(t, primaryRepoId) === params.repoId,
-    );
-    if (blockingTasks.length > 0) {
+    const blockers = await repoRemovalBlockers(params);
+    if (blockers.taskCount > 0) {
       throw new Error(
-        `Cannot remove repository: ${blockingTasks.length} task(s) still reference it.`,
+        `Cannot remove repository: ${blockers.taskCount} task(s) still reference it.`,
       );
     }
 
-    const sessions = await daemonClient.listSessions();
-    for (const s of sessions) {
-      if (s.projectId !== params.configProjectId) continue;
-
-      let effectiveRepo = s.repoId?.trim();
-      if (!effectiveRepo || effectiveRepo.length === 0) {
-        const task = tasks.find((x) => x.id === s.taskId);
-        effectiveRepo = task
-          ? effectiveTaskRepoId(task, primaryRepoId)
-          : primaryRepoId;
-      }
-      if (effectiveRepo === params.repoId) {
-        throw new Error(
-          'Cannot remove repository: a task session still references it.',
-        );
-      }
+    if (blockers.workspaceCount > 0) {
+      throw new Error(
+        `Cannot remove repository: ${blockers.workspaceCount} workspace(s) still reference it.`,
+      );
     }
   }
+
+  ipcMain.handle(
+    'project:getRepoManagementStates',
+    async (): Promise<
+      | Record<string, RepoManagementState>
+      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+    > => {
+      if (!isMultiRepo2Enabled()) {
+        return multiRepo2DisabledError();
+      }
+      try {
+        const projectDir = activeProjectDir();
+        const repos = await projectStore.getReposAt(projectDir);
+        const projectId = await activeConfigProjectId(projectDir);
+        const entries = await Promise.all(
+          repos.map(async (repo): Promise<[string, RepoManagementState]> => {
+            const [pathState, blockers] = await Promise.all([
+              repoPathStatus(repo.rootPath),
+              repoRemovalBlockers({
+                configProjectId: projectId,
+                repoId: repo.id,
+                repos,
+              }),
+            ]);
+            return [
+              repo.id,
+              {
+                pathStatus: pathState,
+                removalBlocked: blockers.taskCount > 0 || blockers.workspaceCount > 0,
+                blockingTaskCount: blockers.taskCount,
+                blockingWorkspaceCount: blockers.workspaceCount,
+              },
+            ];
+          }),
+        );
+        return Object.fromEntries(entries);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { error: message };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    'project:pickRepoDirectory',
+    async (): Promise<
+      | { rootPath: string }
+      | { error: 'NOT_GIT_REPO' }
+      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      | null
+    > => {
+      if (!isMultiRepo2Enabled()) {
+        return multiRepo2DisabledError();
+      }
+      return pickDirectory('Add repository to project', 'Add repository');
+    },
+  );
 
   ipcMain.handle(
     'repo:getBranchDiscovery',
@@ -1063,20 +1166,7 @@ app.whenReady().then(async () => {
         }
         const projectDir = activeProjectDir();
         const reposBefore = await projectStore.getReposAt(projectDir);
-        let projectId = projectStore.get()?.id ?? '';
-        if (!projectId) {
-          try {
-            const parsed = JSON.parse(
-              await fs.readFile(path.join(projectDir, 'config.json'), 'utf8'),
-            ) as { id?: string };
-            if (typeof parsed.id === 'string') projectId = parsed.id;
-          } catch {
-            return { error: 'Invalid project configuration' };
-          }
-        }
-        if (!projectId) {
-          return { error: 'Invalid project configuration' };
-        }
+        const projectId = await activeConfigProjectId(projectDir);
         await assertRepoUnusedForRemoval({
           configProjectId: projectId,
           repoId: rid,

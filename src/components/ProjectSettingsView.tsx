@@ -7,6 +7,7 @@ import {
   type CloudProject,
   type LocalProject,
   type RepoConfig,
+  type RepoManagementState,
 } from '../types';
 import { defaultTaskAgentForProject } from '../cloudBindingPrefs';
 import AgentModelPicker from './AgentModelPicker';
@@ -27,6 +28,14 @@ interface Props {
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type Category = 'project' | 'team';
+
+function isRepoManagementStatesError(
+  result:
+    | Record<string, RepoManagementState>
+    | { error: string; code?: 'MULTI_REPO2_DISABLED' },
+): result is { error: string; code?: 'MULTI_REPO2_DISABLED' } {
+  return typeof (result as { error?: unknown }).error === 'string';
+}
 
 function AutomationSettingRow({
   title,
@@ -194,9 +203,14 @@ function ProjectConfigPane({
   onAutoStartWhenUnblockedChange,
   onProjectAgentPrefsRefresh,
 }: ProjectConfigPaneProps) {
+  const multiRepoManagementEnabled =
+    project.kind === 'local' && window.electronAPI.featureFlags.multiRepo2;
   const [repos, setRepos] = useState<RepoConfig[] | null>(null);
+  const [repoStates, setRepoStates] = useState<Record<string, RepoManagementState>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [addRepoState, setAddRepoState] = useState<SaveState>('idle');
+  const [addRepoError, setAddRepoError] = useState<string | null>(null);
   const [autoStartEnabled, setAutoStartEnabled] = useState(false);
   const [autoStartLoading, setAutoStartLoading] = useState(true);
   const [autoStartSaveState, setAutoStartSaveState] = useState<SaveState>('idle');
@@ -238,20 +252,44 @@ function ProjectConfigPane({
       : (project.planningAgent ?? 'claude-code');
   const defaultTaskAgentValue = defaultTaskAgentForProject(project);
 
+  const refreshRepoStates = useCallback(
+    async (nextRepos: RepoConfig[]) => {
+      if (!multiRepoManagementEnabled) {
+        setRepoStates({});
+        return;
+      }
+      const result = await window.electronAPI.project.getRepoManagementStates();
+      if (isRepoManagementStatesError(result)) {
+        throw new Error(result.error);
+      }
+      const known = new Set(nextRepos.map((r) => r.id));
+      setRepoStates(
+        Object.fromEntries(
+          Object.entries(result).filter(([repoId]) => known.has(repoId)),
+        ),
+      );
+    },
+    [multiRepoManagementEnabled],
+  );
+
   const refresh = useCallback(async () => {
     try {
       const next = await window.electronAPI.project.getRepos();
       setRepos(next);
+      await refreshRepoStates(next);
       setLoadError(null);
       setExpanded((prev) => {
         if (Object.keys(prev).length > 0) return prev;
-        if (next.length === 1) return { [next[0].rootPath]: true };
+        if (next.length === 1) {
+          const key = multiRepoManagementEnabled ? next[0].id : next[0].rootPath;
+          return { [key]: true };
+        }
         return prev;
       });
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : String(err));
     }
-  }, []);
+  }, [multiRepoManagementEnabled, refreshRepoStates]);
 
   useEffect(() => {
     void refresh();
@@ -266,6 +304,8 @@ function ProjectConfigPane({
     setPlanSpawnError(null);
     setTaskSpawnSaveState('idle');
     setTaskSpawnError(null);
+    setAddRepoState('idle');
+    setAddRepoError(null);
   }, [project.id]);
 
   const planningModelsKey = JSON.stringify(project.planningModels ?? {});
@@ -591,6 +631,51 @@ function ProjectConfigPane({
       setAutoReviewOnOpenPrSaveState((state) => (state === 'saved' ? 'idle' : state));
     }, 1500);
   }, []);
+
+  const handleAddRepo = useCallback(async () => {
+    if (!multiRepoManagementEnabled) return;
+    setAddRepoState('saving');
+    setAddRepoError(null);
+    try {
+      const picked = await window.electronAPI.project.pickRepoDirectory();
+      if (!picked) {
+        setAddRepoState('idle');
+        return;
+      }
+      if ('error' in picked) {
+        setAddRepoState('error');
+        setAddRepoError(
+          picked.error === 'NOT_GIT_REPO'
+            ? 'Choose a folder that contains a .git directory.'
+            : picked.error,
+        );
+        return;
+      }
+
+      const result = await window.electronAPI.project.addRepo({
+        rootPath: picked.rootPath,
+      });
+      if ('error' in result) {
+        setAddRepoState('error');
+        setAddRepoError(result.error);
+        return;
+      }
+
+      setRepos(result.repos);
+      await refreshRepoStates(result.repos);
+      const added = result.repos.find((r) => r.rootPath === picked.rootPath);
+      if (added) {
+        setExpanded((prev) => ({ ...prev, [added.id]: true }));
+      }
+      setAddRepoState('saved');
+      window.setTimeout(() => {
+        setAddRepoState((state) => (state === 'saved' ? 'idle' : state));
+      }, 1500);
+    } catch (err) {
+      setAddRepoState('error');
+      setAddRepoError(err instanceof Error ? err.message : String(err));
+    }
+  }, [multiRepoManagementEnabled, refreshRepoStates]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -949,13 +1034,32 @@ function ProjectConfigPane({
         </section>
 
         <section className="mt-8">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-[13px] font-medium uppercase tracking-[0.12em] text-zinc-500">
-              Repositories
-            </h2>
-            <span className="text-[11px] text-zinc-600">
-              {repos?.length ?? 0} {repos?.length === 1 ? 'repo' : 'repos'}
-            </span>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-[13px] font-medium uppercase tracking-[0.12em] text-zinc-500">
+                Repositories
+              </h2>
+              {multiRepoManagementEnabled ? (
+                <p className="mt-1 text-[12px] leading-snug text-zinc-600">
+                  Manage the local git repositories attached to this project.
+                </p>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="text-[11px] text-zinc-600">
+                {repos?.length ?? 0} {repos?.length === 1 ? 'repo' : 'repos'}
+              </span>
+              {multiRepoManagementEnabled ? (
+                <button
+                  type="button"
+                  onClick={() => void handleAddRepo()}
+                  disabled={addRepoState === 'saving'}
+                  className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-[12px] font-medium text-zinc-200 transition hover:bg-white/[0.07] disabled:pointer-events-none disabled:opacity-50"
+                >
+                  {addRepoState === 'saving' ? 'Adding…' : 'Add repo'}
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {loadError ? (
@@ -963,25 +1067,47 @@ function ProjectConfigPane({
               {loadError}
             </p>
           ) : null}
+          {multiRepoManagementEnabled && (addRepoError || addRepoState === 'saved') ? (
+            <p
+              className={`mt-3 rounded-md border px-3 py-2 text-[12px] ${
+                addRepoError
+                  ? 'border-red-500/30 bg-red-500/[0.06] text-red-300'
+                  : 'border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-300'
+              }`}
+            >
+              {addRepoError ?? 'Repository added.'}
+            </p>
+          ) : null}
 
           <div className="mt-3 flex flex-col gap-2">
             {repos === null && !loadError ? (
               <p className="px-3 py-4 text-[12px] text-zinc-600">Loading…</p>
             ) : (
-              repos?.map((repo) => (
-                <RepoCard
-                  key={repo.rootPath}
-                  repo={repo}
-                  expanded={expanded[repo.rootPath] ?? false}
-                  onToggle={() =>
-                    setExpanded((prev) => ({
-                      ...prev,
-                      [repo.rootPath]: !(prev[repo.rootPath] ?? false),
-                    }))
-                  }
-                  onSaved={(repos) => setRepos(repos)}
-                />
-              ))
+              repos?.map((repo, index) => {
+                const key = multiRepoManagementEnabled ? repo.id : repo.rootPath;
+                return (
+                  <RepoCard
+                    key={key}
+                    repo={repo}
+                    repoCount={repos.length}
+                    repoState={repoStates[repo.id]}
+                    primary={index === 0}
+                    multiRepoManagementEnabled={multiRepoManagementEnabled}
+                    expanded={expanded[key] ?? false}
+                    onToggle={() =>
+                      setExpanded((prev) => ({
+                        ...prev,
+                        [key]: !(prev[key] ?? false),
+                      }))
+                    }
+                    onSaved={(repos) => setRepos(repos)}
+                    onReposChanged={async (repos) => {
+                      setRepos(repos);
+                      await refreshRepoStates(repos);
+                    }}
+                  />
+                );
+              })
             )}
           </div>
         </section>
@@ -992,12 +1118,28 @@ function ProjectConfigPane({
 
 interface RepoCardProps {
   repo: RepoConfig;
+  repoCount: number;
+  repoState?: RepoManagementState;
+  primary: boolean;
+  multiRepoManagementEnabled: boolean;
   expanded: boolean;
   onToggle: () => void;
   onSaved: (repos: RepoConfig[]) => void;
+  onReposChanged: (repos: RepoConfig[]) => void | Promise<void>;
 }
 
-function RepoCard({ repo, expanded, onToggle, onSaved }: RepoCardProps) {
+function RepoCard({
+  repo,
+  repoCount,
+  repoState,
+  primary,
+  multiRepoManagementEnabled,
+  expanded,
+  onToggle,
+  onSaved,
+  onReposChanged,
+}: RepoCardProps) {
+  const label = repoDisplayLabelForSettings(repo);
   return (
     <div className="rounded-xl border border-white/[0.08] bg-white/[0.02]">
       <button
@@ -1012,13 +1154,33 @@ function RepoCard({ repo, expanded, onToggle, onSaved }: RepoCardProps) {
           }`}
         />
         <div className="min-w-0 flex-1">
-          <div
-            className="truncate font-mono text-[12px] text-zinc-200"
-            title={repo.rootPath}
-          >
-            {repo.rootPath}
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span
+              className={`truncate ${
+                multiRepoManagementEnabled
+                  ? 'text-[13px] font-medium text-zinc-200'
+                  : 'font-mono text-[12px] text-zinc-200'
+              }`}
+              title={multiRepoManagementEnabled ? label : repo.rootPath}
+            >
+              {multiRepoManagementEnabled ? label : repo.rootPath}
+            </span>
+            {primary && multiRepoManagementEnabled ? (
+              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
+                Primary
+              </span>
+            ) : null}
+            {multiRepoManagementEnabled && repoState ? (
+              <RepoStateBadge state={repoState} />
+            ) : null}
           </div>
           <div className="mt-0.5 truncate text-[11px] text-zinc-600">
+            {multiRepoManagementEnabled ? (
+              <span className="font-mono" title={repo.rootPath}>
+                {repo.rootPath}
+              </span>
+            ) : null}
+            {multiRepoManagementEnabled ? ' · ' : ''}
             base: {repo.baseBranch}
             {repo.setupScript ? ' · setup script' : ''}
             {repo.env ? ' · .env' : ''}
@@ -1027,25 +1189,170 @@ function RepoCard({ repo, expanded, onToggle, onSaved }: RepoCardProps) {
       </button>
       {expanded ? (
         <div className="border-t border-white/[0.06] px-4 py-4">
-          <RepoFields repo={repo} onSaved={onSaved} />
+          <RepoFields
+            repo={repo}
+            repoCount={repoCount}
+            repoState={repoState}
+            primary={primary}
+            multiRepoManagementEnabled={multiRepoManagementEnabled}
+            onSaved={onSaved}
+            onReposChanged={onReposChanged}
+          />
         </div>
       ) : null}
     </div>
   );
 }
 
-interface RepoFieldsProps {
-  repo: RepoConfig;
-  onSaved: (repos: RepoConfig[]) => void;
+function RepoStateBadge({ state }: { state: RepoManagementState }) {
+  if (state.pathStatus === 'valid' && !state.removalBlocked) {
+    return (
+      <span className="rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-1.5 py-0.5 text-[10px] text-emerald-300">
+        Valid git repo
+      </span>
+    );
+  }
+
+  if (state.pathStatus === 'missing') {
+    return (
+      <span className="rounded-full border border-red-500/25 bg-red-500/[0.06] px-1.5 py-0.5 text-[10px] text-red-300">
+        Missing path
+      </span>
+    );
+  }
+
+  if (state.pathStatus === 'not_git') {
+    return (
+      <span className="rounded-full border border-amber-500/25 bg-amber-500/[0.06] px-1.5 py-0.5 text-[10px] text-amber-300">
+        Not a git repo
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-full border border-amber-500/25 bg-amber-500/[0.06] px-1.5 py-0.5 text-[10px] text-amber-300">
+      Removal blocked
+    </span>
+  );
 }
 
-function RepoFields({ repo, onSaved }: RepoFieldsProps) {
+interface RepoFieldsProps {
+  repo: RepoConfig;
+  repoCount: number;
+  repoState?: RepoManagementState;
+  primary: boolean;
+  multiRepoManagementEnabled: boolean;
+  onSaved: (repos: RepoConfig[]) => void;
+  onReposChanged: (repos: RepoConfig[]) => void | Promise<void>;
+}
+
+function RepoFields({
+  repo,
+  repoCount,
+  repoState,
+  primary,
+  multiRepoManagementEnabled,
+  onSaved,
+  onReposChanged,
+}: RepoFieldsProps) {
+  const [actionState, setActionState] = useState<SaveState>('idle');
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const removalBlocked =
+    repoCount <= 1 || (repoState?.removalBlocked ?? false);
+  const removalBlockCopy =
+    repoCount <= 1
+      ? 'A project must have at least one repository.'
+      : repoState?.removalBlocked
+        ? removalBlockedMessage(repoState)
+        : null;
+
+  const handleSetPrimary = async () => {
+    if (!multiRepoManagementEnabled || primary) return;
+    setActionState('saving');
+    setActionError(null);
+    const result = await window.electronAPI.project.setPrimaryRepo({ repoId: repo.id });
+    if ('error' in result) {
+      setActionState('error');
+      setActionError(result.error);
+      return;
+    }
+    await onReposChanged(result.repos);
+    setActionState('saved');
+    window.setTimeout(() => {
+      setActionState((state) => (state === 'saved' ? 'idle' : state));
+    }, 1500);
+  };
+
+  const handleRemove = async () => {
+    if (!multiRepoManagementEnabled || removalBlocked) return;
+    setActionState('saving');
+    setActionError(null);
+    const result = await window.electronAPI.project.removeRepo({ repoId: repo.id });
+    if ('error' in result) {
+      setActionState('error');
+      setActionError(result.error);
+      return;
+    }
+    await onReposChanged(result.repos);
+    setActionState('saved');
+  };
+
   return (
     <div className="flex flex-col gap-5">
+      {multiRepoManagementEnabled ? (
+        <>
+          <div className="rounded-lg border border-white/[0.06] bg-black/10 px-3 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-[12px] font-medium text-zinc-300">
+                  Repository binding
+                </div>
+                <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-600" title={repo.rootPath}>
+                  {repo.rootPath}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {repoState ? <RepoStateBadge state={repoState} /> : null}
+                <button
+                  type="button"
+                  onClick={() => void handleSetPrimary()}
+                  disabled={primary || actionState === 'saving'}
+                  className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2.5 py-1.5 text-[12px] font-medium text-zinc-200 transition hover:bg-white/[0.06] disabled:pointer-events-none disabled:opacity-45"
+                >
+                  {primary ? 'Primary repo' : 'Set primary'}
+                </button>
+              </div>
+            </div>
+            {repoState?.pathStatus === 'missing' ? (
+              <p className="mt-2 text-[11px] text-red-300">
+                This path no longer exists on disk.
+              </p>
+            ) : repoState?.pathStatus === 'not_git' ? (
+              <p className="mt-2 text-[11px] text-amber-300">
+                This folder exists, but Flux cannot find a .git directory in it.
+              </p>
+            ) : null}
+          </div>
+          <FieldEditor
+            label="Display name"
+            description="Optional label shown for this repository in Flux."
+            repoId={repo.id}
+            rootPath={repo.rootPath}
+            useRepoId={multiRepoManagementEnabled}
+            field="name"
+            initialValue={repo.name ?? ''}
+            placeholder={repoDisplayLabelForSettings({ ...repo, name: undefined })}
+            onSaved={onSaved}
+          />
+        </>
+      ) : null}
       <FieldEditor
         label="Base branch"
         description="Branch fetched from origin and used as the base for new task worktrees."
+        repoId={repo.id}
         rootPath={repo.rootPath}
+        useRepoId={multiRepoManagementEnabled}
         field="baseBranch"
         initialValue={repo.baseBranch}
         placeholder="main"
@@ -1054,7 +1361,9 @@ function RepoFields({ repo, onSaved }: RepoFieldsProps) {
       <FieldEditor
         label="Setup script"
         description="Bash script run inside each new worktree after creation. Output is logged to .flux-setup.log."
+        repoId={repo.id}
         rootPath={repo.rootPath}
+        useRepoId={multiRepoManagementEnabled}
         field="setupScript"
         initialValue={repo.setupScript ?? ''}
         placeholder={'# e.g.\nnpm install\n'}
@@ -1064,7 +1373,9 @@ function RepoFields({ repo, onSaved }: RepoFieldsProps) {
       <FieldEditor
         label=".env contents"
         description="Written verbatim to .env in each new worktree. Stored locally in plaintext."
+        repoId={repo.id}
         rootPath={repo.rootPath}
+        useRepoId={multiRepoManagementEnabled}
         field="env"
         initialValue={repo.env ?? ''}
         placeholder={'KEY=value\n'}
@@ -1072,15 +1383,69 @@ function RepoFields({ repo, onSaved }: RepoFieldsProps) {
         sensitive
         onSaved={onSaved}
       />
+      {multiRepoManagementEnabled ? (
+        <div className="border-t border-white/[0.06] pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-[12px] font-medium text-zinc-300">
+                Remove repository
+              </div>
+              <p className="mt-0.5 text-[11px] leading-snug text-zinc-600">
+                Removes this repo from project settings. Files on disk are not deleted.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleRemove()}
+              disabled={removalBlocked || actionState === 'saving'}
+              className="rounded-md border border-red-500/30 bg-red-500/[0.06] px-2.5 py-1.5 text-[12px] font-medium text-red-200 transition hover:bg-red-500/[0.1] disabled:pointer-events-none disabled:opacity-45"
+            >
+              {actionState === 'saving' ? 'Working…' : 'Remove'}
+            </button>
+          </div>
+          {removalBlockCopy ? (
+            <p className="mt-2 text-[11px] text-amber-300">{removalBlockCopy}</p>
+          ) : null}
+          {actionError ? (
+            <p className="mt-2 text-[11px] text-red-400">{actionError}</p>
+          ) : actionState === 'saved' ? (
+            <p className="mt-2 text-[11px] text-emerald-400">Saved</p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function removalBlockedMessage(state: RepoManagementState): string {
+  const parts: string[] = [];
+  if (state.blockingTaskCount > 0) {
+    parts.push(`${state.blockingTaskCount} task(s)`);
+  }
+  if (state.blockingWorkspaceCount > 0) {
+    parts.push(`${state.blockingWorkspaceCount} workspace(s)`);
+  }
+  return `Cannot remove while ${parts.join(' and ')} still reference this repository.`;
+}
+
+function repoDisplayLabelForSettings(
+  repo: Pick<RepoConfig, 'id' | 'name' | 'rootPath'>,
+): string {
+  const explicit = (repo.name ?? '').trim();
+  if (explicit) return explicit;
+  const cleaned = repo.rootPath.replace(/[\\/]+$/, '');
+  const base = cleaned.split(/[\\/]/).filter(Boolean).pop();
+  if (base) return base;
+  return repo.id ? `repo:${repo.id.slice(0, 7)}` : 'repo';
 }
 
 interface FieldEditorProps {
   label: string;
   description: string;
+  repoId: string;
   rootPath: string;
-  field: 'baseBranch' | 'setupScript' | 'env';
+  useRepoId: boolean;
+  field: 'name' | 'baseBranch' | 'setupScript' | 'env';
   initialValue: string;
   placeholder?: string;
   multiline?: boolean;
@@ -1091,7 +1456,9 @@ interface FieldEditorProps {
 function FieldEditor({
   label,
   description,
+  repoId,
   rootPath,
+  useRepoId,
   field,
   initialValue,
   placeholder,
@@ -1118,10 +1485,15 @@ function FieldEditor({
     if (!dirty) return;
     setState('saving');
     setError(null);
-    const result = await window.electronAPI.project.updateRepo({
-      rootPath,
-      patch: { [field]: value },
-    });
+    const result = useRepoId
+      ? await window.electronAPI.project.updateRepoById({
+          repoId,
+          patch: { [field]: value },
+        })
+      : await window.electronAPI.project.updateRepo({
+          rootPath,
+          patch: { [field]: value },
+        });
     if ('error' in result) {
       setState('error');
       setError(result.error);

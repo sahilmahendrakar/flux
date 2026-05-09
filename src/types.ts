@@ -101,6 +101,15 @@ export interface RepoConfig {
   env?: string;
 }
 
+export type RepoPathStatus = 'valid' | 'missing' | 'not_git';
+
+export interface RepoManagementState {
+  pathStatus: RepoPathStatus;
+  removalBlocked: boolean;
+  blockingTaskCount: number;
+  blockingWorkspaceCount: number;
+}
+
 export interface LocalProject {
   id: string;
   kind: 'local';
