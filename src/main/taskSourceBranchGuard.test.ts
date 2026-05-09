@@ -75,4 +75,24 @@ describe('taskHasBlockingWorkspaceState', () => {
       await fs.rm(cwd, { recursive: true, force: true });
     }
   });
+
+  it('detects repo-scoped worktrees/<repoId>/<taskId> when repoId is provided', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const os = await import('node:os');
+    const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'flux-guard-repo-'));
+    try {
+      await fs.mkdir(path.join(cwd, 'worktrees', 'rid', 'tid'), { recursive: true });
+      const hit = await taskHasBlockingWorkspaceState({
+        taskId: 'tid',
+        repoId: 'rid',
+        listSessions: async () => [],
+        projectDir: cwd,
+        repoGitRoots: [cwd],
+      });
+      expect(hit).toBe(true);
+    } finally {
+      await fs.rm(cwd, { recursive: true, force: true });
+    }
+  });
 });

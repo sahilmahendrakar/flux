@@ -15,6 +15,8 @@ import type {
   RepoConfig,
   RepoManagementState,
   RepoSettingsPatch,
+  ResolveTaskWorktreeIpcPayload,
+  ResolveTaskWorktreeIpcResult,
   Session,
   SessionStartOptions,
   SessionStartResult,
@@ -87,8 +89,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('workspace:openPath', dirPath, target) as Promise<
         { ok: true } | { error: string }
       >,
-    resolveTaskWorktree: (taskId: string) =>
-      ipcRenderer.invoke('workspace:resolveTaskWorktree', taskId) as Promise<string | null>,
+    resolveTaskWorktree: (payload: ResolveTaskWorktreeIpcPayload) =>
+      ipcRenderer.invoke('workspace:resolveTaskWorktree', payload) as Promise<ResolveTaskWorktreeIpcResult>,
   },
   project: {
     get: () => ipcRenderer.invoke('project:get') as Promise<LocalProject | null>,

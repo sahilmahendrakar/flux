@@ -53,6 +53,8 @@ export function taskSourceBranchSettingsWouldChange(
  */
 export async function taskHasBlockingWorkspaceState(input: {
   taskId: string;
+  /** When set, also treats `worktrees/<repoId>/<taskId>` as blocking (`multi-repo2`). */
+  repoId?: string | null;
   listSessions: () => Promise<{ taskId: string }[]>;
   projectDir: string;
   /** Every configured clone root (`RepoConfig.rootPath`) for this project. */
@@ -61,6 +63,17 @@ export async function taskHasBlockingWorkspaceState(input: {
   const sessions = await input.listSessions();
   if (sessions.some((s) => s.taskId === input.taskId)) {
     return true;
+  }
+
+  const rid = input.repoId?.trim();
+  if (rid) {
+    const repoScoped = path.join(input.projectDir, 'worktrees', rid, input.taskId);
+    try {
+      await fs.access(repoScoped);
+      return true;
+    } catch {
+      /* no repo-scoped dir */
+    }
   }
 
   const legacyDir = path.join(input.projectDir, 'worktrees', input.taskId);

@@ -689,7 +689,7 @@ export default function App() {
   const tasksWorktreeIdsKey = useMemo(
     () =>
       tasks
-        .map((t) => t.id)
+        .map((t) => `${t.id}\t${t.repoId ?? ''}`)
         .sort()
         .join('\0'),
     [tasks],
@@ -714,15 +714,14 @@ export default function App() {
       setTaskHasWorktreeById({});
       return;
     }
-    const ids = tasksRef.current.map((t) => t.id);
-    if (ids.length === 0) {
+    if (tasksRef.current.length === 0) {
       setTaskHasWorktreeById({});
       return;
     }
     const gen = ++worktreeResolveGenRef.current;
     const handle = window.setTimeout(() => {
       void api
-        .resolveWorktrees(ids)
+        .resolveWorktrees(tasksRef.current.map((t) => ({ taskId: t.id, repoId: t.repoId })))
         .then((map) => {
           if (worktreeResolveGenRef.current !== gen) return;
           setTaskHasWorktreeById(map);

@@ -13,6 +13,8 @@ import type {
   RepoConfig,
   RepoManagementState,
   RepoSettingsPatch,
+  ResolveTaskWorktreeIpcPayload,
+  ResolveTaskWorktreeIpcResult,
   Session,
   SessionStartOptions,
   SessionStartResult,
@@ -91,7 +93,9 @@ declare global {
           dirPath: string,
           target: OpenWorkspaceTarget,
         ) => Promise<{ ok: true } | { error: string }>;
-        resolveTaskWorktree: (taskId: string) => Promise<string | null>;
+        resolveTaskWorktree: (
+          payload: ResolveTaskWorktreeIpcPayload,
+        ) => Promise<ResolveTaskWorktreeIpcResult>;
       };
       project: {
         get: () => Promise<LocalProject | null>;
@@ -281,7 +285,11 @@ declare global {
           taskId: string;
           githubPr?: TaskGithubPr;
         }) => Promise<TaskPullRequestIpcResult>;
-        resolveWorktrees: (taskIds: string[]) => Promise<Record<string, boolean>>;
+        resolveWorktrees: (
+          taskIdsOrEntries:
+            | string[]
+            | { taskId: string; repoId?: string | null }[],
+        ) => Promise<Record<string, boolean>>;
         cleanupResources: (id: string) => Promise<{ errors: string[] }>;
         onChanged: (cb: () => void) => () => void;
         onUserInput: (

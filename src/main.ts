@@ -125,6 +125,7 @@ import type {
   TaskGithubPr,
   TaskPullRequestIpcResult,
   TaskRequestPullRequestFromAgentResult,
+  ResolveTaskWorktreeIpcResult,
 } from './types';
 import {
   classifyGitBranchPresence,
@@ -1672,14 +1673,31 @@ app.whenReady().then(async () => {
   ipcMain.handle('workspace:openPath', async (_e, rawPath: unknown, rawTarget: unknown) =>
     openWorkspacePath(rawPath, rawTarget),
   );
-  ipcMain.handle('workspace:resolveTaskWorktree', async (_e, taskId: unknown) => {
-    if (typeof taskId !== 'string' || !taskId.trim()) return null;
-    return resolveTaskWorktreePath(
-      taskId.trim(),
-      () => daemonClient.listSessions(),
-      worktreeService.getProjectDir(),
-    );
-  });
+  ipcMain.handle(
+    'workspace:resolveTaskWorktree',
+    async (_e, payload: unknown): Promise<ResolveTaskWorktreeIpcResult> => {
+      const parsed = parseResolveTaskWorktreePayload(payload);
+      const taskId = parsed.taskId;
+      if (!taskId) {
+        return {
+          path: null,
+          detail: { code: 'no-worktree', message: 'Invalid task id.' },
+        };
+      }
+      const projectDir = worktreeService.getProjectDir();
+      const resolved = await resolveTaskWorktreePath(
+        taskId,
+        () => daemonClient.listSessions(),
+        projectDir ?? '',
+        parsed.repoId,
+      );
+      if (resolved) {
+        return { path: resolved };
+      }
+      const detail = await detailWhenResolveFailed(parsed.repoId, projectDir);
+      return { path: null, detail };
+    },
+  );
 
   // ---- Email (Resend) ----
   console.log(
@@ -1838,6 +1856,7 @@ app.whenReady().then(async () => {
         const repoGitRootsForGuard = [...new Set(repos.map((r) => path.resolve(r.rootPath)))];
         const locked = await taskHasBlockingWorkspaceState({
           taskId: tid,
+          repoId: prev.repoId,
           listSessions: () => daemonClient.listSessions(),
           projectDir: worktreeService.getProjectDir() || projectDir,
           repoGitRoots: repoGitRootsForGuard,
@@ -1908,6 +1927,7 @@ app.whenReady().then(async () => {
         const repoGitRootsForRepoPatch = [...new Set(repos.map((r) => path.resolve(r.rootPath)))];
         const locked = await taskHasBlockingWorkspaceState({
           taskId: tid,
+          repoId: prev.repoId,
           listSessions: () => daemonClient.listSessions(),
           projectDir: worktreeService.getProjectDir() || projectDir,
           repoGitRoots: repoGitRootsForRepoPatch,
@@ -1934,11 +1954,16 @@ app.whenReady().then(async () => {
     async (_e, taskId: string): Promise<{ errors: string[] }> => {
       const projectDir = activeProjectDir();
       const repos = await projectStore.getReposAt(projectDir);
+      const project = projectStore.get();
+      const taskRepoId = project
+        ? taskStore.getAll(project.id).find((t) => t.id === taskId)?.repoId?.trim() || null
+        : null;
       const errors = await teardownEphemeralResourcesForTask(
         daemonClient,
         worktreeService,
         taskId,
         repos,
+        taskRepoId,
       );
       return { errors };
     },
@@ -1949,13 +1974,43 @@ app.whenReady().then(async () => {
   ipcMain.handle('tasks:resolveWorktrees', async (_e, raw: unknown): Promise<Record<string, boolean>> => {
     const projectDir = worktreeService.getProjectDir();
     if (!projectDir) return {};
-    const ids = Array.isArray(raw)
-      ? raw.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim())
-      : [];
-    const capped = ids.slice(0, 400);
+    let entries: { taskId: string; repoId?: string | null }[] = [];
+    if (Array.isArray(raw)) {
+      const first = raw[0];
+      if (
+        first &&
+        typeof first === 'object' &&
+        typeof (first as { taskId?: unknown }).taskId === 'string'
+      ) {
+        entries = raw
+          .filter((x): x is { taskId: string; repoId?: unknown } => {
+            return Boolean(
+              x &&
+                typeof x === 'object' &&
+                typeof (x as { taskId?: unknown }).taskId === 'string' &&
+                String((x as { taskId: string }).taskId).trim().length > 0,
+            );
+          })
+          .map((x) => ({
+            taskId: String(x.taskId).trim(),
+            repoId:
+              typeof x.repoId === 'string' ? x.repoId : x.repoId === null ? null : undefined,
+          }));
+      } else {
+        entries = raw
+          .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+          .map((x) => ({ taskId: x.trim() }));
+      }
+    }
+    const capped = entries.slice(0, 400);
     const out: Record<string, boolean> = {};
-    for (const taskId of capped) {
-      const p = await resolveTaskWorktreePath(taskId, () => daemonClient.listSessions(), projectDir);
+    for (const { taskId, repoId } of capped) {
+      const p = await resolveTaskWorktreePath(
+        taskId,
+        () => daemonClient.listSessions(),
+        projectDir,
+        repoId,
+      );
       out[taskId] = Boolean(p);
     }
     return out;
@@ -2173,20 +2228,21 @@ app.whenReady().then(async () => {
       if (!rootPath || !projectDir) {
         return { ok: false, code: 'NO_PROJECT', message: 'No git project open' };
       }
+      const project = projectStore.get();
+      const row = project ? taskStore.getAll(project.id).find((t) => t.id === taskId) : undefined;
       const worktreePath = await resolveTaskWorktreePath(
         taskId,
         () => daemonClient.listSessions(),
         projectDir,
+        row?.repoId,
       );
       const ghCwd = worktreePath || rootPath || projectDir;
-      const project = projectStore.get();
       let prUrl = '';
       const fromPayload =
         o.githubPr && typeof o.githubPr === 'object' && typeof (o.githubPr as TaskGithubPr).url === 'string'
           ? String((o.githubPr as TaskGithubPr).url).trim()
           : '';
       if (fromPayload) prUrl = fromPayload;
-      const row = project ? taskStore.getAll(project.id).find((t) => t.id === taskId) : undefined;
       if (!prUrl && project) {
         prUrl = row?.githubPr?.url?.trim() ?? '';
       }
@@ -2321,6 +2377,93 @@ app.whenReady().then(async () => {
       },
       binding,
     );
+  }
+
+  function parseResolveTaskWorktreePayload(raw: unknown): {
+    taskId: string;
+    repoId?: string | null;
+  } {
+    if (typeof raw === 'string') {
+      return { taskId: raw.trim() };
+    }
+    if (raw && typeof raw === 'object' && typeof (raw as { taskId?: unknown }).taskId === 'string') {
+      const o = raw as { taskId: string; repoId?: unknown };
+      const repoId = o.repoId;
+      return {
+        taskId: o.taskId.trim(),
+        repoId: typeof repoId === 'string' || repoId === null ? repoId : undefined,
+      };
+    }
+    return { taskId: '' };
+  }
+
+  async function detailWhenResolveFailed(
+    repoId: string | null | undefined,
+    projectDir: string | null,
+  ): Promise<NonNullable<ResolveTaskWorktreeIpcResult['detail']>> {
+    if (!projectDir?.trim()) {
+      return {
+        code: 'no-project-dir',
+        message: 'No Flux project directory is open.',
+      };
+    }
+    const rid = repoId?.trim();
+    if (!rid) {
+      return {
+        code: 'no-worktree',
+        message:
+          "No workspace folder yet. Start this task's agent session to create a worktree.",
+      };
+    }
+    let project: Project;
+    try {
+      project = await resolveProjectForStart();
+    } catch {
+      return {
+        code: 'no-project-dir',
+        message: 'No project is open.',
+      };
+    }
+    const repos = await projectStore.getReposAt(activeProjectDir());
+    const repoCfg = resolveRepoForBranchDiscovery(repos, rid);
+    if (!repoCfg) {
+      return {
+        code: 'repo-unknown',
+        message:
+          'Unknown repository for this task. Choose a repository that exists under Project settings.',
+      };
+    }
+    if (project.kind === 'cloud') {
+      const mb = project.repoMachineBindings?.[repoCfg.id];
+      if (!mb?.rootPath?.trim()) {
+        return {
+          code: 'repo-not-bound',
+          message: `This machine has no local clone bound for repository "${repoDisplayLabel(repoCfg)}". Bind the repository in Project settings before opening the workspace.`,
+        };
+      }
+    }
+    const resolvedClone = path.resolve(repoCfg.rootPath);
+    try {
+      await fs.access(resolvedClone);
+    } catch {
+      return {
+        code: 'repo-path-missing',
+        message: `The repository clone path does not exist: ${resolvedClone}`,
+      };
+    }
+    try {
+      await fs.access(path.join(resolvedClone, '.git'));
+    } catch {
+      return {
+        code: 'repo-not-git',
+        message: `Expected a Git repository at ${resolvedClone}, but no .git entry was found.`,
+      };
+    }
+    return {
+      code: 'no-worktree',
+      message:
+        "No workspace folder yet. Start this task's agent session to create a worktree.",
+    };
   }
 
   async function gitRootForDaemonSession(session: Session): Promise<string | null> {
@@ -2859,6 +3002,7 @@ app.whenReady().then(async () => {
         const repoGitRootsSourcePatch = [...new Set(repos.map((r) => path.resolve(r.rootPath)))];
         const locked = await taskHasBlockingWorkspaceState({
           taskId: id,
+          repoId: previous.repoId,
           listSessions: () => daemonClient.listSessions(),
           projectDir: worktreeService.getProjectDir() || projectDir,
           repoGitRoots: repoGitRootsSourcePatch,
@@ -2896,6 +3040,7 @@ app.whenReady().then(async () => {
         const repoGitRootsPersistPatch = [...new Set(repos.map((r) => path.resolve(r.rootPath)))];
         const locked = await taskHasBlockingWorkspaceState({
           taskId: id,
+          repoId: previous.repoId,
           listSessions: () => daemonClient.listSessions(),
           projectDir: worktreeService.getProjectDir() || projectDir,
           repoGitRoots: repoGitRootsPersistPatch,
@@ -2932,6 +3077,7 @@ app.whenReady().then(async () => {
           worktreeService,
           id,
           cleanupRepos,
+          updated.repoId?.trim() ?? null,
         );
         if (errors.length > 0) {
           console.error('[task:auto-cleanup-workspace-on-done] teardown', {

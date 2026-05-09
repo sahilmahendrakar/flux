@@ -41,6 +41,8 @@ export async function teardownEphemeralResourcesForTask(
   worktreeService: WorktreeService,
   taskId: string,
   repos: readonly RepoConfig[],
+  /** Persists which repository this task targets — drives repo-scoped `worktrees/<repoId>/<taskId>` cleanup. */
+  taskRepoId?: string | null,
 ): Promise<string[]> {
   const errors: string[] = [];
   let sessionIds: string[] = [];
@@ -92,6 +94,25 @@ export async function teardownEphemeralResourcesForTask(
     await worktreeService.remove(legacyOrphan, primaryGit ? path.resolve(primaryGit) : null);
   } catch {
     /* no legacy orphan */
+  }
+
+  const rid = taskRepoId?.trim();
+  if (rid) {
+    const repoScoped = path.join(projectDir, 'worktrees', rid, taskId);
+    try {
+      await fs.access(repoScoped);
+      const cfg = repos.find((r) => r.id === rid);
+      const gitRoot = cfg?.rootPath?.trim() ? path.resolve(cfg.rootPath) : null;
+      try {
+        await worktreeService.remove(repoScoped, gitRoot);
+      } catch (err) {
+        errors.push(
+          `Worktree cleanup (${rid}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    } catch {
+      /* no repo-scoped folder */
+    }
   }
 
   const worktreesRoot = path.join(projectDir, 'worktrees');

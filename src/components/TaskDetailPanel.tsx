@@ -26,6 +26,7 @@ import {
   resolvedCursorAgentModel,
   type RepoBranchDiscovery,
   type RepoConfig,
+  type ResolveTaskWorktreeIpcResult,
 } from '../types';
 import {
   effectiveTaskRepoId,
@@ -271,6 +272,10 @@ export default function TaskDetailPanel({
   const assigneeMenuWrapRef = useRef<HTMLDivElement>(null);
   /** Local path for “Open in” (running session, stopped session, or leftover worktree on disk). */
   const [resolvedWorktreePath, setResolvedWorktreePath] = useState<string | null>(null);
+  /** When path is missing, explains repo binding vs no worktree (`workspace:resolveTaskWorktree`). */
+  const [worktreeResolveDetail, setWorktreeResolveDetail] = useState<
+    ResolveTaskWorktreeIpcResult['detail'] | null
+  >(null);
   const [branchDiscovery, setBranchDiscovery] = useState<RepoBranchDiscovery | null>(null);
   const [branchDiscoveryLoading, setBranchDiscoveryLoading] = useState(false);
   const [branchDiscoveryError, setBranchDiscoveryError] = useState<string | null>(null);
@@ -409,13 +414,19 @@ export default function TaskDetailPanel({
   useEffect(() => {
     if (!task) {
       setResolvedWorktreePath(null);
+      setWorktreeResolveDetail(null);
       return;
     }
     let cancelled = false;
     const refreshWorktreePath = () => {
-      void window.electronAPI.workspace.resolveTaskWorktree(task.id).then((p) => {
-        if (!cancelled) setResolvedWorktreePath(p);
-      });
+      void window.electronAPI.workspace
+        .resolveTaskWorktree({ taskId: task.id, repoId: task.repoId })
+        .then((r) => {
+          if (!cancelled) {
+            setResolvedWorktreePath(r.path);
+            setWorktreeResolveDetail(r.detail ?? null);
+          }
+        });
     };
     refreshWorktreePath();
     const unsubExit = window.electronAPI.sessions.onExit((ex) => {
@@ -427,7 +438,7 @@ export default function TaskDetailPanel({
       unsubExit();
       unsubTasks();
     };
-  }, [task?.id, session?.id, session?.worktreePath, taskSessionStartPending]);
+  }, [task?.id, task?.repoId, session?.id, session?.worktreePath, taskSessionStartPending]);
 
   useEffect(() => {
     if (!task) return;
@@ -1054,7 +1065,15 @@ export default function TaskDetailPanel({
                   Mark as done
                 </button>
               ) : null}
-              <OpenInWorkspaceButton worktreePath={resolvedWorktreePath} size="md" />
+              <OpenInWorkspaceButton
+                worktreePath={resolvedWorktreePath}
+                disabledReason={
+                  resolvedWorktreePath?.trim()
+                    ? undefined
+                    : worktreeResolveDetail?.message ?? undefined
+                }
+                size="md"
+              />
               <GithubPrIconButton
                 githubPr={task.githubPr}
                 taskId={task.id}

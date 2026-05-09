@@ -437,6 +437,29 @@ export interface Session {
 /** Where to open a task worktree folder from the main process (`workspace:openPath`). */
 export type OpenWorkspaceTarget = 'cursor' | 'vscode' | 'terminal' | 'file-manager';
 
+/** Payload for `workspace:resolveTaskWorktree` — bare string is legacy (`taskId` only). */
+export type ResolveTaskWorktreeIpcPayload =
+  | string
+  | { taskId: string; repoId?: string | null };
+
+/**
+ * Structured failure when no on-disk/session path exists — distinguishes missing clone
+ * binding from “repo ok but no worktree yet” (`multi-repo2`).
+ */
+export type ResolveTaskWorktreeDetailCode =
+  | 'no-project-dir'
+  | 'repo-unknown'
+  | 'repo-not-bound'
+  | 'repo-path-missing'
+  | 'repo-not-git'
+  | 'no-worktree';
+
+/** Result of `workspace:resolveTaskWorktree` (path null when nothing exists yet or repo unavailable). */
+export type ResolveTaskWorktreeIpcResult = {
+  path: string | null;
+  detail?: { code: ResolveTaskWorktreeDetailCode; message: string };
+};
+
 /** Planning assistant PTY session (one of many per project in the daemon). */
 export interface PlanningSession {
   id: string;
