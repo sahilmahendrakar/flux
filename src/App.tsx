@@ -21,6 +21,7 @@ import {
   type ActiveProjectKey,
   type PlanningSession,
   type ProjectTabState,
+  type RepoConfig,
   type TaskPrErrorCode,
   type TaskPullRequestIpcResult,
   type TaskRequestPullRequestFromAgentResult,
@@ -326,6 +327,8 @@ export default function App() {
   const memberPhotoRefreshKeyRef = useRef('');
   const [autoStartWhenUnblockedProject, setAutoStartWhenUnblockedProject] = useState(false);
   const [repoDefaultBranchShort, setRepoDefaultBranchShort] = useState('main');
+  /** Loaded for multi-repo2 task UI (repo picker + labels). Null while unused or loading. */
+  const [projectRepos, setProjectRepos] = useState<RepoConfig[] | null>(null);
 
   const auth = useAuth();
   const uid = auth.user?.uid ?? null;
@@ -378,6 +381,26 @@ export default function App() {
       cancelled = true;
     };
   }, [project?.id, project?.rootPath, project?.kind]);
+
+  useEffect(() => {
+    if (!project || !window.electronAPI.featureFlags.multiRepo2) {
+      setProjectRepos(null);
+      return;
+    }
+    let cancelled = false;
+    void window.electronAPI.project
+      .getRepos()
+      .then((repos) => {
+        if (!cancelled) setProjectRepos(repos);
+      })
+      .catch(() => {
+        if (!cancelled) setProjectRepos([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.id, project?.rootPath]);
+
   const membersState = useMembers(cloudProjectId);
   const { cloudPlanningDocsSeedModal } = useCloudPlanningDocsMigration(
     project?.kind === 'cloud' ? project : null,
@@ -1701,6 +1724,15 @@ export default function App() {
             next = { ...next };
             delete next.createSourceBranchIfMissing;
           }
+          if (patch.repoId !== undefined) {
+            const rid = typeof patch.repoId === 'string' ? patch.repoId.trim() : '';
+            if (rid.length === 0) {
+              next = { ...next };
+              delete next.repoId;
+            } else {
+              next = { ...next, repoId: rid };
+            }
+          }
           next = {
             ...next,
             ...assigneePatchForCloudAutoStartOnUnblock({
@@ -1734,16 +1766,19 @@ export default function App() {
       if (patch.autoStartOnUnblock !== undefined) {
         persistable.autoStartOnUnblock = patch.autoStartOnUnblock;
       }
-      if (patch.assigneeId !== undefined) {
-        persistable.assigneeId = patch.assigneeId;
-      }
-      if (patch.sourceBranch !== undefined) {
-        persistable.sourceBranch = patch.sourceBranch;
-      }
-      if (patch.createSourceBranchIfMissing !== undefined) {
-        persistable.createSourceBranchIfMissing = patch.createSourceBranchIfMissing;
-      }
-      if (Object.keys(persistable).length === 0) return;
+          if (patch.assigneeId !== undefined) {
+            persistable.assigneeId = patch.assigneeId;
+          }
+          if (patch.sourceBranch !== undefined) {
+            persistable.sourceBranch = patch.sourceBranch;
+          }
+          if (patch.createSourceBranchIfMissing !== undefined) {
+            persistable.createSourceBranchIfMissing = patch.createSourceBranchIfMissing;
+          }
+          if (patch.repoId !== undefined) {
+            persistable.repoId = patch.repoId;
+          }
+          if (Object.keys(persistable).length === 0) return;
 
       const existing = pendingRef.current.get(id);
       if (existing) clearTimeout(existing.timer);
@@ -2041,7 +2076,11 @@ export default function App() {
       agent: Agent,
       labelInput?: string[],
       assigneeId?: string,
-      branch?: { sourceBranch?: string; createSourceBranchIfMissing?: boolean },
+      branch?: {
+        sourceBranch?: string;
+        createSourceBranchIfMissing?: boolean;
+        repoId?: string;
+      },
     ) => {
       if (!provider) return;
       try {
@@ -2068,6 +2107,7 @@ export default function App() {
           ...(branch?.createSourceBranchIfMissing !== undefined
             ? { createSourceBranchIfMissing: branch.createSourceBranchIfMissing }
             : {}),
+          ...(branch?.repoId !== undefined ? { repoId: branch.repoId } : {}),
         });
         setTasks((prev) => {
           if (prev.some((t) => t.id === task.id)) return prev;
@@ -2913,6 +2953,8 @@ export default function App() {
                             onTaskPrClick: (id) => void handleTaskPrClick(id),
                             prLoading: prLoadingTaskId === item.session.taskId,
                             prAgentAwaiting: Boolean(prAgentAwaitingByTaskId[item.session.taskId]),
+                            projectRepos: projectRepos ?? undefined,
+                            multiRepo2Enabled: window.electronAPI.featureFlags.multiRepo2,
                           }
                         : undefined
                     }
@@ -2991,6 +3033,8 @@ export default function App() {
                           void handleUpdateTask(id, { assigneeId })
                         }
                         repoDefaultBranchShort={repoDefaultBranchShort}
+                        projectRepos={projectRepos ?? undefined}
+                        multiRepo2Enabled={window.electronAPI.featureFlags.multiRepo2}
                         cloudUnblockAutostartClientUid={
                           project.kind === 'cloud' && uid ? uid : undefined
                         }
@@ -3040,6 +3084,8 @@ export default function App() {
                             ? Boolean(prAgentAwaitingByTaskId[selectedTask.id])
                             : false
                         }
+                        projectRepos={projectRepos ?? undefined}
+                        multiRepo2Enabled={window.electronAPI.featureFlags.multiRepo2}
                       />
                     </div>
                     <div

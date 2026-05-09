@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
-import { Session, Task, TaskStatus, COLUMNS, Agent } from '../types';
+import { Session, Task, TaskStatus, COLUMNS, Agent, type RepoConfig } from '../types';
 import { projectLabelCatalog } from '../taskLabels';
 import type { ProjectMember } from '../renderer/projects/members';
 import {
@@ -23,7 +23,11 @@ interface Props {
     agent: Agent,
     labels?: string[],
     assigneeId?: string,
-    branch?: { sourceBranch?: string; createSourceBranchIfMissing?: boolean },
+    branch?: {
+      sourceBranch?: string;
+      createSourceBranchIfMissing?: boolean;
+      repoId?: string;
+    },
   ) => void;
   /** Initial agent selection in the new-task modal. */
   defaultTaskAgent: Agent;
@@ -45,6 +49,9 @@ interface Props {
   prAgentAwaitingByTaskId?: Record<string, boolean>;
   /** Configured / detected default short branch name for branch chips on cards. */
   repoDefaultBranchShort: string;
+  /** From main (`project:getRepos`) when multi-repo2 is enabled; drives new-task repo picker. */
+  projectRepos?: RepoConfig[];
+  multiRepo2Enabled?: boolean;
   /** Cloud + signed-in: used to lock per-task unblock autostart when another member is assignee. */
   cloudUnblockAutostartClientUid?: string;
   /** Active daemon sessions (used with disk resolution to know if a task worktree exists). */
@@ -73,6 +80,8 @@ export default function Board({
   prLoadingTaskId,
   prAgentAwaitingByTaskId,
   repoDefaultBranchShort,
+  projectRepos,
+  multiRepo2Enabled = false,
   cloudUnblockAutostartClientUid,
   sessions,
   taskHasWorktreeById,
@@ -231,6 +240,8 @@ export default function Board({
           labelCatalog={labelCatalog}
           defaultAgent={defaultTaskAgent}
           projectMembers={projectMembers}
+          projectRepos={projectRepos}
+          multiRepo2Enabled={multiRepo2Enabled}
           onClose={() => setModalOpen(false)}
           onCreate={(title, agent, labels, assigneeId, branch) => {
             onCreateTask(title, agent, labels, assigneeId, branch);
