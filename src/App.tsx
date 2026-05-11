@@ -328,9 +328,10 @@ export default function App() {
   const pendingAgentPrDiscoveryLastAtRef = useRef<Map<string, number>>(new Map());
   const worktreeResolveGenRef = useRef(0);
   const memberPhotoRefreshKeyRef = useRef('');
+  const projectReposLoadSeqRef = useRef(0);
   const [autoStartWhenUnblockedProject, setAutoStartWhenUnblockedProject] = useState(false);
   const [repoDefaultBranchShort, setRepoDefaultBranchShort] = useState('main');
-  /** Loaded for multi-repo2 task UI (repo picker + labels). Null while unused or loading. */
+  /** Loaded for task UI (repo picker + labels). Null while loading. */
   const [projectRepos, setProjectRepos] = useState<RepoConfig[] | null>(null);
   /** Cloud multi-repo: local clone path/status per shared repo id for board tooltips. */
   const [cloudRepoBindingOverview, setCloudRepoBindingOverview] =
@@ -393,30 +394,35 @@ export default function App() {
     };
   }, [project?.id, project?.rootPath, project?.kind]);
 
-  useEffect(() => {
-    if (!project || !window.electronAPI.featureFlags.multiRepo2) {
+  const refreshProjectRepos = useCallback(async (): Promise<RepoConfig[]> => {
+    const seq = ++projectReposLoadSeqRef.current;
+    if (!project) {
       setProjectRepos(null);
-      return;
+      return [];
     }
-    let cancelled = false;
-    void window.electronAPI.project
-      .getRepos()
-      .then((repos) => {
-        if (!cancelled) setProjectRepos(repos);
-      })
-      .catch(() => {
-        if (!cancelled) setProjectRepos([]);
-      });
+    try {
+      const repos = await window.electronAPI.project.getRepos();
+      if (seq === projectReposLoadSeqRef.current) setProjectRepos(repos);
+      return repos;
+    } catch (err) {
+      console.warn('[App] project.getRepos failed', err);
+      const fallback = project.kind === 'local' ? project.repos : [];
+      if (seq === projectReposLoadSeqRef.current) setProjectRepos(fallback);
+      return fallback;
+    }
+  }, [project]);
+
+  useEffect(() => {
+    void refreshProjectRepos();
     return () => {
-      cancelled = true;
+      projectReposLoadSeqRef.current += 1;
     };
-  }, [project?.id, project?.rootPath]);
+  }, [refreshProjectRepos]);
 
   useEffect(() => {
     if (
       !project ||
-      project.kind !== 'cloud' ||
-      !window.electronAPI.featureFlags.multiRepo2
+      project.kind !== 'cloud'
     ) {
       setCloudRepoBindingOverview(null);
       return;
@@ -856,7 +862,7 @@ export default function App() {
       const result = await window.electronAPI.projects.activateCloud({
         id: match.id,
         rootPath: primaryPath,
-        ...(window.electronAPI.featureFlags.multiRepo2 && match.repos?.length
+        ...(match.repos?.length
           ? { sharedRepos: match.repos }
           : {}),
       });
@@ -885,12 +891,30 @@ export default function App() {
   // Multi-repo2 cloud: keep ~/.flux workspace `repos[]` aligned with shared repo ids + bindings.
   useEffect(() => {
     if (!project || project.kind !== 'cloud') return;
-    if (!window.electronAPI.featureFlags.multiRepo2) return;
     if (project.sharedRepos.length === 0) return;
-    void window.electronAPI.project.syncCloudSharedRepos(project.sharedRepos).catch((err) => {
-      console.warn('[App] syncCloudSharedRepos', err);
-    });
-  }, [project?.id, project?.kind, project?.sharedRepos]);
+    let cancelled = false;
+    void window.electronAPI.project
+      .syncCloudSharedRepos(project.sharedRepos)
+      .then((result) => {
+        if (cancelled) return;
+        if ('error' in result) {
+          console.warn('[App] syncCloudSharedRepos failed', result.error);
+          return;
+        }
+        void refreshProjectRepos();
+      })
+      .catch((err) => {
+        console.warn('[App] syncCloudSharedRepos', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    project?.id,
+    project?.kind,
+    project?.kind === 'cloud' ? project.sharedRepos : undefined,
+    refreshProjectRepos,
+  ]);
 
   // Keep cloud project's Firestore-side fields fresh when the snapshot updates.
   useEffect(() => {
@@ -1734,11 +1758,20 @@ export default function App() {
   );
 
   const handleUpdateTask = useCallback(
-    (id: string, patch: Partial<Task>) => {
+    (id: string, patch: TaskPatch) => {
+      const { githubPr: patchGithubPr, ...patchRest } = patch;
       setTasks((prev) =>
         prev.map((t) => {
           if (t.id !== id) return t;
-          let next: Task = { ...t, ...patch };
+          let next: Task = { ...t, ...patchRest };
+          if (patchGithubPr !== undefined) {
+            if (patchGithubPr === null) {
+              next = { ...next };
+              delete next.githubPr;
+            } else {
+              next = { ...next, githubPr: patchGithubPr };
+            }
+          }
           if (patch.labels !== undefined) {
             const n = normalizeTaskLabels(patch.labels);
             if (n.length > 0) {
@@ -1819,6 +1852,9 @@ export default function App() {
           }
           if (patch.repoId !== undefined) {
             persistable.repoId = patch.repoId;
+          }
+          if (patchGithubPr !== undefined) {
+            persistable.githubPr = patchGithubPr;
           }
           if (Object.keys(persistable).length === 0) return;
 
@@ -2725,7 +2761,7 @@ export default function App() {
       return {
         sessionId,
         title,
-        running: s?.status === 'running' ?? false,
+        running: s?.status === 'running',
       };
     });
   }, [openPlanningMainTabIds, planningSessions]);
@@ -2996,7 +3032,7 @@ export default function App() {
                             prLoading: prLoadingTaskId === item.session.taskId,
                             prAgentAwaiting: Boolean(prAgentAwaitingByTaskId[item.session.taskId]),
                             projectRepos: projectRepos ?? undefined,
-                            multiRepo2Enabled: window.electronAPI.featureFlags.multiRepo2,
+                            multiRepo2Enabled: true,
                           }
                         : undefined
                     }
@@ -3076,7 +3112,7 @@ export default function App() {
                         }
                         repoDefaultBranchShort={repoDefaultBranchShort}
                         projectRepos={projectRepos ?? undefined}
-                        multiRepo2Enabled={window.electronAPI.featureFlags.multiRepo2}
+                        multiRepo2Enabled
                         cloudRepoBindingOverview={cloudRepoBindingOverview ?? undefined}
                         cloudUnblockAutostartClientUid={
                           project.kind === 'cloud' && uid ? uid : undefined
@@ -3128,7 +3164,7 @@ export default function App() {
                             : false
                         }
                         projectRepos={projectRepos ?? undefined}
-                        multiRepo2Enabled={window.electronAPI.featureFlags.multiRepo2}
+                        multiRepo2Enabled
                       />
                     </div>
                     <div
@@ -3221,6 +3257,13 @@ export default function App() {
                   currentUserEmail={userEmail ?? undefined}
                   onAutoStartWhenUnblockedChange={setAutoStartWhenUnblockedProject}
                   onProjectAgentPrefsRefresh={refreshPlanningRelatedProjectState}
+                  onCloudSharedReposChanged={(sharedRepos) => {
+                    setProject((cur) =>
+                      cur && cur.kind === 'cloud'
+                        ? { ...cur, sharedRepos }
+                        : cur,
+                    );
+                  }}
                 />
               </div>
             ) : null}

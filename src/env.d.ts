@@ -83,9 +83,6 @@ declare global {
   interface Window {
     electronAPI: {
       platform: string;
-      featureFlags: {
-        multiRepo2: boolean;
-      };
       /** Opens http(s) URLs in the system default browser (not an in-app window). */
       openExternalUrl: (url: string) => Promise<void>;
       workspace: {
@@ -118,12 +115,12 @@ declare global {
         }) => Promise<{ ok: true; repos: RepoConfig[] } | { error: string }>;
         getRepoManagementStates: () => Promise<
           | Record<string, RepoManagementState>
-          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+          | { error: string }
         >;
         pickRepoDirectory: () => Promise<
           | { rootPath: string }
           | { error: 'NOT_GIT_REPO' }
-          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+          | { error: string }
           | null
         >;
         updateRepoById: (payload: {
@@ -131,25 +128,25 @@ declare global {
           patch: RepoSettingsPatch;
         }) => Promise<
           | { ok: true; repos: RepoConfig[] }
-          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+          | { error: string }
         >;
         addRepo: (payload: {
           rootPath: string;
         }) => Promise<
           | { ok: true; repos: RepoConfig[] }
-          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+          | { error: string }
         >;
         removeRepo: (payload: {
           repoId: string;
         }) => Promise<
           | { ok: true; repos: RepoConfig[] }
-          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+          | { error: string }
         >;
         setPrimaryRepo: (payload: {
           repoId: string;
         }) => Promise<
           | { ok: true; repos: RepoConfig[] }
-          | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+          | { error: string }
         >;
         getPrimaryRepoId: () => Promise<
           { ok: true; repoId: string | null } | { error: string }
@@ -165,7 +162,7 @@ declare global {
           sharedRepos: CloudSharedRepo[];
         }) => Promise<
           | { ok: true; binding: CloudProjectLocalBinding }
-          | { error: string; code?: 'MULTI_REPO2_DISABLED' | 'NOT_GIT_REPO' }
+          | { error: string; code?: 'NOT_GIT_REPO' }
         >;
         syncCloudSharedRepos: (
           sharedRepos: CloudSharedRepo[],

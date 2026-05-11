@@ -10,6 +10,7 @@ import {
   serverTimestamp,
   setDoc,
   Timestamp,
+  updateDoc,
   where,
   type DocumentData,
   type QueryDocumentSnapshot,
@@ -162,6 +163,14 @@ export async function createCloudProject(
     memberIds: [uid],
     createdAt: new Date().toISOString(),
   };
+}
+
+export async function updateCloudProjectRepos(
+  projectId: string,
+  repos: CloudSharedRepo[],
+): Promise<void> {
+  const db = getFirebaseFirestore();
+  await updateDoc(doc(db, 'projects', projectId), { repos });
 }
 
 /** Owner-only delete. Rules enforce this. */

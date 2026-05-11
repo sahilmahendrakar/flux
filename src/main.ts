@@ -16,7 +16,6 @@ import {
   resolveRepoForBranchDiscovery,
   validateTaskRepoIdPatchValue,
 } from './repoIdentity';
-import { isMultiRepo2Enabled } from './featureFlags';
 import { McpServer } from './main/McpServer';
 import { McpRendererBridge } from './main/McpRendererBridge';
 import { AppStateStore } from './main/AppStateStore';
@@ -424,6 +423,17 @@ const createWindow = () => {
     mainWindow = null;
   });
 
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error('[mainWindow] did-fail-load', {
+      errorCode,
+      errorDescription,
+      validatedURL,
+    });
+  });
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[mainWindow] render-process-gone', details);
+  });
+
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
@@ -641,7 +651,10 @@ app.whenReady().then(async () => {
 
   if (activeProjectKey?.kind === 'cloud' && activeRootPath) {
     try {
-      const { projectDir } = await projectStore.ensureLayoutForRoot(activeRootPath);
+      const { projectDir } = await projectStore.ensureCloudLayoutForRoot(
+        activeProjectKey.id,
+        activeRootPath,
+      );
       worktreeService.setRootPath(activeRootPath);
       worktreeService.setProjectDir(projectDir);
     } catch {
@@ -860,13 +873,6 @@ app.whenReady().then(async () => {
     return projectStore.getReposAt(activeProjectDir());
   });
 
-  function multiRepo2DisabledError(): { error: string; code: 'MULTI_REPO2_DISABLED' } {
-    return {
-      error: 'This action requires the multi-repo2 feature flag.',
-      code: 'MULTI_REPO2_DISABLED',
-    };
-  }
-
   async function repoPathStatus(rootPath: string): Promise<RepoManagementState['pathStatus']> {
     const resolved = path.resolve(rootPath);
     try {
@@ -916,7 +922,6 @@ app.whenReady().then(async () => {
     projectDir: string;
     sharedRepos: CloudSharedRepo[];
   }): Promise<void> {
-    if (!isMultiRepo2Enabled()) return;
     const binding = bindingStore.get(params.cloudProjectId);
     if (!binding) return;
     const built = repoConfigsFromCloudSharedAndBinding(
@@ -1029,11 +1034,8 @@ app.whenReady().then(async () => {
     'project:getRepoManagementStates',
     async (): Promise<
       | Record<string, RepoManagementState>
-      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      | { error: string }
     > => {
-      if (!isMultiRepo2Enabled()) {
-        return multiRepo2DisabledError();
-      }
       try {
         const projectDir = activeProjectDir();
         const repos = await projectStore.getReposAt(projectDir);
@@ -1072,12 +1074,9 @@ app.whenReady().then(async () => {
     async (): Promise<
       | { rootPath: string }
       | { error: 'NOT_GIT_REPO' }
-      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      | { error: string }
       | null
     > => {
-      if (!isMultiRepo2Enabled()) {
-        return multiRepo2DisabledError();
-      }
       return pickDirectory('Add repository to project', 'Add repository');
     },
   );
@@ -1090,9 +1089,6 @@ app.whenReady().then(async () => {
       const key = appStateStore.get().activeProjectKey;
       if (key?.kind !== 'cloud') {
         return { error: 'No cloud project is open.', code: 'NOT_CLOUD' };
-      }
-      if (!isMultiRepo2Enabled()) {
-        return multiRepo2DisabledError();
       }
       const sharedRepos = parseCloudSharedReposArg(rawSharedRepos);
       const binding = bindingStore.get(key.id);
@@ -1123,14 +1119,11 @@ app.whenReady().then(async () => {
       payload: unknown,
     ): Promise<
       | { ok: true; binding: CloudProjectLocalBinding }
-      | { error: string; code?: 'MULTI_REPO2_DISABLED' | 'NOT_GIT_REPO' }
+      | { error: string; code?: 'NOT_GIT_REPO' }
     > => {
       const key = appStateStore.get().activeProjectKey;
       if (key?.kind !== 'cloud') {
         return { error: 'No cloud project is open.' };
-      }
-      if (!isMultiRepo2Enabled()) {
-        return multiRepo2DisabledError();
       }
       if (!payload || typeof payload !== 'object') {
         return { error: 'Invalid payload' };
@@ -1165,7 +1158,6 @@ app.whenReady().then(async () => {
     async (_e, rawSharedRepos: unknown): Promise<{ ok: true } | { error: string }> => {
       const key = appStateStore.get().activeProjectKey;
       if (key?.kind !== 'cloud') return { error: 'No cloud project is open.' };
-      if (!isMultiRepo2Enabled()) return { ok: true };
       const projectDir = worktreeService.getProjectDir();
       if (!projectDir) return { error: 'No workspace' };
       const sharedRepos = parseCloudSharedReposArg(rawSharedRepos);
@@ -1191,11 +1183,12 @@ app.whenReady().then(async () => {
         const repo = resolveRepoForBranchDiscovery(repos, repoId);
         if (!repo?.rootPath) {
           const explicit = repoId != null && repoId.trim().length > 0;
+          const activeKey = appStateStore.get().activeProjectKey;
           return {
             error: explicit
-              ? isMultiRepo2Enabled()
+              ? activeKey?.kind === 'cloud'
                 ? UNBOUND_REPO_BRANCH_DISCOVERY
-                : 'Unknown repository id for this project'
+                : `Unknown repository id "${repoId?.trim()}" for this local project. Open Project settings → Project Config and choose a repository that exists on this project.`
               : 'No repository root configured for this project',
           };
         }
@@ -1258,11 +1251,8 @@ app.whenReady().then(async () => {
       payload: { repoId: string; patch: RepoSettingsPatch },
     ): Promise<
       | { ok: true; repos: RepoConfig[] }
-      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      | { error: string }
     > => {
-      if (!isMultiRepo2Enabled()) {
-        return multiRepo2DisabledError();
-      }
       try {
         const rid = (payload.repoId ?? '').trim();
         if (!rid) {
@@ -1287,11 +1277,8 @@ app.whenReady().then(async () => {
       payload: { rootPath: string },
     ): Promise<
       | { ok: true; repos: RepoConfig[] }
-      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      | { error: string }
     > => {
-      if (!isMultiRepo2Enabled()) {
-        return multiRepo2DisabledError();
-      }
       try {
         const root = (payload.rootPath ?? '').trim();
         if (!root) {
@@ -1312,11 +1299,8 @@ app.whenReady().then(async () => {
       payload: { repoId: string },
     ): Promise<
       | { ok: true; repos: RepoConfig[] }
-      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      | { error: string }
     > => {
-      if (!isMultiRepo2Enabled()) {
-        return multiRepo2DisabledError();
-      }
       try {
         const rid = (payload.repoId ?? '').trim();
         if (!rid) {
@@ -1345,11 +1329,8 @@ app.whenReady().then(async () => {
       payload: { repoId: string },
     ): Promise<
       | { ok: true; repos: RepoConfig[] }
-      | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+      | { error: string }
     > => {
-      if (!isMultiRepo2Enabled()) {
-        return multiRepo2DisabledError();
-      }
       try {
         const rid = (payload.repoId ?? '').trim();
         if (!rid) {
@@ -1633,13 +1614,16 @@ app.whenReady().then(async () => {
       await bindingStore.set(payload.id, payload.rootPath);
       await projectStore.clear();
       await taskStore.reinit('');
-      const { projectDir } = await projectStore.ensureLayoutForRoot(payload.rootPath);
+      const { projectDir } = await projectStore.ensureCloudLayoutForRoot(
+        payload.id,
+        payload.rootPath,
+      );
       worktreeService.setRootPath(payload.rootPath);
       worktreeService.setProjectDir(projectDir);
       await appStateStore.set({
         activeProjectKey: { kind: 'cloud', id: payload.id },
       });
-      if (isMultiRepo2Enabled() && payload.sharedRepos && payload.sharedRepos.length > 0) {
+      if (payload.sharedRepos && payload.sharedRepos.length > 0) {
         await syncCloudReposDiskFromBinding({
           cloudProjectId: payload.id,
           projectDir,
@@ -2526,7 +2510,7 @@ app.whenReady().then(async () => {
       );
     }
 
-    const discoveryKey = isMultiRepo2Enabled() ? task.repoId : undefined;
+    const discoveryKey = task.repoId;
     const repoCfg = resolveRepoForBranchDiscovery(repos, discoveryKey);
 
     if (!repoCfg) {
@@ -2719,7 +2703,7 @@ app.whenReady().then(async () => {
         const projectDir = activeProjectDir();
         sessionRepoCfg = await resolveRepoConfigForTaskSession(project, merged, projectDir);
         const sourceOpts = await worktreeSourceOptsForTaskSession(merged, sessionRepoCfg);
-        const layout = isMultiRepo2Enabled() ? ('repo-scoped' as const) : ('legacy-flat' as const);
+        const layout = 'repo-scoped' as const;
         const created = await worktreeService.create({
           taskId: task.id,
           repo: {

@@ -2,7 +2,11 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { backfillRepoIdentities, ProjectStore } from './ProjectStore';
+import {
+  backfillRepoIdentities,
+  ensurePlanningAssistantMarkdownFiles,
+  ProjectStore,
+} from './ProjectStore';
 import { deriveStablePrimaryRepoIdForProject } from '../repoIdentity';
 
 const PROJECT_ID = 'p1';
@@ -215,6 +219,56 @@ describe('ProjectStore repo-id operations', () => {
     await expect(store.addRepoAt(projectDir, rootB)).rejects.toThrow(/already part of this project/);
   });
 
+  it('preserves added repos after reopening the local project root', async () => {
+    const rootA = path.join(tmp, 'a');
+    const rootB = path.join(tmp, 'b');
+    await fs.mkdir(rootA, { recursive: true });
+    await fs.mkdir(rootB, { recursive: true });
+    await touchGitRepo(rootA);
+    await touchGitRepo(rootB);
+
+    const store = new ProjectStore(tmp);
+    const { projectDir } = await store.create(rootA);
+    await store.addRepoAt(projectDir, rootB);
+
+    const reopened = new ProjectStore(tmp);
+    await reopened.create(rootA);
+
+    const repos = reopened.get()?.repos ?? [];
+    expect(repos.map((r) => path.resolve(r.rootPath))).toEqual([
+      path.resolve(rootA),
+      path.resolve(rootB),
+    ]);
+  });
+
+  it('keeps cloud materialized config separate from a local project with the same root basename', async () => {
+    const rootA = path.join(tmp, 'same-name');
+    const cloudExtra = path.join(tmp, 'cloud-extra');
+    await fs.mkdir(rootA, { recursive: true });
+    await fs.mkdir(cloudExtra, { recursive: true });
+    await touchGitRepo(rootA);
+    await touchGitRepo(cloudExtra);
+
+    const local = new ProjectStore(tmp);
+    const { projectDir: localDir } = await local.create(rootA);
+
+    const cloud = new ProjectStore(tmp);
+    const { projectDir: cloudDir } = await cloud.ensureCloudLayoutForRoot('cloud-123', rootA);
+    expect(cloudDir).not.toBe(localDir);
+    await cloud.addRepoAt(cloudDir, cloudExtra);
+
+    const reopened = new ProjectStore(tmp);
+    await reopened.create(rootA);
+    const localRepos = reopened.get()?.repos ?? [];
+    expect(localRepos.map((r) => path.resolve(r.rootPath))).toEqual([path.resolve(rootA)]);
+
+    const cloudRepos = await cloud.getReposAt(cloudDir);
+    expect(cloudRepos.map((r) => path.resolve(r.rootPath))).toEqual([
+      path.resolve(rootA),
+      path.resolve(cloudExtra),
+    ]);
+  });
+
   it('setPrimaryRepoAt moves repo to index 0 and syncs project rootPath', async () => {
     const rootA = path.join(tmp, 'a');
     const rootB = path.join(tmp, 'b');
@@ -256,5 +310,37 @@ describe('ProjectStore repo-id operations', () => {
     const repos = await store.removeRepoAt(projectDir, rid);
     expect(repos).toHaveLength(1);
     expect(repos[0].rootPath).toBe(path.resolve(rootA));
+  });
+});
+
+describe('ensurePlanningAssistantMarkdownFiles (multi-repo2 planning copy)', () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'flux-planning-md-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it('writes repo-aware MCP guidance when multiRepoGuide is true', async () => {
+    await ensurePlanningAssistantMarkdownFiles(dir, 'MyApp', '/tmp/primary', {
+      multiRepoGuide: true,
+    });
+    const claude = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
+    expect(claude).toContain('flux__get_project_info');
+    expect(claude).toContain('repos[]');
+    expect(claude).toContain('repoId');
+  });
+
+  it('uses single-repo tool copy when multiRepoGuide is false', async () => {
+    await ensurePlanningAssistantMarkdownFiles(dir, 'Solo', '/tmp/one', {
+      multiRepoGuide: false,
+    });
+    const claude = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
+    expect(claude).toContain('flux__get_project_info');
+    expect(claude).not.toContain('repos[]');
+    expect(claude).not.toContain('repoId');
   });
 });

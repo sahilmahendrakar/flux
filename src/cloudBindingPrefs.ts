@@ -1,4 +1,3 @@
-import path from 'node:path';
 import type {
   Agent,
   AgentSessionModelDefaults,
@@ -12,7 +11,11 @@ import {
   migrateLegacyCloudBinding,
   primaryMachineBinding,
 } from './cloudLocalBindingMigration';
-import { deriveStablePrimaryRepoIdForProject } from './repoIdentity';
+import {
+  deriveStablePrimaryRepoIdForProject,
+  normalizeRepoRootPathForIdentity,
+  repoRootBasename,
+} from './repoIdentity';
 
 export { primaryRootPathFromCloudBinding } from './cloudLocalBindingMigration';
 
@@ -82,7 +85,7 @@ function sharedReposForHydration(
   return [
     {
       id,
-      name: path.basename(path.resolve(primary.rootPath)),
+      name: repoRootBasename(primary.rootPath),
       baseBranch: 'main',
     },
   ];
@@ -108,10 +111,10 @@ function repoMachineBindingsForHydration(
 export function resolveCloudPrimaryRepoId(
   project: Pick<CloudProject, 'rootPath' | 'sharedRepos' | 'repoMachineBindings'>,
 ): string | undefined {
-  const primaryPath = path.resolve(project.rootPath);
+  const primaryPath = normalizeRepoRootPathForIdentity(project.rootPath);
   for (const sr of project.sharedRepos) {
     const machine = project.repoMachineBindings[sr.id];
-    if (machine && path.resolve(machine.rootPath) === primaryPath) {
+    if (machine && normalizeRepoRootPathForIdentity(machine.rootPath) === primaryPath) {
       return sr.id;
     }
   }

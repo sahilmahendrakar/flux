@@ -13,7 +13,6 @@ import {
   deriveRepoIdForRootPath,
   deriveStablePrimaryRepoIdForProject,
 } from '../repoIdentity';
-import { isMultiRepo2Enabled } from '../featureFlags';
 
 const DEFAULT_AGENT: Agent = 'claude-code';
 const DEFAULT_BASE_BRANCH = 'main';
@@ -364,7 +363,7 @@ export async function ensurePlanningAssistantMarkdownFiles(
   options?: { multiRepoGuide?: boolean },
 ): Promise<void> {
   const resolvedRoot = path.resolve(rootPath);
-  const multiRepoGuide = options?.multiRepoGuide ?? isMultiRepo2Enabled();
+  const multiRepoGuide = options?.multiRepoGuide ?? true;
   const md = planningAssistantMarkdown(projectName, resolvedRoot, multiRepoGuide);
   for (const fileName of ['CLAUDE.md', 'AGENTS.md'] as const) {
     const filePath = path.join(planningDir, fileName);
@@ -870,6 +869,18 @@ export class ProjectStore {
     return this.materialiseProjectDir(rootPath);
   }
 
+  /**
+   * Cloud projects must not share the local-project directory derived from the
+   * repo basename. The Firestore project id is the stable namespace.
+   */
+  async ensureCloudLayoutForRoot(
+    cloudProjectId: string,
+    rootPath: string,
+  ): Promise<{ projectDir: string; project: LocalProject }> {
+    const safeId = cloudProjectId.replace(/[^A-Za-z0-9_-]/g, '_');
+    return this.materialiseProjectDir(rootPath, path.join('cloud-projects', safeId));
+  }
+
   async create(rootPath: string): Promise<{ project: LocalProject; projectDir: string }> {
     const { projectDir, project } = await this.materialiseProjectDir(rootPath);
     this.projectDir = projectDir;
@@ -879,10 +890,11 @@ export class ProjectStore {
 
   private async materialiseProjectDir(
     rootPath: string,
+    projectDirName?: string,
   ): Promise<{ projectDir: string; project: LocalProject }> {
     const resolvedRoot = path.resolve(rootPath);
     const projectName = path.basename(resolvedRoot);
-    const projectDir = path.join(this.fluxBaseDir, projectName);
+    const projectDir = path.join(this.fluxBaseDir, projectDirName ?? projectName);
 
     await fs.mkdir(projectDir, { recursive: true });
     await fs.mkdir(path.join(projectDir, 'planning'), { recursive: true });

@@ -6,13 +6,15 @@ import {
   type AgentSpawnDefaultsPatch,
   type CloudRepoBindingOverview,
   type CloudRepoLocalBindingStatus,
-  type CloudSharedRepo,
   type CloudProject,
+  type CloudSharedRepo,
   type LocalProject,
   type RepoConfig,
   type RepoManagementState,
 } from '../types';
 import { defaultTaskAgentForProject } from '../cloudBindingPrefs';
+import { deriveRepoIdForRootPath, repoRootBasename } from '../repoIdentity';
+import { updateCloudProjectRepos } from '../renderer/projects/cloudProjects';
 import AgentModelPicker from './AgentModelPicker';
 import { SettingsSwitch } from './SettingsSwitch';
 import { AGENT_SPAWN_AGENT_SELECT_CLASS } from './AgentSessionPrefsMenu';
@@ -27,6 +29,7 @@ interface Props {
   onAutoStartWhenUnblockedChange?: (enabled: boolean) => void;
   /** After planning / default task agent prefs are saved, reload the active project from the main process. */
   onProjectAgentPrefsRefresh?: () => void | Promise<void>;
+  onCloudSharedReposChanged?: (repos: CloudSharedRepo[]) => void;
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -35,8 +38,8 @@ type Category = 'project' | 'team';
 function isRepoManagementStatesError(
   result:
     | Record<string, RepoManagementState>
-    | { error: string; code?: 'MULTI_REPO2_DISABLED' },
-): result is { error: string; code?: 'MULTI_REPO2_DISABLED' } {
+    | { error: string },
+): result is { error: string } {
   return typeof (result as { error?: unknown }).error === 'string';
 }
 
@@ -120,6 +123,7 @@ export function ProjectSettingsView({
   currentUserEmail,
   onAutoStartWhenUnblockedChange,
   onProjectAgentPrefsRefresh,
+  onCloudSharedReposChanged,
 }: Props) {
   const teamAvailable = project.kind === 'cloud' && !!currentUid;
   const [category, setCategory] = useState<Category>('project');
@@ -155,6 +159,7 @@ export function ProjectSettingsView({
             project={project}
             onAutoStartWhenUnblockedChange={onAutoStartWhenUnblockedChange}
             onProjectAgentPrefsRefresh={onProjectAgentPrefsRefresh}
+            onCloudSharedReposChanged={onCloudSharedReposChanged}
           />
         ) : teamAvailable && project.kind === 'cloud' && currentUid ? (
           <TeamView
@@ -199,16 +204,17 @@ interface ProjectConfigPaneProps {
   project: LocalProject | CloudProject;
   onAutoStartWhenUnblockedChange?: (enabled: boolean) => void;
   onProjectAgentPrefsRefresh?: () => void | Promise<void>;
+  onCloudSharedReposChanged?: (repos: CloudSharedRepo[]) => void;
 }
 
 function ProjectConfigPane({
   project,
   onAutoStartWhenUnblockedChange,
   onProjectAgentPrefsRefresh,
+  onCloudSharedReposChanged,
 }: ProjectConfigPaneProps) {
-  const multiRepo2 = window.electronAPI.featureFlags.multiRepo2;
-  const multiRepoLocalManagementEnabled = project.kind === 'local' && multiRepo2;
-  const multiRepoCloudBindingsEnabled = project.kind === 'cloud' && multiRepo2;
+  const multiRepoLocalManagementEnabled = project.kind === 'local';
+  const multiRepoCloudBindingsEnabled = project.kind === 'cloud';
   const [repos, setRepos] = useState<RepoConfig[] | null>(null);
   const [repoStates, setRepoStates] = useState<Record<string, RepoManagementState>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -677,6 +683,7 @@ function ProjectConfigPane({
 
       setRepos(result.repos);
       await refreshRepoStates(result.repos);
+      await onProjectAgentPrefsRefresh?.();
       const added = result.repos.find((r) => r.rootPath === picked.rootPath);
       if (added) {
         setExpanded((prev) => ({ ...prev, [added.id]: true }));
@@ -689,7 +696,88 @@ function ProjectConfigPane({
       setAddRepoState('error');
       setAddRepoError(err instanceof Error ? err.message : String(err));
     }
-  }, [multiRepoLocalManagementEnabled, refreshRepoStates]);
+  }, [multiRepoLocalManagementEnabled, onProjectAgentPrefsRefresh, refreshRepoStates]);
+
+  const handleAddCloudRepo = useCallback(async () => {
+    if (!multiRepoCloudBindingsEnabled || project.kind !== 'cloud') return;
+    setAddRepoState('saving');
+    setAddRepoError(null);
+    try {
+      const picked = await window.electronAPI.project.pickRepoDirectory();
+      if (!picked) {
+        setAddRepoState('idle');
+        return;
+      }
+      if ('error' in picked) {
+        setAddRepoState('error');
+        setAddRepoError(
+          picked.error === 'NOT_GIT_REPO'
+            ? 'Choose a folder that contains a .git directory.'
+            : picked.error,
+        );
+        return;
+      }
+
+      const existingRoot = project.sharedRepos.find((sr) => {
+        const bound = project.repoMachineBindings[sr.id]?.rootPath;
+        return bound === picked.rootPath;
+      });
+      if (existingRoot) {
+        setAddRepoState('error');
+        setAddRepoError('That local folder is already bound to this cloud project.');
+        return;
+      }
+
+      const existingIds = new Set(project.sharedRepos.map((r) => r.id));
+      let repoId = deriveRepoIdForRootPath({
+        projectId: project.id,
+        rootPath: picked.rootPath,
+      });
+      let salt = 1;
+      while (existingIds.has(repoId)) {
+        repoId = deriveRepoIdForRootPath({
+          projectId: project.id,
+          rootPath: picked.rootPath,
+          salt: `dup-${salt}`,
+        });
+        salt += 1;
+      }
+
+      const nextRepo: CloudSharedRepo = {
+        id: repoId,
+        name: repoRootBasename(picked.rootPath) || `repo:${repoId.slice(0, 7)}`,
+        baseBranch: 'main',
+      };
+      const nextSharedRepos = [...project.sharedRepos, nextRepo];
+      await updateCloudProjectRepos(project.id, nextSharedRepos);
+      onCloudSharedReposChanged?.(nextSharedRepos);
+
+      const bindResult = await window.electronAPI.project.bindCloudSharedRepo({
+        repoId,
+        rootPath: picked.rootPath,
+        sharedRepos: nextSharedRepos,
+      });
+      if ('error' in bindResult) {
+        setAddRepoState('error');
+        setAddRepoError(bindResult.error);
+        return;
+      }
+
+      await onProjectAgentPrefsRefresh?.();
+      setAddRepoState('saved');
+      window.setTimeout(() => {
+        setAddRepoState((state) => (state === 'saved' ? 'idle' : state));
+      }, 1500);
+    } catch (err) {
+      setAddRepoState('error');
+      setAddRepoError(err instanceof Error ? err.message : String(err));
+    }
+  }, [
+    multiRepoCloudBindingsEnabled,
+    onCloudSharedReposChanged,
+    onProjectAgentPrefsRefresh,
+    project,
+  ]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
@@ -1080,6 +1168,15 @@ function ProjectConfigPane({
                 >
                   {addRepoState === 'saving' ? 'Adding…' : 'Add repo'}
                 </button>
+              ) : multiRepoCloudBindingsEnabled ? (
+                <button
+                  type="button"
+                  onClick={() => void handleAddCloudRepo()}
+                  disabled={addRepoState === 'saving'}
+                  className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-[12px] font-medium text-zinc-200 transition hover:bg-white/[0.07] disabled:pointer-events-none disabled:opacity-50"
+                >
+                  {addRepoState === 'saving' ? 'Adding…' : 'Add repo'}
+                </button>
               ) : null}
             </div>
           </div>
@@ -1088,6 +1185,9 @@ function ProjectConfigPane({
             <CloudTeamReposBindingsSection
               project={project}
               onBindingsChanged={onProjectAgentPrefsRefresh}
+              onSharedReposChanged={onCloudSharedReposChanged}
+              addRepoActionError={addRepoError}
+              addRepoActionSaved={addRepoState === 'saved'}
             />
           ) : (
             <>
@@ -1129,10 +1229,14 @@ function ProjectConfigPane({
                             [key]: !(prev[key] ?? false),
                           }))
                         }
-                        onSaved={(repos) => setRepos(repos)}
+                        onSaved={(repos) => {
+                          setRepos(repos);
+                          void onProjectAgentPrefsRefresh?.();
+                        }}
                         onReposChanged={async (repos) => {
                           setRepos(repos);
                           await refreshRepoStates(repos);
+                          await onProjectAgentPrefsRefresh?.();
                         }}
                       />
                     );
@@ -1151,16 +1255,12 @@ function CloudRepoBindingStatusBadge({ status }: { status: CloudRepoLocalBinding
   if (status.kind === 'missing_binding') {
     return (
       <span className="rounded-full border border-zinc-500/25 bg-zinc-500/[0.06] px-1.5 py-0.5 text-[10px] text-zinc-400">
-        Not bound
+        Missing local path
       </span>
     );
   }
   if (status.pathStatus === 'valid') {
-    return (
-      <span className="rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-1.5 py-0.5 text-[10px] text-emerald-300">
-        Ready
-      </span>
-    );
+    return null;
   }
   if (status.pathStatus === 'missing') {
     return (
@@ -1179,14 +1279,22 @@ function CloudRepoBindingStatusBadge({ status }: { status: CloudRepoLocalBinding
 function CloudTeamReposBindingsSection({
   project,
   onBindingsChanged,
+  onSharedReposChanged,
+  addRepoActionError,
+  addRepoActionSaved,
 }: {
   project: CloudProject;
   onBindingsChanged?: () => void | Promise<void>;
+  onSharedReposChanged?: (repos: CloudSharedRepo[]) => void;
+  addRepoActionError?: string | null;
+  addRepoActionSaved?: boolean;
 }) {
   const [overview, setOverview] = useState<CloudRepoBindingOverview | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionRepoId, setActionRepoId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const displayedActionError = actionError ?? addRepoActionError ?? null;
 
   const sharedReposKey = project.sharedRepos.map((s) => s.id).join(',');
 
@@ -1249,9 +1357,17 @@ function CloudTeamReposBindingsSection({
 
   if (project.sharedRepos.length === 0) {
     return (
-      <p className="mt-4 text-[12px] text-zinc-500">
-        No shared repositories are listed for this cloud project yet.
-      </p>
+      <div className="mt-4">
+        {displayedActionError ? (
+          <p className="mb-3 rounded-md border border-red-500/30 bg-red-500/[0.06] px-3 py-2 text-[12px] text-red-300">
+            {displayedActionError}
+          </p>
+        ) : null}
+        <p className="text-[12px] text-zinc-500">
+          No shared repositories are listed for this cloud project yet. Use Add repo to add
+          one to the team project and bind it on this machine.
+        </p>
+      </div>
     );
   }
 
@@ -1262,24 +1378,42 @@ function CloudTeamReposBindingsSection({
           {loadError}
         </p>
       ) : null}
-      {actionError ? (
+      {displayedActionError ? (
         <p className="rounded-md border border-red-500/30 bg-red-500/[0.06] px-3 py-2 text-[12px] text-red-300">
-          {actionError}
+          {displayedActionError}
+        </p>
+      ) : addRepoActionSaved ? (
+        <p className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2 text-[12px] text-emerald-300">
+          Repository added.
         </p>
       ) : null}
       {project.sharedRepos.map((sr, index) => {
         const st = overview?.[sr.id];
+        const isExpanded = expanded[sr.id] ?? false;
         return (
           <div
             key={sr.id}
-            className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3"
+            className="rounded-xl border border-white/[0.08] bg-white/[0.02]"
           >
-            <div className="flex flex-wrap items-start justify-between gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                setExpanded((prev) => ({ ...prev, [sr.id]: !(prev[sr.id] ?? false) }))
+              }
+              className="flex w-full flex-wrap items-start justify-between gap-3 px-4 py-3 text-left"
+              aria-expanded={isExpanded}
+            >
+              <div className="flex min-w-0 flex-1 gap-2">
+                <ChevronRight
+                  className={`mt-0.5 shrink-0 text-zinc-500 transition-transform ${
+                    isExpanded ? 'rotate-90' : ''
+                  }`}
+                />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[13px] font-medium text-zinc-200">{sr.name}</span>
                   {index === 0 ? (
-                    <span className="rounded-full border border-sky-500/20 bg-sky-500/[0.08] px-1.5 py-0.5 text-[10px] font-medium text-sky-200">
+                    <span className="rounded-full border border-emerald-500/20 bg-emerald-500/[0.08] px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
                       Primary
                     </span>
                   ) : null}
@@ -1324,6 +1458,20 @@ function CloudTeamReposBindingsSection({
                   </p>
                 ) : null}
               </div>
+              </div>
+            </button>
+            {isExpanded ? (
+              <div className="border-t border-white/[0.06] px-4 py-4">
+                <CloudRepoFields
+                  project={project}
+                  repo={sr}
+                  status={st}
+                  onSharedReposChanged={onSharedReposChanged}
+                  onBindingsChanged={onBindingsChanged}
+                />
+              </div>
+            ) : null}
+            <div className="flex justify-end border-t border-white/[0.04] px-4 py-3">
               <button
                 type="button"
                 onClick={() => void handleBind(sr.id)}
@@ -1340,6 +1488,134 @@ function CloudTeamReposBindingsSection({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function CloudRepoFields({
+  project,
+  repo,
+  status,
+  onSharedReposChanged,
+  onBindingsChanged,
+}: {
+  project: CloudProject;
+  repo: CloudSharedRepo;
+  status?: CloudRepoLocalBindingStatus;
+  onSharedReposChanged?: (repos: CloudSharedRepo[]) => void;
+  onBindingsChanged?: () => void | Promise<void>;
+}) {
+  const [name, setName] = useState(repo.name);
+  const [baseBranch, setBaseBranch] = useState(repo.baseBranch);
+  const [remoteUrl, setRemoteUrl] = useState(repo.remoteUrl ?? '');
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(repo.name);
+    setBaseBranch(repo.baseBranch);
+    setRemoteUrl(repo.remoteUrl ?? '');
+    setSaveState('idle');
+    setError(null);
+  }, [repo.id, repo.name, repo.baseBranch, repo.remoteUrl]);
+
+  const save = async () => {
+    const trimmedName = name.trim();
+    const trimmedBase = baseBranch.trim();
+    if (!trimmedName) {
+      setSaveState('error');
+      setError('Display name is required.');
+      return;
+    }
+    setSaveState('saving');
+    setError(null);
+    try {
+      const nextRepos = project.sharedRepos.map((r) => {
+        if (r.id !== repo.id) return r;
+        const next: CloudSharedRepo = {
+          ...r,
+          name: trimmedName,
+          baseBranch: trimmedBase || 'main',
+        };
+        const trimmedRemote = remoteUrl.trim();
+        if (trimmedRemote) {
+          next.remoteUrl = trimmedRemote;
+        } else {
+          delete next.remoteUrl;
+        }
+        return next;
+      });
+      await updateCloudProjectRepos(project.id, nextRepos);
+      onSharedReposChanged?.(nextRepos);
+      const syncResult = await window.electronAPI.project.syncCloudSharedRepos(nextRepos);
+      if ('error' in syncResult) {
+        throw new Error(syncResult.error);
+      }
+      await onBindingsChanged?.();
+      setSaveState('saved');
+      window.setTimeout(() => {
+        setSaveState((state) => (state === 'saved' ? 'idle' : state));
+      }, 1500);
+    } catch (err) {
+      setSaveState('error');
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const bindingCopy =
+    status?.kind === 'bound'
+      ? status.rootPath
+      : 'No local folder is bound on this machine.';
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-lg border border-white/[0.06] bg-black/10 px-3 py-2">
+        <div className="text-[12px] font-medium text-zinc-300">Repository binding</div>
+        <p className="mt-0.5 truncate font-mono text-[11px] text-zinc-600" title={bindingCopy}>
+          {bindingCopy}
+        </p>
+      </div>
+      <label className="block">
+        <span className="text-[12px] font-medium text-zinc-300">Display name</span>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="mt-1.5 w-full rounded-md border border-white/[0.08] bg-black/20 px-2.5 py-1.5 text-[13px] text-zinc-100 outline-none focus:border-white/[0.16]"
+        />
+      </label>
+      <label className="block">
+        <span className="text-[12px] font-medium text-zinc-300">Base branch</span>
+        <input
+          value={baseBranch}
+          onChange={(e) => setBaseBranch(e.target.value)}
+          placeholder="main"
+          className="mt-1.5 w-full rounded-md border border-white/[0.08] bg-black/20 px-2.5 py-1.5 font-mono text-[13px] text-zinc-100 outline-none focus:border-white/[0.16]"
+        />
+      </label>
+      <label className="block">
+        <span className="text-[12px] font-medium text-zinc-300">Remote origin</span>
+        <input
+          value={remoteUrl}
+          onChange={(e) => setRemoteUrl(e.target.value)}
+          placeholder="https://github.com/org/repo.git"
+          className="mt-1.5 w-full rounded-md border border-white/[0.08] bg-black/20 px-2.5 py-1.5 font-mono text-[13px] text-zinc-100 outline-none focus:border-white/[0.16]"
+        />
+      </label>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={saveState === 'saving'}
+          className="rounded-md border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 text-[12px] font-medium text-zinc-200 transition hover:bg-white/[0.07] disabled:pointer-events-none disabled:opacity-50"
+        >
+          {saveState === 'saving' ? 'Saving...' : 'Save repository'}
+        </button>
+        {error ? (
+          <span className="text-[11px] text-red-400">{error}</span>
+        ) : saveState === 'saved' ? (
+          <span className="text-[11px] text-emerald-400">Saved</span>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1434,11 +1710,7 @@ function RepoCard({
 
 function RepoStateBadge({ state }: { state: RepoManagementState }) {
   if (state.pathStatus === 'valid' && !state.removalBlocked) {
-    return (
-      <span className="rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-1.5 py-0.5 text-[10px] text-emerald-300">
-        Valid git repo
-      </span>
-    );
+    return null;
   }
 
   if (state.pathStatus === 'missing') {
@@ -1457,11 +1729,7 @@ function RepoStateBadge({ state }: { state: RepoManagementState }) {
     );
   }
 
-  return (
-    <span className="rounded-full border border-amber-500/25 bg-amber-500/[0.06] px-1.5 py-0.5 text-[10px] text-amber-300">
-      Removal blocked
-    </span>
-  );
+  return null;
 }
 
 interface RepoFieldsProps {

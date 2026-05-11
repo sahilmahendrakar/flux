@@ -129,12 +129,8 @@ async function handleRequest(
             message: 'tasks.create requires payload.input',
           };
         }
-        const multiRepo2 = window.electronAPI.featureFlags.multiRepo2;
-        let input = payload.input;
-        if (!multiRepo2) {
-          const { repoId: _omit, ...rest } = input;
-          input = rest;
-        } else if (project.kind === 'cloud') {
+        const input = payload.input;
+        if (project.kind === 'cloud') {
           const rid = input.repoId?.trim();
           if (rid) {
             const known = project.sharedRepos.some((r) => r.id === rid);
@@ -170,11 +166,7 @@ async function handleRequest(
         const previous =
           tasksSnapshot.find((t) => t.id === payload.taskId) ?? null;
         let patch = payload.patch;
-        if (!window.electronAPI.featureFlags.multiRepo2 && patch.repoId !== undefined) {
-          const { repoId: _omit, ...rest } = patch;
-          patch = rest;
-        } else if (
-          window.electronAPI.featureFlags.multiRepo2 &&
+        if (
           project.kind === 'cloud' &&
           patch.repoId !== undefined
         ) {
@@ -332,8 +324,7 @@ async function handleRequest(
           ...(defaultBranchShort !== undefined ? { defaultBranchShort } : {}),
           ...(branchDiscoveryError !== undefined ? { branchDiscoveryError } : {}),
         };
-        const multiRepo2 = window.electronAPI.featureFlags.multiRepo2;
-        if (multiRepo2 && project.kind === 'cloud') {
+        if (project.kind === 'cloud') {
           const primaryRepoId = resolveCloudPrimaryRepoId(project);
           const repos: McpBridgeProjectInfoRepoSummary[] = await Promise.all(
             project.sharedRepos.map(async (sr) => {
@@ -370,9 +361,7 @@ async function handleRequest(
       }
       case 'repo.branchDiscovery': {
         const payload = (req.payload ?? {}) as McpBridgeRepoBranchDiscoveryPayload;
-        const multiRepo2 = window.electronAPI.featureFlags.multiRepo2;
         const repoIdArg =
-          multiRepo2 &&
           payload.repoId != null &&
           payload.repoId.trim() !== '' &&
           project.kind === 'cloud'

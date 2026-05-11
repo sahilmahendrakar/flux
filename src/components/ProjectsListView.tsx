@@ -133,7 +133,7 @@ export function ProjectsListView({
       const result = await window.electronAPI.projects.activateCloud({
         id: summary.id,
         rootPath: primaryPath,
-        ...(window.electronAPI.featureFlags.multiRepo2 && summary.repos?.length
+        ...(summary.repos?.length
           ? { sharedRepos: summary.repos }
           : {}),
       });

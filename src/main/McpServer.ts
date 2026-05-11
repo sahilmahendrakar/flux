@@ -20,7 +20,6 @@ import {
   planTaskSourceBranchFieldsForCreate,
   validateStoredTaskSourceBranchName,
 } from '../taskBranches';
-import { isMultiRepo2Enabled } from '../featureFlags';
 import { collectRepoBranchDiscovery } from './repoGit';
 import { mergedTaskCreateAgentFields } from '../projectAgentDefaults';
 import type {
@@ -365,7 +364,7 @@ export class McpServer {
           );
           if (active.kind === 'local') {
             const repos = await this.projectStore.getReposAt(active.projectDir);
-            const requestedRepoId = isMultiRepo2Enabled() ? input.repoId : undefined;
+            const requestedRepoId = input.repoId;
             const repoResolved = resolveLocalTaskRepoIdForCreate(repos, requestedRepoId);
             if (!repoResolved.ok) {
               return jsonToolPayload({ error: repoResolved.message });
@@ -430,7 +429,7 @@ export class McpServer {
               ...(input.createSourceBranchIfMissing !== undefined
                 ? { createSourceBranchIfMissing: input.createSourceBranchIfMissing }
                 : {}),
-              ...(isMultiRepo2Enabled() && input.repoId !== undefined
+              ...(input.repoId !== undefined
                 ? { repoId: input.repoId }
                 : {}),
             },
@@ -552,7 +551,7 @@ export class McpServer {
             if (input.createSourceBranchIfMissing !== undefined) {
               patch.createSourceBranchIfMissing = input.createSourceBranchIfMissing;
             }
-            if (input.repoId !== undefined && isMultiRepo2Enabled()) {
+            if (input.repoId !== undefined) {
               patch.repoId = input.repoId;
             }
             const updated = await this.taskActions.updateTask(input.id, patch);
@@ -610,7 +609,7 @@ export class McpServer {
           if (input.createSourceBranchIfMissing !== undefined) {
             patch.createSourceBranchIfMissing = input.createSourceBranchIfMissing;
           }
-          if (input.repoId !== undefined && isMultiRepo2Enabled()) {
+          if (input.repoId !== undefined) {
             patch.repoId = input.repoId;
           }
           if (assigneeId !== undefined) patch.assigneeId = assigneeId;
@@ -805,16 +804,15 @@ export class McpServer {
                 branchDiscoveryError = err instanceof Error ? err.message : String(err);
               }
             }
-            const multi = isMultiRepo2Enabled();
-            const repoSummaries = multi ? await this.buildLocalProjectInfoRepoSummaries(repos) : undefined;
+            const repoSummaries = await this.buildLocalProjectInfoRepoSummaries(repos);
             return jsonToolPayload({
               name: active.project.name,
               rootPath: primaryRootPath,
               taskCounts,
               ...(defaultBranchShort !== undefined ? { defaultBranchShort } : {}),
               ...(branchDiscoveryError !== undefined ? { branchDiscoveryError } : {}),
-              ...(multi && primaryRepoId !== undefined ? { primaryRepoId } : {}),
-              ...(multi && repoSummaries !== undefined ? { repos: repoSummaries } : {}),
+              ...(primaryRepoId !== undefined ? { primaryRepoId } : {}),
+              repos: repoSummaries,
             });
           }
           const result = await this.bridge.request<McpBridgeProjectInfoResult>(
@@ -823,7 +821,6 @@ export class McpServer {
           );
           if (!result.ok) return this.bridgeError(result);
           const data = result.data;
-          const multi = isMultiRepo2Enabled();
           return jsonToolPayload({
             name: data.name,
             rootPath: active.rootPath,
@@ -834,8 +831,8 @@ export class McpServer {
             ...(data.branchDiscoveryError !== undefined
               ? { branchDiscoveryError: data.branchDiscoveryError }
               : {}),
-            ...(multi && data.primaryRepoId !== undefined ? { primaryRepoId: data.primaryRepoId } : {}),
-            ...(multi && data.repos !== undefined ? { repos: data.repos } : {}),
+            ...(data.primaryRepoId !== undefined ? { primaryRepoId: data.primaryRepoId } : {}),
+            ...(data.repos !== undefined ? { repos: data.repos } : {}),
           });
         } catch (err) {
           return toolError(err);
@@ -868,12 +865,11 @@ export class McpServer {
           }
           if (active.kind === 'local') {
             const repos = await this.projectStore.getReposAt(active.projectDir);
-            const repoIdArg = isMultiRepo2Enabled() ? input.repoId?.trim() || undefined : undefined;
+            const repoIdArg = input.repoId?.trim() || undefined;
             const repo = resolveRepoForBranchDiscovery(repos, repoIdArg);
             if (!repo?.rootPath) {
               return jsonToolPayload({
                 error:
-                  isMultiRepo2Enabled() &&
                   input.repoId != null &&
                   input.repoId.trim() !== ''
                     ? 'Unknown repository id for this project'
@@ -903,8 +899,7 @@ export class McpServer {
             'repo.branchDiscovery',
             active.activeKey,
             {
-              ...(isMultiRepo2Enabled() &&
-              input.repoId != null &&
+              ...(input.repoId != null &&
               input.repoId.trim() !== ''
                 ? { repoId: input.repoId.trim() }
                 : {}),

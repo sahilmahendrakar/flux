@@ -56,7 +56,6 @@ import type {
   PlanningDocsCloudMigrationPersistedV1,
   PlanningDocsListResult,
 } from './planningDocs/types';
-import { isMultiRepo2Enabled } from './featureFlags';
 import { ipcSubscribe } from './ipcSubscribe';
 
 type PlanningStartResult = PlanningSession | { error: string; message?: string };
@@ -79,9 +78,6 @@ type ActivateCloudResult =
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
-  featureFlags: {
-    multiRepo2: isMultiRepo2Enabled(),
-  },
   openExternalUrl: (url: string) =>
     ipcRenderer.invoke('openExternalUrl', url) as Promise<void>,
   workspace: {
@@ -117,13 +113,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getRepoManagementStates: () =>
       ipcRenderer.invoke('project:getRepoManagementStates') as Promise<
         | Record<string, RepoManagementState>
-        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        | { error: string }
       >,
     pickRepoDirectory: () =>
       ipcRenderer.invoke('project:pickRepoDirectory') as Promise<
         | { rootPath: string }
         | { error: 'NOT_GIT_REPO' }
-        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        | { error: string }
         | null
       >,
     updateRepo: (payload: { rootPath: string; patch: RepoSettingsPatch }) =>
@@ -133,22 +129,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateRepoById: (payload: { repoId: string; patch: RepoSettingsPatch }) =>
       ipcRenderer.invoke('project:updateRepoById', payload) as Promise<
         | { ok: true; repos: RepoConfig[] }
-        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        | { error: string }
       >,
     addRepo: (payload: { rootPath: string }) =>
       ipcRenderer.invoke('project:addRepo', payload) as Promise<
         | { ok: true; repos: RepoConfig[] }
-        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        | { error: string }
       >,
     removeRepo: (payload: { repoId: string }) =>
       ipcRenderer.invoke('project:removeRepo', payload) as Promise<
         | { ok: true; repos: RepoConfig[] }
-        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        | { error: string }
       >,
     setPrimaryRepo: (payload: { repoId: string }) =>
       ipcRenderer.invoke('project:setPrimaryRepo', payload) as Promise<
         | { ok: true; repos: RepoConfig[] }
-        | { error: string; code?: 'MULTI_REPO2_DISABLED' }
+        | { error: string }
       >,
     getPrimaryRepoId: () =>
       ipcRenderer.invoke('project:getPrimaryRepoId') as Promise<
@@ -166,7 +162,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }) =>
       ipcRenderer.invoke('project:bindCloudSharedRepo', payload) as Promise<
         | { ok: true; binding: CloudProjectLocalBinding }
-        | { error: string; code?: 'MULTI_REPO2_DISABLED' | 'NOT_GIT_REPO' }
+        | { error: string; code?: 'NOT_GIT_REPO' }
       >,
     syncCloudSharedRepos: (sharedRepos: CloudSharedRepo[]) =>
       ipcRenderer.invoke('project:syncCloudSharedRepos', sharedRepos) as Promise<

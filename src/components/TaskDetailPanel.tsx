@@ -70,6 +70,7 @@ import {
   planTaskSourceBranchFieldsForCreate,
   taskSourceBranchPersistIsNoOp,
 } from '../taskBranches';
+import type { TaskPatch } from '../renderer/tasks/TaskProvider';
 
 function taskAgentSupportsCliResume(agent: Agent): boolean {
   return agent === 'cursor' || agent === 'claude-code' || agent === 'codex';
@@ -104,7 +105,7 @@ export interface TaskDetailPanelProps {
   taskSessionStartPending?: boolean;
   onSelectTask: (id: string) => void;
   onClose: () => void;
-  onUpdate: (id: string, patch: Partial<Task>) => void;
+  onUpdate: (id: string, patch: TaskPatch) => void;
   onDelete: (id: string, opts?: { closeDetail?: boolean }) => void;
   /** Present when a teammate (not the current user) is running an agent on this task. */
   remoteRunner?: { uid: string; displayName?: string; photoURL?: string } | null;

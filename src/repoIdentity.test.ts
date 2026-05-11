@@ -44,8 +44,9 @@ describe('repoIdentity (multi-repo2)', () => {
       rootPath: '/abs/repo/.',
     });
     expect(a).toBe(b);
-    // path.resolve normalizes, so trailing `/.` collapses
+    // Path normalization collapses trailing `/.` without importing Node built-ins.
     expect(a).toBe(c);
+    expect(a).toBe('176de224cb7dd9c7654bf30448859c08a046daae5db1d571e98ddf41dfe867d1');
     expect(a).not.toBe(
       deriveStablePrimaryRepoIdForProject({
         projectId: 'p2',
@@ -65,6 +66,12 @@ describe('repoIdentity (multi-repo2)', () => {
       rootPath: '/abs/b',
     });
     expect(primary).not.toBe(sibling);
+    expect(
+      deriveRepoIdForRootPath({
+        projectId: 'p1',
+        rootPath: '/abs/other',
+      }),
+    ).toBe('15e2832f6b88aeca3c92e84603e2f60b8400d75540d305cc62bdff12770763a4');
   });
 
   it('getPrimaryRepo returns the first repo (or undefined)', () => {
