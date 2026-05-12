@@ -1,0 +1,37 @@
+src/main/AppStateStore.ts
+  s_843751cb82f256::t_1d351fc0af4ab9 94-95,103-104
+src/types.ts
+  s_843751cb82f256::t_a25b44e954fa5b 38-39
+src/App.tsx
+  s_843751cb82f256::t_3ea7fb9dd0b0f5 262
+  s_843751cb82f256::t_4fd959f368db03 1243
+  s_843751cb82f256::t_0fdf70a22783b4 385-386
+  s_843751cb82f256::t_87773d46037028 1213
+  s_843751cb82f256::t_3ab2f27747a223 1257
+  s_843751cb82f256::t_bd79145288ddf6 2912
+  s_843751cb82f256::t_405b6bb53af620 1098-1100,1102-1104,1106-1121
+  s_843751cb82f256::t_5096f91f77c678 1131,1136
+  s_843751cb82f256::t_dd2a3f4f82f7a3 2175
+  s_843751cb82f256::t_853ca2120d7672 2204
+  s_843751cb82f256::t_39150635102976 2453,2456
+  s_843751cb82f256::t_7f617299f1759c 2224,2234,2237-2238,2241,2243
+  s_843751cb82f256::t_9ca834d4ce0f1b 1130,1135
+  s_843751cb82f256::t_b58e2d3ed75f11 1101,1105
+  s_843751cb82f256::t_7c0011cef267f1 284
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "5903acf2bf106db564518e463f2bd8f95146d57b",
+  "prompts": {},
+  "sessions": {
+    "s_843751cb82f256": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0119356d-2316-4287-8b5a-afbf5bdf8bed",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
