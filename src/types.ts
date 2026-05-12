@@ -35,6 +35,11 @@ export interface ProjectTabState {
   openPlanningTabIds?: string[];
   /** Selected planning session in the board sidebar strip. */
   planningSidebarActiveSessionId?: string | null;
+  /**
+   * User intent: planning strip should be open on the board (survives Docs / Settings /
+   * task tab; cleared on explicit dismiss). Absent on disk means false.
+   */
+  planningSidebarOpen?: boolean;
 }
 
 /**
