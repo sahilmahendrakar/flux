@@ -1,0 +1,24 @@
+src/components/BoardFilterBar.tsx
+  s_19e814883d46a5::t_220c35ffb057c8 16
+  s_19e814883d46a5::t_08da585ae13fe7 92-95
+  s_19e814883d46a5::t_46a871ca5b1ce7 173-177
+  s_19e814883d46a5::t_7b53270f680544 389,391-398,408,410-413
+  s_19e814883d46a5::t_dee84e1e39e1a4 1-2
+  s_19e814883d46a5::t_32615364de7fbc 27,33,38-40,42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "a825a4b5d68c52cf62924f7831239ab08734e4b6",
+  "prompts": {},
+  "sessions": {
+    "s_19e814883d46a5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "81603f29-c53c-4d4c-9b8a-d6c2d80e02d9",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
