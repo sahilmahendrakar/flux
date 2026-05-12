@@ -52,6 +52,7 @@ import type {
 import type {
   PlanningDocsCloudMigrationPersistedV1,
   PlanningDocsListResult,
+  PlanningDocsWriteResult,
 } from './planningDocs/types';
 
 interface ImportMetaEnv {
@@ -358,6 +359,10 @@ declare global {
         read: (relativePath: string) => Promise<
           { content: string } | { error: string }
         >;
+        write: (
+          relativePath: string,
+          content: string,
+        ) => Promise<PlanningDocsWriteResult>;
         applyFirestoreSnapshot: (payload: {
           projectId: string;
           docs: Array<{
