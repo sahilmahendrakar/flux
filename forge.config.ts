@@ -187,7 +187,6 @@ const config: ForgeConfig = {
       // Enabled so main can spawn the Flux daemon by re-invoking the
       // Electron binary with ELECTRON_RUN_AS_NODE=1. See docs/daemon-packaging.md.
       [FuseV1Options.RunAsNode]: true,
-      [FuseV1Options.EnableCookieEncryption]: true,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
