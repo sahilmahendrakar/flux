@@ -1,0 +1,68 @@
+src/planningDocs/path.ts
+  s_ca6f8266c9a9d2::t_0a8b584f0a9e0e 2-5
+  s_ca6f8266c9a9d2::t_2046f94ba3cea6 118-126
+src/planningDocs/types.ts
+  s_ca6f8266c9a9d2::t_c305efa639ee41 76-84
+src/planningDocs/FilesystemPlanningDocsProvider.ts
+  s_ca6f8266c9a9d2::t_4a8a5f4647bd6d 8,10
+  s_ca6f8266c9a9d2::t_4670f19e95b1a9 43
+  s_ca6f8266c9a9d2::t_27fa252c6510a7 86-109
+src/planningDocs/cloudMirrorPlanningDocsProvider.ts
+  s_ca6f8266c9a9d2::t_d448d2aa540da9 2-7
+  s_ca6f8266c9a9d2::t_ef683134d0db07 27-30
+src/components/PlanningDocsView.tsx
+  s_ca6f8266c9a9d2::t_ffefb5e1d1a972 11-15
+  s_ca6f8266c9a9d2::t_3971760cbdd8bf 121
+  s_ca6f8266c9a9d2::t_aacc36fa9d98a8 319
+  s_ca6f8266c9a9d2::t_a273234e787998 107-109
+  s_ca6f8266c9a9d2::t_ba9093d693071c 1-8,29,46-61,70,74-75,80-85,92-101,112-113,116-120,122-127,130,134-136,141-142,144,147-149,151,155,190-221,224-243,261-278,280-283,285-318,320-328,331,333-344,388-406
+src/planningDocs/cloudMirrorPlanningDocsProvider.test.ts
+  s_ca6f8266c9a9d2::t_d75c63e02b83ea 11,18,21
+  s_ca6f8266c9a9d2::t_b680e7086998b0 6
+src/preload.ts
+  s_ca6f8266c9a9d2::t_9f4b52fe89db5e 51
+  s_ca6f8266c9a9d2::t_79b1a665e66568 429-430
+src/planningDocs/path.test.ts
+  s_ca6f8266c9a9d2::t_612a3e2fbac45c 7
+  s_ca6f8266c9a9d2::t_52576cda9a7589 82-96
+src/App.tsx
+  s_ca6f8266c9a9d2::t_6a10cf29bb008f 2416
+  s_ca6f8266c9a9d2::t_20445352b6ca12 2284-2301
+  s_ca6f8266c9a9d2::t_ccb9974ec8750d 2412
+  s_ca6f8266c9a9d2::t_124a652d389476 2544-2551
+  s_ca6f8266c9a9d2::t_a5da47c81f9e64 2508-2510,2514
+  s_ca6f8266c9a9d2::t_f80ce6f357f23c 2272
+  s_ca6f8266c9a9d2::t_ef78ba82c4c77e 2442-2450
+  s_ca6f8266c9a9d2::t_366ea9e7b5a357 3112
+  s_ca6f8266c9a9d2::t_dcc63cb2ba86e0 287
+  s_ca6f8266c9a9d2::t_7dea8bd744734d 2236-2246,2248
+  s_ca6f8266c9a9d2::t_90f8de1b69bd2a 2520-2522,2526-2529,2531-2537,2539-2542
+  s_ca6f8266c9a9d2::t_1235d49ab7e831 2395
+  s_ca6f8266c9a9d2::t_cfcf4e500b4f94 2523-2525
+  s_ca6f8266c9a9d2::t_adde63e3968718 2538
+  s_ca6f8266c9a9d2::t_3e3c19fa456ec2 2429
+src/planningDocs/FilesystemPlanningDocsProvider.test.ts
+  s_ca6f8266c9a9d2::t_1b300c156ea0ae 57-78
+src/env.d.ts
+  s_ca6f8266c9a9d2::t_3b5ead19c2bd7a 48
+  s_ca6f8266c9a9d2::t_f948f1d5c74e7a 287-290
+src/main.ts
+  s_ca6f8266c9a9d2::t_6d8919834b8149 2586-2600
+  s_ca6f8266c9a9d2::t_d15606bcd8da1e 81-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "f5b75bfe31d3a5a91c2d1197432d830281cccaba",
+  "prompts": {},
+  "sessions": {
+    "s_ca6f8266c9a9d2": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "aaf86662-085f-4059-a5e1-ce6411cf0345",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
