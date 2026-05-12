@@ -262,6 +262,8 @@ export default function App() {
   /** Per-task: Flux task worktree exists on disk or is tied to a session worktree path. */
   const [taskHasWorktreeById, setTaskHasWorktreeById] = useState<Record<string, boolean>>({});
   const [planPanelOpen, setPlanPanelOpen] = useState(false);
+  /** Persisted: user wants the board planning strip open (see {@link ProjectTabState.planningSidebarOpen}). */
+  const [planningSidebarOpen, setPlanningSidebarOpen] = useState(false);
   const [planPanelWidth, setPlanPanelWidth] = useState(DEFAULT_PLANNING_PANEL_WIDTH);
   const [planningSessions, setPlanningSessions] = useState<PlanningSession[]>([]);
   const [planningSidebarActiveId, setPlanningSidebarActiveId] = useState<string | null>(
@@ -1102,6 +1104,8 @@ export default function App() {
       setPlanningSessions([]);
       setPlanningSidebarActiveId(null);
       setOpenPlanningMainTabIds(new Set());
+      setPlanningSidebarOpen(false);
+      setPlanPanelOpen(false);
       return;
     }
     setSessions((prev) => prev.filter((s) => s.projectId === project.id));
@@ -1180,6 +1184,7 @@ export default function App() {
         setOpenTabIds(new Set(restoredOpen));
         setOpenPlanningMainTabIds(new Set(persisted.openPlanningTabIds ?? []));
         setPlanningSidebarActiveId(persisted.planningSidebarActiveSessionId ?? null);
+        setPlanningSidebarOpen(persisted.planningSidebarOpen === true);
         if (persisted.activeTaskId === 'settings') {
           setActiveTabId('board');
           pushProjectSettingsRoute();
@@ -1209,6 +1214,7 @@ export default function App() {
       activeTaskId: activeTabId,
       openPlanningTabIds: Array.from(openPlanningMainTabIds),
       planningSidebarActiveSessionId: planningSidebarActiveId,
+      planningSidebarOpen,
     };
     void window.electronAPI.projects
       .setTabs(projectKey, tabs)
@@ -1222,7 +1228,23 @@ export default function App() {
     activeTabId,
     openPlanningMainTabIds,
     planningSidebarActiveId,
+    planningSidebarOpen,
   ]);
+
+  useEffect(() => {
+    const onBoardWorkspace = activeTabId === 'board' && !settingsRouteActive;
+    if (!onBoardWorkspace) {
+      setPlanPanelOpen(false);
+      return;
+    }
+    if (!planningSidebarOpen) {
+      setPlanPanelOpen(false);
+      return;
+    }
+    // Match pre-persist behavior: user can open the strip before any planning session exists;
+    // child UI handles empty / loading / remapped active session.
+    setPlanPanelOpen(true);
+  }, [activeTabId, settingsRouteActive, planningSidebarOpen]);
 
   const pendingRef = useRef<
     Map<
@@ -2164,6 +2186,7 @@ export default function App() {
     prAgentPromptSentTaskIdsRef.current.clear();
     setPrAgentAwaitingByTaskId({});
     setPlanPanelOpen(false);
+    setPlanningSidebarOpen(false);
     replaceProjectWorkspaceRoute();
     setActiveTabId('board');
     setDocsSidebarExpanded(false);
@@ -2194,6 +2217,7 @@ export default function App() {
     prAgentPromptSentTaskIdsRef.current.clear();
     setPrAgentAwaitingByTaskId({});
     setPlanPanelOpen(false);
+    setPlanningSidebarOpen(false);
     replaceProjectWorkspaceRoute();
     setDocsSidebarExpanded(false);
     setPlanningDocFiles([]);
@@ -2213,7 +2237,7 @@ export default function App() {
     const routeSid = parsePlanTabId(activeTabId);
     if (routeSid) {
       setPlanningSidebarActiveId(routeSid);
-      setPlanPanelOpen(true);
+      setPlanningSidebarOpen(true);
       setActiveTabId('board');
       return;
     }
@@ -2223,21 +2247,20 @@ export default function App() {
     }
     if (activeTabId !== 'board') {
       setActiveTabId('board');
-      setPlanPanelOpen(true);
+      setPlanningSidebarOpen(true);
       return;
     }
-    if (!planPanelOpen) {
-      setPlanPanelOpen(true);
+    if (!planningSidebarOpen) {
+      setPlanningSidebarOpen(true);
     } else {
       setActiveTabId('plan');
-      setPlanPanelOpen(false);
+      setPlanningSidebarOpen(false);
     }
-  }, [activeTabId, planPanelOpen]);
+  }, [activeTabId, planningSidebarOpen]);
 
   const handleDocsNav = useCallback(() => {
     leaveSettingsIfActive();
     setActiveTabId('docs');
-    setPlanPanelOpen(false);
     setDocsSidebarExpanded(true);
   }, []);
 
@@ -2249,20 +2272,7 @@ export default function App() {
     leaveSettingsIfActive();
     setSelectedPlanningDocPath(relativePath);
     setActiveTabId('docs');
-    setPlanPanelOpen(false);
   }, []);
-
-  useEffect(() => {
-    if (activeTabId === 'docs') {
-      setPlanPanelOpen(false);
-    }
-  }, [activeTabId]);
-
-  useEffect(() => {
-    if (settingsRouteActive) {
-      setPlanPanelOpen(false);
-    }
-  }, [settingsRouteActive]);
 
   const maxPlanningWidthForRow = useCallback(() => {
     const row = boardRowRef.current;
@@ -2456,10 +2466,10 @@ export default function App() {
     }
     if (activeTabId === 'plan') {
       setActiveTabId('board');
-      setPlanPanelOpen(false);
+      setPlanningSidebarOpen(false);
       return;
     }
-    setPlanPanelOpen(false);
+    setPlanningSidebarOpen(false);
   }, [activeTabId, handleClosePlanningMainTab]);
 
   const handleOpenSettingsTab = useCallback(() => {
@@ -2921,7 +2931,7 @@ export default function App() {
                         onTogglePlanPanel={() => {
                           leaveSettingsIfActive();
                           setActiveTabId('board');
-                          setPlanPanelOpen((v) => !v);
+                          setPlanningSidebarOpen((v) => !v);
                         }}
                         projectMembers={projectMembers}
                         onTaskAssigneeChange={(id, assigneeId) =>
