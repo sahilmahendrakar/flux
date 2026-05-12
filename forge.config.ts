@@ -4,11 +4,15 @@ import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerDMG } from '@electron-forge/maker-dmg';
 import { MakerRpm } from '@electron-forge/maker-rpm';
+import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { daemonRuntimeModules } from './runtime-dependencies';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,20 +25,105 @@ const dmgContents = (opts: { appPath: string }) => [
   { x: 230, y: 260, type: 'file' as const, path: opts.appPath },
 ];
 
+/**
+ * Phase A keeps the daemon and its external modules OUTSIDE `app.asar`
+ * (`packageAfterCopy` stages them into `Resources/daemon/`), so the only
+ * things the asar needs from the source tree are the Vite bundles and
+ * `package.json`. Everything else (node_modules in particular) stays out.
+ * See runtime-dependencies.ts and docs/daemon-packaging.md.
+ */
+function packagerIgnore(file: string): boolean {
+  if (!file) return false;
+  if (file === '/package.json') return false;
+  if (file.startsWith('/.vite')) return false;
+  return true;
+}
+
+/**
+ * Stage `daemon.js` + every module declared in `runtime-dependencies.ts`
+ * into `Contents/Resources/daemon/` (macOS) / `resources/daemon/` (Linux/Win),
+ * outside `app.asar`. `DaemonClient.resolveDaemonScriptPath()` reads from
+ * `process.resourcesPath + '/daemon/daemon.js'` in packaged builds.
+ *
+ * Runs after Forge copies the app into staging and BEFORE asar packing, so
+ * the staged tree at `buildPath/../daemon/` survives as a sibling of
+ * `app.asar` in the final bundle.
+ */
+async function stageDaemonResources(buildPath: string): Promise<void> {
+  const resourcesDir = path.resolve(buildPath, '..');
+  const daemonDir = path.join(resourcesDir, 'daemon');
+  await fsp.mkdir(daemonDir, { recursive: true });
+
+  const daemonSrc = path.join(__dirname, '.vite', 'build', 'daemon.js');
+  if (!fs.existsSync(daemonSrc)) {
+    throw new Error(
+      `[forge.config] expected daemon bundle at ${daemonSrc}; Vite must build it before packageAfterCopy runs`,
+    );
+  }
+  await fsp.cp(daemonSrc, path.join(daemonDir, 'daemon.js'));
+  const daemonMapSrc = `${daemonSrc}.map`;
+  if (fs.existsSync(daemonMapSrc)) {
+    await fsp.cp(daemonMapSrc, path.join(daemonDir, 'daemon.js.map'));
+  }
+
+  for (const mod of daemonRuntimeModules) {
+    const src = path.join(__dirname, mod.copyFrom);
+    if (!fs.existsSync(src)) {
+      throw new Error(
+        `[forge.config] expected module source at ${src} for daemon runtime dep ${mod.specifier}`,
+      );
+    }
+    const dst = path.join(daemonDir, mod.copyTo);
+    await fsp.mkdir(path.dirname(dst), { recursive: true });
+    // `dereference: true` is important for pnpm: while this repo currently
+    // uses a flat (non-symlinked) node_modules, the option keeps the copy
+    // working if pnpm's layout changes later.
+    await fsp.cp(src, dst, { recursive: true, dereference: true });
+  }
+}
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    asarUnpack: ['**/*.node', '**/node_modules/node-pty/**'],
+    // The daemon's native deps no longer live in the staged app, so prune
+    // has nothing to do. Left as `false` to avoid invoking pnpm-prune on
+    // the staged tree (the renderer + main don't need it — Vite bundles
+    // their runtime deps directly).
+    prune: false,
+    // Defense-in-depth only: with Phase A's hook, the daemon's `.node`
+    // bindings already live outside the asar in `Resources/daemon/`. This
+    // glob still matters for any future renderer/main native dep that
+    // accidentally lands in the asar — see `AutoUnpackNativesPlugin` below.
+    asarUnpack: ['**/*.node'],
+    ignore: packagerIgnore,
     // Base path without extension; electron-packager picks .icns / .ico / .png per OS.
     icon: path.resolve(__dirname, 'assets', 'app-icon'),
-    osxSign: {},
-    osxNotarize: {
-      appleId: process.env.APPLE_ID,
-      appleIdPassword: process.env.APPLE_PASSWORD,
-      teamId: process.env.APPLE_TEAM_ID,
-    },
+    ...(process.env.APPLE_ID
+      ? {
+          osxSign: {},
+          osxNotarize: {
+            appleId: process.env.APPLE_ID,
+            appleIdPassword: process.env.APPLE_PASSWORD,
+            teamId: process.env.APPLE_TEAM_ID,
+          },
+        }
+      : {}),
   } as ForgePackagerOptions,
   rebuildConfig: {},
+  hooks: {
+    packageAfterCopy: async (
+      _forgeConfig,
+      buildPath,
+      _electronVersion,
+      _platform,
+      _arch,
+    ) => {
+      // `buildPath` is the staged app source dir (e.g. `Flux.app/Contents/Resources/app`).
+      // We need to place files at its sibling `Resources/daemon/`, which is outside the
+      // soon-to-be-built `app.asar`.
+      await stageDaemonResources(buildPath);
+    },
+  },
   makers: [
     new MakerSquirrel({}),
     new MakerZIP({}, ['darwin']),
@@ -67,7 +156,10 @@ const config: ForgeConfig = {
         },
         {
           // Detached PTY daemon; spawned via ELECTRON_RUN_AS_NODE=1 so it
-          // outlives the Electron main process. See 0001-session-daemon.md.
+          // outlives the Electron main process. In packaged builds the
+          // daemon bundle is staged into Contents/Resources/daemon/ by the
+          // packageAfterCopy hook above, outside app.asar. See
+          // docs/daemon-packaging.md.
           entry: 'src/daemon/daemon.ts',
           config: 'vite.daemon.config.ts',
           target: 'main',
@@ -85,12 +177,15 @@ const config: ForgeConfig = {
         },
       ],
     }),
+    // No-op for Phase A's daemon path (its `.node` files live outside the
+    // asar already), but kept for any future main/renderer-side native dep.
+    new AutoUnpackNativesPlugin({}),
     // Fuses are used to enable/disable various Electron functionality
     // at package time, before code signing the application
     new FusesPlugin({
       version: FuseVersion.V1,
       // Enabled so main can spawn the Flux daemon by re-invoking the
-      // Electron binary with ELECTRON_RUN_AS_NODE=1. See 0001-session-daemon.md.
+      // Electron binary with ELECTRON_RUN_AS_NODE=1. See docs/daemon-packaging.md.
       [FuseV1Options.RunAsNode]: true,
       [FuseV1Options.EnableCookieEncryption]: true,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,

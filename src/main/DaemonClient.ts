@@ -1007,20 +1007,38 @@ export class DaemonClient {
 }
 
 /**
- * Resolve the daemon script path for both `electron-forge start` and
- * packaged builds. Forge's vite plugin emits each build entry's bundle
- * alongside `main.js` in `.vite/build/` (dev) or under `Flux.app/...` (packaged).
- * Both live in the same directory as the current main bundle, so
- * `__dirname + '/daemon.js'` works for both.
+ * Resolve the daemon script path for `electron-forge start`, packaged
+ * builds, and ad-hoc dev fallbacks.
+ *
+ * In packaged builds the daemon bundle and its native deps live OUTSIDE
+ * `app.asar`, under `Contents/Resources/daemon/` (macOS) /
+ * `resources/daemon/` (Linux/Win), staged by the `packageAfterCopy` hook
+ * in `forge.config.ts`. This sidesteps two real problems:
+ *   - `node-pty@1.x`'s `spawn-helper` companion binary cannot be executed
+ *     from inside an asar archive (proximate cause of "sessions don't
+ *     start" pre-Phase-A; see docs/daemon-packaging.md section 2).
+ *   - `EnableEmbeddedAsarIntegrityValidation` adds per-file integrity
+ *     checks that the daemon doesn't need to pay on every spawn.
+ *
+ * Lookup order:
+ *   1. `process.resourcesPath/daemon/daemon.js` — packaged builds (only path
+ *      that exists once the asar is built; `__dirname` is inside the asar).
+ *   2. `__dirname + '/daemon.js'` — dev: Forge's Vite plugin emits the
+ *      daemon bundle next to `main.js` under `.vite/build/`.
+ *   3. `.vite/build/daemon.js` under `process.cwd()` — last-ditch fallback
+ *      for unusual dev launches (kept verbatim to avoid regressions).
  */
 function resolveDaemonScriptPath(): string {
-  // `__dirname` at runtime is where `main.js` sits; the daemon bundle is
-  // emitted into the same folder by the extra forge/vite build entry.
-  const candidate = path.join(__dirname, 'daemon.js');
-  if (fs.existsSync(candidate)) return candidate;
-  // Forge dev mode keeps outputs at .vite/build/<name>.js relative to cwd.
-  const dev = path.resolve(process.cwd(), '.vite/build/daemon.js');
-  return dev;
+  if (app.isPackaged) {
+    const packaged = path.join(process.resourcesPath, 'daemon', 'daemon.js');
+    if (fs.existsSync(packaged)) return packaged;
+    // Fall through to the dev lookups so a misconfigured packaged build
+    // throws the same clear "script not found" error from spawnDaemon as
+    // a misconfigured dev build, rather than racing into an existsSync.
+  }
+  const devSibling = path.join(__dirname, 'daemon.js');
+  if (fs.existsSync(devSibling)) return devSibling;
+  return path.resolve(process.cwd(), '.vite/build/daemon.js');
 }
 
 // Re-export Agent for consumers that import types alongside the client.

@@ -12,6 +12,7 @@ import { AppStateStore } from './main/AppStateStore';
 import { LocalBindingStore } from './main/LocalBindingStore';
 import { WorktreeService } from './main/WorktreeService';
 import { DaemonClient } from './main/DaemonClient';
+import { applyShellEnvToProcess } from './main/userShellEnv';
 import {
   deleteSessionWorkspaceAndStop,
   teardownEphemeralResourcesForTask,
@@ -387,8 +388,6 @@ const createWindow = () => {
     );
   }
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
 };
 
 // This method will be called when Electron has finished
@@ -423,6 +422,17 @@ app.whenReady().then(async () => {
       return null;
     }
   });
+  // Resolve the user's interactive-login-shell env BEFORE the daemon
+  // spawns. In packaged macOS GUI launches the parent inherits launchd's
+  // minimal PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), which makes `agent`,
+  // `claude`, `codex`, `gh`, etc. unreachable from PTY children — node-pty
+  // surfaces ENOENT as an immediate PTY exit, and the renderer renders
+  // "This planning session has ended" the moment the user starts one.
+  // Side-effecting `process.env` here means the daemon (and every PTY
+  // it ever spawns) inherits the corrected env without per-call wiring.
+  // See `docs/daemon-packaging.md` and `src/main/userShellEnv.ts`.
+  await applyShellEnvToProcess();
+
   const daemonClient = new DaemonClient();
   try {
     await daemonClient.ensureRunning();
