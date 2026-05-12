@@ -1,0 +1,37 @@
+src/components/boardFilterOptionSearch.ts
+  s_39dee2459940db::t_63d0c4aeea0e0c 1-23
+src/components/BoardFilterBar.tsx
+  s_39dee2459940db::t_e8c87f650d1397 399-412,414-434,439-452,454-474,479-492,494-528,534-547,549-583
+  s_39dee2459940db::t_5fa6dba8456620 153
+  s_39dee2459940db::t_5761a70eab8272 196-215
+  s_39dee2459940db::t_f643d41c7ddea9 195
+  s_39dee2459940db::t_55ae7c9215209f 89-116
+  s_39dee2459940db::t_83756c3b40641f 275
+  s_39dee2459940db::t_2385adcb6781ee 228-251
+  s_39dee2459940db::t_cd012025080f93 329-330
+  s_39dee2459940db::t_dea80b4c5b9371 76
+  s_39dee2459940db::t_48407c3b8df8d6 1
+  s_39dee2459940db::t_a87e4ffac17121 162-166,172-181
+  s_39dee2459940db::t_f7afc085dcd745 140-141,144,146
+  s_39dee2459940db::t_0a89c9bc4b391e 16-23
+  s_39dee2459940db::t_9b061e9d838b16 323
+  s_39dee2459940db::t_424705defc5920 62-75,77-88,117-121
+src/components/boardFilterOptionSearch.test.ts
+  s_39dee2459940db::t_b8101e90dc0aa3 1-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "66f230525ad86b4b5634502715f55d1fcfc40d76",
+  "prompts": {},
+  "sessions": {
+    "s_39dee2459940db": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "16a03e6f-7738-471a-8f2f-f36aea56f7eb",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
