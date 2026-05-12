@@ -1,0 +1,27 @@
+src/main.ts
+  s_f5c404e739b7bd::t_21e2334f13f881 1547-1553,1556-1569,1571-1573
+  s_f5c404e739b7bd::t_45fc4a0ba04d23 1427,1440
+  s_f5c404e739b7bd::t_30d7444677c2e7 1370-1373,1375,1399-1418
+src/preload.ts
+  s_f5c404e739b7bd::t_7f234fcc80873f 250
+src/taskAgentPullRequestPrompt.ts
+  s_f5c404e739b7bd::t_236ff6c465267b 17-18,26
+src/taskAgentPullRequestPrompt.test.ts
+  s_f5c404e739b7bd::t_8db9cf0e9b8989 50,66-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "b74387e93bd7cde96126065f0dc55c09da47bc46",
+  "prompts": {},
+  "sessions": {
+    "s_f5c404e739b7bd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6be27834-e7c5-4ff9-93cd-d5cc034d3178",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
