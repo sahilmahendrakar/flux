@@ -1,0 +1,23 @@
+src/taskDeleteWorkspaceConfirmation.ts
+  s_649fe0843c0a31::t_315115186c3766 1-14
+src/taskDeleteWorkspaceConfirmation.test.ts
+  s_649fe0843c0a31::t_b7dccf4e69fdcb 1-33
+src/App.tsx
+  s_649fe0843c0a31::t_3016e722b2104e 41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "3c7499fceeef74839998a5fcb7da2c187e7c554b",
+  "prompts": {},
+  "sessions": {
+    "s_649fe0843c0a31": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "077ff456-2aca-4100-a4db-21896e085f22",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
