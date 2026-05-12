@@ -35,8 +35,6 @@ export interface ProjectTabState {
   openPlanningTabIds?: string[];
   /** Selected planning session in the board sidebar strip. */
   planningSidebarActiveSessionId?: string | null;
-  /** Board planning sidebar open (survives leaving the board and app restart). */
-  planningSidebarOpen?: boolean;
 }
 
 /**
