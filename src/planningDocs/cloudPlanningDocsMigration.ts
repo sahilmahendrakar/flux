@@ -14,7 +14,8 @@
  *   shared docs from local files (explicit opt-in). Declining records resolution so
  *   we do not nag; nothing is uploaded automatically.
  *
- * - **New teammates:** Activation runs `ensureLayoutForRoot`, which may seed
+ * - **New teammates:** Cloud activation materialises `planning/` under
+ *   `~/.flux/projects/<cloudProjectId>/` and may seed `CLAUDE.md` / `AGENTS.md` with
  *   `CLAUDE.md` / `AGENTS.md` with machine-specific paths. Those bodies often differ
  *   only by embedded workspace paths — see {@link planningMarkdownEquivalentForSeededInstructions}.
  *   Treating them as equivalent avoids noisy conflict copies while still replacing with

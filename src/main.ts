@@ -587,11 +587,20 @@ app.whenReady().then(async () => {
       await projectStore.init(lastOpenedProjectDir);
       const project = projectStore.get();
       if (project && project.id === activeProjectKey.id) {
-        await taskStore.reinit(lastOpenedProjectDir);
+        const { projectDir: materialisedDir } = await projectStore.ensureLayoutForRoot(
+          project.rootPath,
+        );
+        if (materialisedDir !== lastOpenedProjectDir) {
+          await projectStore.init(materialisedDir);
+        }
+        await taskStore.reinit(materialisedDir);
         await migrateTaskRepoIdsForProject(taskStore, project);
-        await projectStore.ensureLayoutForRoot(project.rootPath);
         worktreeService.setRootPath(project.rootPath);
-        worktreeService.setProjectDir(lastOpenedProjectDir);
+        worktreeService.setProjectDir(materialisedDir);
+        await appStateStore.set({
+          lastOpenedProjectDir: materialisedDir,
+          activeProjectKey: { kind: 'local', id: project.id },
+        });
       } else {
         await appStateStore.set({
           lastOpenedProjectDir: null,
@@ -615,13 +624,19 @@ app.whenReady().then(async () => {
       await projectStore.init(lastOpenedProjectDir);
       const project = projectStore.get();
       if (project) {
-        await taskStore.reinit(lastOpenedProjectDir);
+        const { projectDir: materialisedDir } = await projectStore.ensureLayoutForRoot(
+          project.rootPath,
+        );
+        if (materialisedDir !== lastOpenedProjectDir) {
+          await projectStore.init(materialisedDir);
+        }
+        await taskStore.reinit(materialisedDir);
         await migrateTaskRepoIdsForProject(taskStore, project);
-        await projectStore.ensureLayoutForRoot(project.rootPath);
         worktreeService.setRootPath(project.rootPath);
-        worktreeService.setProjectDir(lastOpenedProjectDir);
+        worktreeService.setProjectDir(materialisedDir);
         await appStateStore.set({
           activeProjectKey: { kind: 'local', id: project.id },
+          lastOpenedProjectDir: materialisedDir,
         });
       }
     } catch {
@@ -1549,14 +1564,19 @@ app.whenReady().then(async () => {
       await projectStore.init(projectDir);
       const project = projectStore.get();
       if (!project) throw new Error(`Local project not found: ${id}`);
-      await projectStore.ensureLayoutForRoot(project.rootPath);
-      await taskStore.reinit(projectDir);
+      const { projectDir: materialisedDir } = await projectStore.ensureLayoutForRoot(
+        project.rootPath,
+      );
+      if (materialisedDir !== projectDir) {
+        await projectStore.init(materialisedDir);
+      }
+      await taskStore.reinit(materialisedDir);
       await taskStore.migrateMissingProjectIds(project.id);
       await migrateTaskRepoIdsForProject(taskStore, project);
       worktreeService.setRootPath(project.rootPath);
-      worktreeService.setProjectDir(projectDir);
+      worktreeService.setProjectDir(materialisedDir);
       await appStateStore.set({
-        lastOpenedProjectDir: projectDir,
+        lastOpenedProjectDir: materialisedDir,
         activeProjectKey: { kind: 'local', id: project.id },
       });
       return project;

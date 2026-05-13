@@ -13,6 +13,24 @@ import {
   deriveRepoIdForRootPath,
   deriveStablePrimaryRepoIdForProject,
 } from '../repoIdentity';
+import {
+  canonicalCloudProjectDir,
+  canonicalLocalProjectDir,
+  FLUX_PROJECTS_SUBDIR,
+  hoistLegacyFlatProjectsDirToNested,
+  isFluxTopLevelReservedDirName,
+  legacyBasenameLocalProjectDir,
+  legacyCloudProjectDir,
+  legacyFlatProjectsDirIfPresent,
+  listLegacyCloudProjectDirs,
+  listNestedProjectDirsUnderProjects,
+  markProjectDirSuperseded,
+  migrateProjectDirToCanonical,
+  projectDirHasWorktrees,
+  readSupersededTarget,
+  stableLocalProjectIdForRoot,
+  writeProjectDirMigrationConflict,
+} from './projectDirLayout';
 
 const DEFAULT_AGENT: Agent = 'claude-code';
 const DEFAULT_BASE_BRANCH = 'main';
@@ -44,10 +62,6 @@ interface ConfigFile {
   autoMarkDoneWhenPrMerged: boolean;
   autoMoveToReviewWhenPrOpen: boolean;
   repos: RepoConfig[];
-}
-
-function stableProjectIdForPath(rootPath: string): string {
-  return createHash('sha256').update(path.resolve(rootPath)).digest('hex');
 }
 
 function errnoCode(err: unknown): string | undefined {
@@ -862,23 +876,52 @@ export class ProjectStore {
   }
 
   /**
-   * Ensures ~/.flux/<basename>/ layout and config exist for a repo root.
-   * Does not update the store's active project — use for cloud worktrees.
+   * Ensures `~/.flux/projects/<localProjectId>/` layout and config exist for a repo root.
+   * Migrates legacy `~/.flux/<repo-basename>/` (and the rare `~/.flux/projects/config.json`
+   * flat layout) on demand. Does not update the store's active project — use for cloud
+   * worktrees after resolving the cloud project directory.
    */
   async ensureLayoutForRoot(rootPath: string): Promise<{ projectDir: string; project: LocalProject }> {
     return this.materialiseProjectDir(rootPath);
   }
 
   /**
-   * Cloud projects must not share the local-project directory derived from the
-   * repo basename. The Firestore project id is the stable namespace.
+   * Cloud projects use `~/.flux/projects/<cloudProjectId>/` (sanitized segment), never the
+   * local basename directory. Migrates from `~/.flux/cloud-projects/<id>/` when present.
    */
   async ensureCloudLayoutForRoot(
     cloudProjectId: string,
     rootPath: string,
   ): Promise<{ projectDir: string; project: LocalProject }> {
-    const safeId = cloudProjectId.replace(/[^A-Za-z0-9_-]/g, '_');
-    return this.materialiseProjectDir(rootPath, path.join('cloud-projects', safeId));
+    const canonical = canonicalCloudProjectDir(this.fluxBaseDir, cloudProjectId);
+    const legacy = legacyCloudProjectDir(this.fluxBaseDir, cloudProjectId);
+    const pickDir = async (): Promise<string> => {
+      const canonicalConfig = await this.readConfigAt(canonical);
+      const legacyConfig = await this.readConfigAt(legacy);
+      if (canonicalConfig) {
+        if (legacyConfig) {
+          if (await this.shouldDeferLegacyMigrationForWorktrees(legacy, legacyConfig, rootPath)) {
+            return legacy;
+          }
+          await this.retireLegacyDirIfSameProjectOrConflict({
+            legacyDir: legacy,
+            canonicalDir: canonical,
+            legacyConfig,
+            canonicalConfig,
+            expectedRootPath: rootPath,
+            expectedCanonicalId: cloudProjectId,
+          });
+        }
+        return canonical;
+      }
+      if (legacyConfig) {
+        const migrated = await migrateProjectDirToCanonical(legacy, canonical);
+        return migrated ? canonical : legacy;
+      }
+      return canonical;
+    };
+    const dir = await pickDir();
+    return this.materialiseProjectDir(rootPath, dir, { projectId: cloudProjectId });
   }
 
   async create(rootPath: string): Promise<{ project: LocalProject; projectDir: string }> {
@@ -888,13 +931,120 @@ export class ProjectStore {
     return { project, projectDir };
   }
 
+  private async readConfigAt(projectDir: string): Promise<ConfigFile | null> {
+    try {
+      const raw = await fs.readFile(path.join(projectDir, 'config.json'), 'utf8');
+      return parseConfig(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  private async shouldDeferLegacyMigrationForWorktrees(
+    legacyDir: string,
+    legacyConfig: ConfigFile,
+    expectedRootPath: string,
+  ): Promise<boolean> {
+    return (
+      path.resolve(legacyConfig.rootPath) === path.resolve(expectedRootPath) &&
+      (await projectDirHasWorktrees(legacyDir))
+    );
+  }
+
+  private async retireLegacyDirIfSameProjectOrConflict(params: {
+    legacyDir: string;
+    canonicalDir: string;
+    legacyConfig: ConfigFile;
+    canonicalConfig: ConfigFile;
+    expectedRootPath: string;
+    expectedCanonicalId?: string;
+  }): Promise<void> {
+    if (path.resolve(params.legacyDir) === path.resolve(params.canonicalDir)) return;
+    if (await readSupersededTarget(params.legacyDir)) return;
+    if (await projectDirHasWorktrees(params.legacyDir)) return;
+
+    const expectedRoot = path.resolve(params.expectedRootPath);
+    const legacyRootMatches = path.resolve(params.legacyConfig.rootPath) === expectedRoot;
+    const canonicalRootMatches = path.resolve(params.canonicalConfig.rootPath) === expectedRoot;
+    const idsAreCompatible = params.expectedCanonicalId
+      ? params.canonicalConfig.id === params.expectedCanonicalId ||
+        params.canonicalConfig.id === params.legacyConfig.id
+      : params.canonicalConfig.id === params.legacyConfig.id;
+
+    if (legacyRootMatches && canonicalRootMatches && idsAreCompatible) {
+      await markProjectDirSuperseded(params.legacyDir, params.canonicalDir);
+      return;
+    }
+
+    const reason = [
+      'Legacy and canonical project directories both exist but do not describe the same project.',
+      `legacyId=${params.legacyConfig.id}`,
+      `canonicalId=${params.canonicalConfig.id}`,
+      `legacyRoot=${params.legacyConfig.rootPath}`,
+      `canonicalRoot=${params.canonicalConfig.rootPath}`,
+    ].join(' ');
+    await writeProjectDirMigrationConflict({
+      legacyDir: params.legacyDir,
+      canonicalDir: params.canonicalDir,
+      reason,
+    });
+    throw new Error(`Flux project migration conflict: ${reason}`);
+  }
+
+  private async resolveLocalMaterialisedProjectDir(resolvedRoot: string): Promise<string> {
+    const stableId = stableLocalProjectIdForRoot(resolvedRoot);
+    const canonical = canonicalLocalProjectDir(this.fluxBaseDir, stableId);
+
+    const direct = await this.readConfigAt(canonical);
+    const legacyBasename = legacyBasenameLocalProjectDir(this.fluxBaseDir, resolvedRoot);
+    const legacyCfg = await this.readConfigAt(legacyBasename);
+    if (direct) {
+      if (legacyCfg && path.resolve(legacyCfg.rootPath) === resolvedRoot) {
+        if (await this.shouldDeferLegacyMigrationForWorktrees(legacyBasename, legacyCfg, resolvedRoot)) {
+          return legacyBasename;
+        }
+        await this.retireLegacyDirIfSameProjectOrConflict({
+          legacyDir: legacyBasename,
+          canonicalDir: canonical,
+          legacyConfig: legacyCfg,
+          canonicalConfig: direct,
+          expectedRootPath: resolvedRoot,
+        });
+      }
+      return canonical;
+    }
+
+    if (legacyCfg && path.resolve(legacyCfg.rootPath) === resolvedRoot) {
+      const target = canonicalLocalProjectDir(this.fluxBaseDir, legacyCfg.id);
+      if (path.resolve(legacyBasename) !== path.resolve(target)) {
+        const migrated = await migrateProjectDirToCanonical(legacyBasename, target);
+        if (!migrated) return legacyBasename;
+      }
+      return target;
+    }
+
+    const flatRoot = await legacyFlatProjectsDirIfPresent(this.fluxBaseDir);
+    const flatCfg = flatRoot ? await this.readConfigAt(flatRoot) : null;
+    if (flatCfg && path.resolve(flatCfg.rootPath) === resolvedRoot) {
+      if (await this.shouldDeferLegacyMigrationForWorktrees(flatRoot, flatCfg, resolvedRoot)) {
+        return flatRoot;
+      }
+      await hoistLegacyFlatProjectsDirToNested(this.fluxBaseDir);
+      return canonicalLocalProjectDir(this.fluxBaseDir, flatCfg.id);
+    }
+
+    return canonical;
+  }
+
   private async materialiseProjectDir(
     rootPath: string,
-    projectDirName?: string,
+    presetProjectDir?: string,
+    options?: { projectId?: string },
   ): Promise<{ projectDir: string; project: LocalProject }> {
     const resolvedRoot = path.resolve(rootPath);
     const projectName = path.basename(resolvedRoot);
-    const projectDir = path.join(this.fluxBaseDir, projectDirName ?? projectName);
+    const projectDir =
+      presetProjectDir ?? (await this.resolveLocalMaterialisedProjectDir(resolvedRoot));
 
     await fs.mkdir(projectDir, { recursive: true });
     await fs.mkdir(path.join(projectDir, 'planning'), { recursive: true });
@@ -911,7 +1061,7 @@ export class ProjectStore {
 
     const now = new Date().toISOString();
     if (!config) {
-      const newProjectId = stableProjectIdForPath(resolvedRoot);
+      const newProjectId = options?.projectId ?? stableLocalProjectIdForRoot(resolvedRoot);
       const primaryRepoId = deriveStablePrimaryRepoIdForProject({
         projectId: newProjectId,
         rootPath: resolvedRoot,
@@ -938,6 +1088,7 @@ export class ProjectStore {
         ],
       };
     } else {
+      const targetProjectId = options?.projectId ?? config.id;
       const previousRootPath = config.rootPath;
       const remapped = config.repos.map((r) =>
         r.rootPath === previousRootPath ? { ...r, rootPath: resolvedRoot } : r,
@@ -945,7 +1096,7 @@ export class ProjectStore {
       if (!remapped.some((r) => r.rootPath === resolvedRoot)) {
         remapped.unshift({
           id: deriveStablePrimaryRepoIdForProject({
-            projectId: config.id,
+            projectId: targetProjectId,
             rootPath: resolvedRoot,
           }),
           name: projectName,
@@ -954,12 +1105,13 @@ export class ProjectStore {
         });
       }
       const { repos } = backfillRepoIdentities({
-        projectId: config.id,
+        projectId: targetProjectId,
         primaryRootPath: resolvedRoot,
         repos: remapped,
       });
       config = {
         ...config,
+        id: targetProjectId,
         rootPath: resolvedRoot,
         name: projectName,
         repos,
@@ -988,32 +1140,105 @@ export class ProjectStore {
     return { projectDir, project: configToLocalProject(config) };
   }
 
-  /** All valid ~/.flux/<name>/ projects (for the welcome list). */
+  /** Discovered local + materialized-on-disk cloud workspaces under `~/.flux/`. */
   async listDiscovered(): Promise<LocalProject[]> {
-    const out: LocalProject[] = [];
+    const pathById = new Map<string, string>();
+    const projectById = new Map<string, LocalProject>();
+
+    const rankPath = (projectDir: string, projectId: string): number => {
+      const abs = path.resolve(projectDir);
+      if (abs === path.resolve(canonicalLocalProjectDir(this.fluxBaseDir, projectId))) {
+        return 3;
+      }
+      if (abs.startsWith(path.resolve(path.join(this.fluxBaseDir, FLUX_PROJECTS_SUBDIR)) + path.sep)) {
+        return 2;
+      }
+      if (
+        abs.startsWith(
+          path.resolve(path.join(this.fluxBaseDir, 'cloud-projects')) + path.sep,
+        )
+      ) {
+        return 1;
+      }
+      return 0;
+    };
+
+    const consider = async (projectDir: string): Promise<void> => {
+      try {
+        const superseded = await readSupersededTarget(projectDir);
+        if (superseded) return;
+      } catch {
+        /* ignore */
+      }
+      let raw: string;
+      try {
+        raw = await fs.readFile(path.join(projectDir, 'config.json'), 'utf8');
+      } catch {
+        return;
+      }
+      const c = parseConfig(raw);
+      if (!c) return;
+      const prev = pathById.get(c.id);
+      if (!prev) {
+        pathById.set(c.id, projectDir);
+        projectById.set(c.id, configToLocalProject(c));
+        return;
+      }
+      if (rankPath(projectDir, c.id) > rankPath(prev, c.id)) {
+        pathById.set(c.id, projectDir);
+        projectById.set(c.id, configToLocalProject(c));
+      }
+    };
+
+    for (const d of await listNestedProjectDirsUnderProjects(this.fluxBaseDir)) {
+      await consider(d);
+    }
+
+    const flat = await legacyFlatProjectsDirIfPresent(this.fluxBaseDir);
+    if (flat) {
+      await consider(flat);
+    }
+
     let dirents;
     try {
       dirents = await fs.readdir(this.fluxBaseDir, { withFileTypes: true });
     } catch {
-      return [];
+      const out = [...projectById.values()];
+      out.sort((a, b) => a.name.localeCompare(b.name));
+      return out;
     }
     for (const ent of dirents) {
       if (!ent.isDirectory()) continue;
+      if (isFluxTopLevelReservedDirName(ent.name)) continue;
       const projectDir = path.join(this.fluxBaseDir, ent.name);
-      try {
-        const raw = await fs.readFile(path.join(projectDir, 'config.json'), 'utf8');
-        const c = parseConfig(raw);
-        if (!c) continue;
-        out.push(configToLocalProject(c));
-      } catch {
-        continue;
-      }
+      await consider(projectDir);
     }
+
+    for (const d of await listLegacyCloudProjectDirs(this.fluxBaseDir)) {
+      await consider(d);
+    }
+
+    const out = [...projectById.values()];
     out.sort((a, b) => a.name.localeCompare(b.name));
     return out;
   }
 
   async findProjectDirById(id: string): Promise<string | null> {
+    const tryDir = async (projectDir: string): Promise<boolean> => {
+      try {
+        const raw = await fs.readFile(path.join(projectDir, 'config.json'), 'utf8');
+        const c = parseConfig(raw);
+        return c?.id === id;
+      } catch {
+        return false;
+      }
+    };
+
+    const primaryLocal = canonicalLocalProjectDir(this.fluxBaseDir, id);
+    if (await tryDir(primaryLocal)) {
+      return primaryLocal;
+    }
+
     let dirents;
     try {
       dirents = await fs.readdir(this.fluxBaseDir, { withFileTypes: true });
@@ -1022,14 +1247,41 @@ export class ProjectStore {
     }
     for (const ent of dirents) {
       if (!ent.isDirectory()) continue;
-      const projectDir = path.join(this.fluxBaseDir, ent.name);
-      try {
-        const raw = await fs.readFile(path.join(projectDir, 'config.json'), 'utf8');
-        const c = parseConfig(raw);
-        if (c?.id === id) return projectDir;
-      } catch {
+      if (isFluxTopLevelReservedDirName(ent.name)) {
+        if (ent.name === FLUX_PROJECTS_SUBDIR) {
+          let nested;
+          try {
+            nested = await fs.readdir(path.join(this.fluxBaseDir, ent.name), {
+              withFileTypes: true,
+            });
+          } catch {
+            continue;
+          }
+          for (const sub of nested) {
+            if (!sub.isDirectory()) continue;
+            const projectDir = path.join(this.fluxBaseDir, ent.name, sub.name);
+            if (await tryDir(projectDir)) return projectDir;
+          }
+        }
+        if (ent.name === 'cloud-projects') {
+          let nested;
+          try {
+            nested = await fs.readdir(path.join(this.fluxBaseDir, ent.name), {
+              withFileTypes: true,
+            });
+          } catch {
+            continue;
+          }
+          for (const sub of nested) {
+            if (!sub.isDirectory()) continue;
+            const projectDir = path.join(this.fluxBaseDir, ent.name, sub.name);
+            if (await tryDir(projectDir)) return projectDir;
+          }
+        }
         continue;
       }
+      const projectDir = path.join(this.fluxBaseDir, ent.name);
+      if (await tryDir(projectDir)) return projectDir;
     }
     return null;
   }
