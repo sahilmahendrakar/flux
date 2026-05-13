@@ -1,0 +1,52 @@
+src/App.tsx
+  s_f31f90e8281265::t_8670a7ca734d11 1631
+  s_f31f90e8281265::t_8a081df20abeab 1612-1621
+  s_f31f90e8281265::t_bc369882971f4a 1564
+src/githubPrDiscoveryMessages.ts
+  s_f31f90e8281265::t_a544d361704528 6,9
+src/main/githubTaskPr.ts
+  s_f31f90e8281265::t_da2f7c6a966165 587
+  s_f31f90e8281265::t_4396ac390f8ae7 401,405-442,446-450,454,466,470,483-486,488
+  s_f31f90e8281265::t_59f624142b1502 6-11
+src/githubPrMetadata.ts
+  s_f31f90e8281265::t_f2fe68783ee3c0 126-150
+src/main.ts
+  s_f31f90e8281265::t_ead551bb9e296d 47
+  s_f31f90e8281265::t_96668d7daf16f1 2270
+src/githubPrMetadata.test.ts
+  s_f31f90e8281265::t_439f8847444629 102-135
+  s_f31f90e8281265::t_b6f3b0dc66391d 9
+src/githubPrDiscoveryMessages.test.ts
+  s_f31f90e8281265::t_0bb5d6bb28e71b 14
+  s_f31f90e8281265::t_a547889fb240b5 23
+src/types.ts
+  s_f31f90e8281265::t_9993efdf4c9832 274
+src/githubTaskPrPolicy.test.ts
+  s_f31f90e8281265::t_a2ca8aea62d1f3 8
+  s_f31f90e8281265::t_05fa02795a1f6e 66-98
+src/renderer/tasks/useGithubPrBoardRefresh.ts
+  s_f31f90e8281265::t_7af09e21719e6f 73
+  s_f31f90e8281265::t_fe268d11a11d4c 49-50,53-57
+  s_f31f90e8281265::t_71f071dac9b4e1 223
+  s_f31f90e8281265::t_65e34097718750 120-136
+  s_f31f90e8281265::t_e4e7f4734b975d 187-192
+  s_f31f90e8281265::t_225b100f37086b 256-261
+  s_f31f90e8281265::t_417309ba3d829d 91-97
+  s_f31f90e8281265::t_ccc15b064fa82c 29-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "e10bac49c12a9c05b99df2fe0dbbe553cf83c339",
+  "prompts": {},
+  "sessions": {
+    "s_f31f90e8281265": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "532f7cdd-eacf-4264-8c0c-490a306464b2",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
