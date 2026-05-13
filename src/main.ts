@@ -44,7 +44,7 @@ import {
 import { listCursorAgentModels } from './main/listCursorAgentModels';
 import { openWorkspacePath, pickSessionForTaskWorktree, resolveTaskWorktreePath } from './main/openWorkspacePath';
 import {
-  ghPrViewCurrentBranchOpen,
+  discoverGithubPrForTaskWorktree,
   ghPrViewJson,
   prMetadataRefMismatchWarning,
   readOriginRemote,
@@ -2267,7 +2267,7 @@ app.whenReady().then(async () => {
       const viewed = prUrl
         ? await ghPrViewJson(ghCwd, prUrl)
         : worktreePath
-          ? await ghPrViewCurrentBranchOpen(worktreePath)
+          ? await discoverGithubPrForTaskWorktree(worktreePath)
           : ({
               ok: false,
               code: 'NO_WORKTREE',

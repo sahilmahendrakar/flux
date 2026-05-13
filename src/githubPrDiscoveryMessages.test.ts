@@ -11,7 +11,7 @@ describe('formatGithubPrDiscoveryFailure', () => {
       { ok: false, code: 'NO_OPEN_PR', message: 'No open pull request found for this task worktree' },
       'pending-agent',
     );
-    expect(msg).toContain('No open pull request');
+    expect(msg).toContain('No pull request');
     expect(msg).toContain('agent may still be');
   });
 
@@ -20,7 +20,7 @@ describe('formatGithubPrDiscoveryFailure', () => {
       { ok: false, code: 'NO_OPEN_PR', message: 'No open pull request found for this task worktree' },
       'lookup',
     );
-    expect(msg).toContain('Still no open pull request');
+    expect(msg).toContain('Still no pull request');
   });
 
   it('passes through gh-style failures unchanged', () => {

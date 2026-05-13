@@ -271,6 +271,7 @@ export type TaskPrErrorCode =
   | 'NO_AGENT_SESSION'
   | 'AGENT_SESSION_NOT_RUNNING'
   | 'NO_PR_URL'
+  /** No PR on GitHub for the task branch (legacy IPC id; discovery includes merged/closed). */
   | 'NO_OPEN_PR'
   | 'TASK_METADATA_REQUIRED'
   | 'GH_NOT_INSTALLED'

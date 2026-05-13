@@ -3,7 +3,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { RepoConfig, TaskGithubPr, TaskPrErrorCode } from '../types';
-import { parseGithubOwnerRepoFromPrUrl, parseGithubOwnerRepoFromRemote, parseGhPrViewJsonStdout } from '../githubPrMetadata';
+import {
+  parseGithubOwnerRepoFromPrUrl,
+  parseGithubOwnerRepoFromRemote,
+  parseGhPrViewJsonStdout,
+  parseGhPrViewJsonStdoutList,
+} from '../githubPrMetadata';
 import { resolveRepoForBranchDiscovery } from '../repoIdentity';
 import { branchForTaskId } from '../taskBranch';
 import { normalizeGitBranchShortName } from '../taskBranches';
@@ -393,27 +398,64 @@ export async function ghPrViewJson(
   return { ok: true, githubPr: parsed };
 }
 
-function noOpenPullRequest(message = 'No open pull request found for this task worktree'): TaskPrError {
+function noPrForTaskBranch(message = 'No pull request found for this task branch'): TaskPrError {
   return { ok: false, code: 'NO_OPEN_PR', message };
 }
 
-export async function ghPrViewCurrentBranchOpen(worktreePath: string): Promise<TaskPrOk | TaskPrError> {
+/** True when GitHub’s head ref matches the task worktree branch (both normalized). */
+export function githubPrHeadMatchesTaskBranch(pr: TaskGithubPr, taskBranchShort: string): boolean {
+  const want = normalizeGitBranchShortName(taskBranchShort);
+  if (!want) return false;
+  const head = normalizeGitBranchShortName(pr.headBranch ?? '');
+  if (!head) return true;
+  return head === want;
+}
+
+/**
+ * Picks one PR for a head branch when `gh pr list` returns multiple rows (e.g.
+ * closed attempts plus a merged PR). Prefers merged, then open, then closed,
+ * breaking ties with newest `updatedAt` / `mergedAt`.
+ */
+export function selectPreferredGithubPrForHead(
+  candidates: TaskGithubPr[],
+  taskBranchShort: string,
+): TaskGithubPr | null {
+  const matching = candidates.filter((c) => githubPrHeadMatchesTaskBranch(c, taskBranchShort));
+  if (matching.length === 0) return null;
+  const rank = (s: TaskGithubPr['state'] | undefined): number =>
+    s === 'merged' ? 3 : s === 'open' ? 2 : s === 'closed' ? 1 : 0;
+  matching.sort((a, b) => {
+    const byState = rank(b.state) - rank(a.state);
+    if (byState !== 0) return byState;
+    const tb = Date.parse(b.updatedAt ?? b.mergedAt ?? '') || 0;
+    const ta = Date.parse(a.updatedAt ?? a.mergedAt ?? '') || 0;
+    return tb - ta;
+  });
+  return matching[0] ?? null;
+}
+
+/**
+ * Resolves the PR for the current worktree branch using `gh`, including **merged**
+ * and **closed** PRs (not only open). Used when the task has no stored PR URL so
+ * fast create-then-merge races still link metadata.
+ */
+export async function discoverGithubPrForTaskWorktree(worktreePath: string): Promise<TaskPrOk | TaskPrError> {
   const pre = await assertGhAvailable(worktreePath);
   if (pre) return pre;
+
+  const branchResult = await readCurrentBranch(worktreePath);
+  if (typeof branchResult !== 'string') {
+    return noPrForTaskBranch(branchResult.message);
+  }
 
   const viewed = await gh(['pr', 'view', '--json', PR_VIEW_FIELDS], worktreePath);
   if (viewed.ok) {
     const parsed = parseGhPrViewJsonStdout(viewed.stdout);
-    if (parsed?.state === 'open') {
+    if (parsed?.url && githubPrHeadMatchesTaskBranch(parsed, branchResult)) {
       return { ok: true, githubPr: parsed };
     }
   } else if (viewed.notFound) {
     return { ok: false, code: 'GH_NOT_INSTALLED', message: viewed.message };
-  }
-
-  const branchResult = await readCurrentBranch(worktreePath);
-  if (typeof branchResult !== 'string') {
-    return noOpenPullRequest(branchResult.message);
   }
 
   const listed = await gh(
@@ -421,11 +463,11 @@ export async function ghPrViewCurrentBranchOpen(worktreePath: string): Promise<T
       'pr',
       'list',
       '--state',
-      'open',
+      'all',
       '--head',
       branchResult,
       '--limit',
-      '1',
+      '30',
       '--json',
       PR_VIEW_FIELDS,
     ],
@@ -438,11 +480,12 @@ export async function ghPrViewCurrentBranchOpen(worktreePath: string): Promise<T
     return { ok: false, code: 'PR_VIEW_FAILED', message: listed.stderr || listed.message };
   }
 
-  const parsed = parseGhPrViewJsonStdout(listed.stdout);
-  if (parsed?.state === 'open') {
-    return { ok: true, githubPr: parsed };
+  const rows = parseGhPrViewJsonStdoutList(listed.stdout);
+  const best = selectPreferredGithubPrForHead(rows, branchResult);
+  if (best) {
+    return { ok: true, githubPr: best };
   }
-  return noOpenPullRequest();
+  return noPrForTaskBranch();
 }
 
 /**
@@ -541,7 +584,7 @@ export async function createPullRequestForTaskWorktree(params: {
   const existing = await gh(['pr', 'view', '--json', PR_VIEW_FIELDS], worktreePath);
   if (existing.ok) {
     const parsedExisting = parseGhPrViewJsonStdout(existing.stdout);
-    if (parsedExisting?.state === 'open') {
+    if (parsedExisting?.url && githubPrHeadMatchesTaskBranch(parsedExisting, branchResult)) {
       return {
         ok: true,
         pushedBaseBranch,

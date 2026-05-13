@@ -123,6 +123,31 @@ export function parseGhPrViewJsonStdout(jsonStr: string): TaskGithubPr | null {
   return null;
 }
 
+/**
+ * Parses every PR object from `gh pr list --json` (JSON array). Empty arrays
+ * yield an empty list (unlike {@link parseGhPrViewJsonStdout}, which returns
+ * `null` for `[]` so callers can tell “no rows” from “invalid JSON”).
+ */
+export function parseGhPrViewJsonStdoutList(jsonStr: string): TaskGithubPr[] {
+  const trimmed = jsonStr.trim();
+  if (!trimmed) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed) as unknown;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const out: TaskGithubPr[] = [];
+  for (const row of parsed) {
+    if (row && typeof row === 'object') {
+      const p = parseGhPrViewRecord(row as GhPrViewJson);
+      if (p) out.push(p);
+    }
+  }
+  return out;
+}
+
 /** Parsed `owner/repo` slug from a github.com PR URL or git remote (for repo-aware PR validation). */
 export type GithubOwnerRepo = { owner: string; repo: string };
 
