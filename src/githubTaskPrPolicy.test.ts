@@ -5,6 +5,7 @@ import {
   extractPrUrlFromGhOutput,
   mergeTaskPrPersistFields,
   prMetadataRefMismatchWarning,
+  selectPreferredGithubPrForHead,
   validateGithubPrMatchesTaskRemote,
 } from './main/githubTaskPr';
 
@@ -59,6 +60,39 @@ describe('extractPrUrlFromGhOutput', () => {
   it('returns null when gh output does not include a GitHub PR URL', () => {
     expect(extractPrUrlFromGhOutput('')).toBeNull();
     expect(extractPrUrlFromGhOutput('https://github.com/o/r/issues/12')).toBeNull();
+  });
+});
+
+describe('selectPreferredGithubPrForHead', () => {
+  it('prefers merged over open for the same head branch', () => {
+    const merged = {
+      url: 'https://github.com/o/r/pull/2',
+      state: 'merged' as const,
+      headBranch: 'flux/task-a',
+      mergedAt: '2024-02-01T00:00:00Z',
+      updatedAt: '2024-02-01T00:00:00Z',
+    };
+    const open = {
+      url: 'https://github.com/o/r/pull/1',
+      state: 'open' as const,
+      headBranch: 'flux/task-a',
+      updatedAt: '2024-01-15T00:00:00Z',
+    };
+    expect(selectPreferredGithubPrForHead([open, merged], 'flux/task-a')).toEqual(merged);
+  });
+
+  it('ignores PRs whose head does not match the task branch', () => {
+    const picked = selectPreferredGithubPrForHead(
+      [
+        {
+          url: 'https://github.com/o/r/pull/3',
+          state: 'merged' as const,
+          headBranch: 'other-branch',
+        },
+      ],
+      'flux/task-a',
+    );
+    expect(picked).toBeNull();
   });
 });
 

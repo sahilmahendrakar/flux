@@ -1561,7 +1561,7 @@ export default function App() {
       cancelPrAgentFollowupTimersForTask(taskId);
       const nextGen = (taskPrDiscoveryGenRef.current.get(taskId) ?? 0) + 1;
       taskPrDiscoveryGenRef.current.set(taskId, nextGen);
-      const delays = [3200, 10_000, 26_000];
+      const delays = [15_000, 30_000, 45_000, 60_000, 75_000, 90_000];
       const timers: number[] = [];
       for (const delay of delays) {
         timers.push(
@@ -1609,6 +1609,16 @@ export default function App() {
     [activeTabId, isFullscreenPlanTab],
   );
 
+  /** Tasks where the user asked the agent to open a PR but Flux has not linked `githubPr` yet. */
+  const awaitingGithubPrLinkTaskIds = useMemo(
+    () =>
+      Object.entries(prAgentAwaitingByTaskId)
+        .filter(([, awaiting]) => awaiting)
+        .map(([taskId]) => taskId)
+        .sort(),
+    [prAgentAwaitingByTaskId],
+  );
+
   useGithubPrBoardRefresh({
     projectId: project?.id,
     projectKind: project?.kind,
@@ -1618,6 +1628,7 @@ export default function App() {
     autoMarkDoneWhenPrMerged: project?.autoMarkDoneWhenPrMerged === true,
     autoMoveToReviewWhenPrOpen: project?.autoMoveToReviewWhenPrOpen === true,
     surfaceActive: isBoardOrPlanTab,
+    awaitingGithubPrLinkTaskIds,
     onCloudPrMergedAutoDone: handleCloudPrRefreshMergedAutoDone,
   });
 

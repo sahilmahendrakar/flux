@@ -6,6 +6,7 @@ import {
   parseGithubOwnerRepoFromRemote,
   parseGithubPrField,
   parseGhPrViewJsonStdout,
+  parseGhPrViewJsonStdoutList,
   parseGhPrViewRecord,
 } from './githubPrMetadata';
 import { isGithubHostingRemote } from './main/githubTaskPr';
@@ -96,6 +97,40 @@ describe('parseGhPrViewRecord / parseGhPrViewJsonStdout', () => {
       state: 'merged',
       mergedAt: '2024-03-01T12:00:00Z',
     });
+  });
+
+  it('parses every row from gh pr list JSON arrays', () => {
+    const json = JSON.stringify([
+      {
+        url: 'https://github.com/o/r/pull/9',
+        state: 'CLOSED',
+        headRefName: 'flux/task-x',
+        updatedAt: '2024-01-01T00:00:00Z',
+      },
+      {
+        url: 'https://github.com/o/r/pull/10',
+        state: 'MERGED',
+        headRefName: 'flux/task-x',
+        mergedAt: '2024-01-02T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z',
+      },
+    ]);
+    expect(parseGhPrViewJsonStdoutList(json)).toEqual([
+      {
+        url: 'https://github.com/o/r/pull/9',
+        state: 'closed',
+        headBranch: 'flux/task-x',
+        updatedAt: '2024-01-01T00:00:00Z',
+      },
+      {
+        url: 'https://github.com/o/r/pull/10',
+        state: 'merged',
+        headBranch: 'flux/task-x',
+        mergedAt: '2024-01-02T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z',
+      },
+    ]);
+    expect(parseGhPrViewJsonStdoutList('[]')).toEqual([]);
   });
 
   it('returns null for invalid JSON', () => {

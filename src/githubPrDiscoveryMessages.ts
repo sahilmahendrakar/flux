@@ -3,10 +3,10 @@ import type { TaskPrErrorCode, TaskPullRequestIpcResult } from './types';
 export type GithubPrDiscoveryMessageContext = 'pending-agent' | 'lookup';
 
 const NO_OPEN_PR_PENDING =
-  'No open pull request was found for this task branch yet. The agent may still be committing or opening the PR on GitHub — wait a moment, then click the icon again to check.';
+  'No pull request was found for this task branch yet. The agent may still be committing or opening the PR on GitHub — wait a moment, then click the icon again to check.';
 
 const NO_OPEN_PR_LOOKUP =
-  'Still no open pull request for this task branch. Confirm in the session that the agent finished `gh pr create` (or equivalent), then click again.';
+  'Still no pull request for this task branch. Confirm in the session that the agent finished `gh pr create` (or equivalent), then click again.';
 
 const NO_WORKTREE_LOOKUP =
   'No task worktree is available to look up a pull request. Start or resume this task session, then try again.';
