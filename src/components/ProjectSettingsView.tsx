@@ -283,12 +283,6 @@ function ProjectConfigPane({
   );
 
   const refresh = useCallback(async () => {
-    if (multiRepoCloudBindingsEnabled) {
-      setRepos([]);
-      setRepoStates({});
-      setLoadError(null);
-      return;
-    }
     try {
       const next = await window.electronAPI.project.getRepos();
       setRepos(next);
@@ -305,11 +299,7 @@ function ProjectConfigPane({
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : String(err));
     }
-  }, [
-    multiRepoCloudBindingsEnabled,
-    multiRepoLocalManagementEnabled,
-    refreshRepoStates,
-  ]);
+  }, [multiRepoLocalManagementEnabled, refreshRepoStates]);
 
   useEffect(() => {
     void refresh();
@@ -763,6 +753,7 @@ function ProjectConfigPane({
         return;
       }
 
+      await refresh();
       await onProjectAgentPrefsRefresh?.();
       setAddRepoState('saved');
       window.setTimeout(() => {
@@ -777,6 +768,7 @@ function ProjectConfigPane({
     onCloudSharedReposChanged,
     onProjectAgentPrefsRefresh,
     project,
+    refresh,
   ]);
 
   return (
@@ -1184,6 +1176,8 @@ function ProjectConfigPane({
           {multiRepoCloudBindingsEnabled && project.kind === 'cloud' ? (
             <CloudTeamReposBindingsSection
               project={project}
+              localRepoConfigs={repos ?? []}
+              onLocalReposChanged={(nextRepos) => setRepos(nextRepos)}
               onBindingsChanged={onProjectAgentPrefsRefresh}
               onSharedReposChanged={onCloudSharedReposChanged}
               addRepoActionError={addRepoError}
@@ -1278,12 +1272,16 @@ function CloudRepoBindingStatusBadge({ status }: { status: CloudRepoLocalBinding
 
 function CloudTeamReposBindingsSection({
   project,
+  localRepoConfigs,
+  onLocalReposChanged,
   onBindingsChanged,
   onSharedReposChanged,
   addRepoActionError,
   addRepoActionSaved,
 }: {
   project: CloudProject;
+  localRepoConfigs: RepoConfig[];
+  onLocalReposChanged?: (repos: RepoConfig[]) => void;
   onBindingsChanged?: () => void | Promise<void>;
   onSharedReposChanged?: (repos: CloudSharedRepo[]) => void;
   addRepoActionError?: string | null;
@@ -1297,6 +1295,7 @@ function CloudTeamReposBindingsSection({
   const displayedActionError = actionError ?? addRepoActionError ?? null;
 
   const sharedReposKey = project.sharedRepos.map((s) => s.id).join(',');
+  const localRepoById = new Map(localRepoConfigs.map((r) => [r.id, r]));
 
   const refreshOverview = useCallback(async () => {
     try {
@@ -1347,6 +1346,11 @@ function CloudTeamReposBindingsSection({
         return;
       }
       await refreshOverview();
+      try {
+        onLocalReposChanged?.(await window.electronAPI.project.getRepos());
+      } catch {
+        // The binding refresh above is enough for the user-visible path state.
+      }
       await onBindingsChanged?.();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : String(err));
@@ -1389,6 +1393,7 @@ function CloudTeamReposBindingsSection({
       ) : null}
       {project.sharedRepos.map((sr, index) => {
         const st = overview?.[sr.id];
+        const localRepoConfig = localRepoById.get(sr.id);
         const isExpanded = expanded[sr.id] ?? false;
         return (
           <div
@@ -1426,6 +1431,8 @@ function CloudTeamReposBindingsSection({
                 <p className="mt-1 text-[11px] text-zinc-500">
                   Base branch:{' '}
                   <span className="font-mono text-zinc-400">{sr.baseBranch}</span>
+                  {localRepoConfig?.setupScript ? ' · setup script' : ''}
+                  {localRepoConfig?.env ? ' · .env' : ''}
                   {sr.remoteUrl ? (
                     <>
                       {' '}
@@ -1465,8 +1472,10 @@ function CloudTeamReposBindingsSection({
                 <CloudRepoFields
                   project={project}
                   repo={sr}
+                  localRepoConfig={localRepoConfig}
                   status={st}
                   onSharedReposChanged={onSharedReposChanged}
+                  onLocalReposChanged={onLocalReposChanged}
                   onBindingsChanged={onBindingsChanged}
                 />
               </div>
@@ -1495,14 +1504,18 @@ function CloudTeamReposBindingsSection({
 function CloudRepoFields({
   project,
   repo,
+  localRepoConfig,
   status,
   onSharedReposChanged,
+  onLocalReposChanged,
   onBindingsChanged,
 }: {
   project: CloudProject;
   repo: CloudSharedRepo;
+  localRepoConfig?: RepoConfig;
   status?: CloudRepoLocalBindingStatus;
   onSharedReposChanged?: (repos: CloudSharedRepo[]) => void;
+  onLocalReposChanged?: (repos: RepoConfig[]) => void;
   onBindingsChanged?: () => void | Promise<void>;
 }) {
   const [name, setName] = useState(repo.name);
@@ -1551,6 +1564,11 @@ function CloudRepoFields({
       if ('error' in syncResult) {
         throw new Error(syncResult.error);
       }
+      try {
+        onLocalReposChanged?.(await window.electronAPI.project.getRepos());
+      } catch {
+        // Shared repo metadata was saved; local repo configs will refresh on the next project sync.
+      }
       await onBindingsChanged?.();
       setSaveState('saved');
       window.setTimeout(() => {
@@ -1566,6 +1584,9 @@ function CloudRepoFields({
     status?.kind === 'bound'
       ? status.rootPath
       : 'No local folder is bound on this machine.';
+  const localRepoFieldsDisabled = !localRepoConfig;
+  const localRepoFieldsDisabledReason =
+    'Bind this shared repository to a local folder before saving local setup or .env values.';
 
   return (
     <div className="flex flex-col gap-4">
@@ -1601,6 +1622,41 @@ function CloudRepoFields({
           className="mt-1.5 w-full rounded-md border border-white/[0.08] bg-black/20 px-2.5 py-1.5 font-mono text-[13px] text-zinc-100 outline-none focus:border-white/[0.16]"
         />
       </label>
+      <FieldEditor
+        label="Setup script"
+        description="Local to this machine. Bash script run inside each new worktree for this repository after creation."
+        repoId={repo.id}
+        rootPath={localRepoConfig?.rootPath ?? ''}
+        useRepoId
+        field="setupScript"
+        initialValue={localRepoConfig?.setupScript ?? ''}
+        placeholder={'# e.g.\nnpm install\n'}
+        multiline
+        disabled={localRepoFieldsDisabled}
+        disabledReason={localRepoFieldsDisabledReason}
+        onSaved={(repos) => {
+          onLocalReposChanged?.(repos);
+          void onBindingsChanged?.();
+        }}
+      />
+      <FieldEditor
+        label=".env contents"
+        description="Local to this machine. Written verbatim to .env in each new worktree for this repository. Stored locally in plaintext."
+        repoId={repo.id}
+        rootPath={localRepoConfig?.rootPath ?? ''}
+        useRepoId
+        field="env"
+        initialValue={localRepoConfig?.env ?? ''}
+        placeholder={'KEY=value\n'}
+        multiline
+        sensitive
+        disabled={localRepoFieldsDisabled}
+        disabledReason={localRepoFieldsDisabledReason}
+        onSaved={(repos) => {
+          onLocalReposChanged?.(repos);
+          void onBindingsChanged?.();
+        }}
+      />
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -1946,6 +2002,8 @@ interface FieldEditorProps {
   placeholder?: string;
   multiline?: boolean;
   sensitive?: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
   onSaved: (repos: RepoConfig[]) => void;
 }
 
@@ -1960,6 +2018,8 @@ function FieldEditor({
   placeholder,
   multiline,
   sensitive,
+  disabled = false,
+  disabledReason,
   onSaved,
 }: FieldEditorProps) {
   const [value, setValue] = useState(initialValue);
@@ -1978,6 +2038,7 @@ function FieldEditor({
   const dirty = value !== savedValue;
 
   const handleSave = async () => {
+    if (disabled) return;
     if (!dirty) return;
     setState('saving');
     setError(null);
@@ -2020,13 +2081,16 @@ function FieldEditor({
         ) : null}
       </div>
       <p className="mt-0.5 text-[11px] leading-snug text-zinc-600">{description}</p>
+      {disabled && disabledReason ? (
+        <p className="mt-1 text-[11px] leading-snug text-amber-300">{disabledReason}</p>
+      ) : null}
       <div className="mt-2">
         {multiline ? (
           <textarea
             value={showMasked ? maskValue(value) : value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
-            disabled={showMasked}
+            disabled={showMasked || disabled}
             rows={Math.min(10, Math.max(4, value.split('\n').length + 1))}
             className="block w-full rounded-md border border-white/[0.08] bg-[#09090b] px-3 py-2 font-mono text-[12px] leading-relaxed text-zinc-100 outline-none focus-visible:border-white/[0.14] focus-visible:ring-1 focus-visible:ring-white/[0.12] disabled:opacity-60"
           />
@@ -2036,6 +2100,7 @@ function FieldEditor({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
+            disabled={disabled}
             className="block w-full rounded-md border border-white/[0.08] bg-[#09090b] px-3 py-2 text-[13px] text-zinc-100 outline-none focus-visible:border-white/[0.14] focus-visible:ring-1 focus-visible:ring-white/[0.12]"
           />
         )}
@@ -2051,7 +2116,7 @@ function FieldEditor({
         <button
           type="button"
           onClick={() => void handleSave()}
-          disabled={!dirty || state === 'saving' || showMasked}
+          disabled={!dirty || state === 'saving' || showMasked || disabled}
           className="rounded-md bg-white px-3 py-1 text-[12px] font-medium text-zinc-950 transition hover:bg-zinc-100 disabled:pointer-events-none disabled:opacity-40"
         >
           {state === 'saving' ? 'Saving…' : 'Save'}

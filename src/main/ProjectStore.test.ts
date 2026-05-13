@@ -201,6 +201,45 @@ describe('ProjectStore repo-id operations', () => {
     expect(repos[0].name).toBe('Core');
   });
 
+  it('applyCloudRepoBindings preserves local setup script and env by repo id', async () => {
+    const rootA = path.join(tmp, 'repo-a');
+    const rootB = path.join(tmp, 'repo-b');
+    const projectDir = path.join(tmp, 'project');
+    await fs.mkdir(rootA, { recursive: true });
+    await fs.mkdir(rootB, { recursive: true });
+    await touchGitRepo(rootA);
+    await touchGitRepo(rootB);
+    await writeLegacyConfig(projectDir, rootA);
+
+    const store = new ProjectStore(tmp);
+    await store.init(projectDir);
+    const id = store.get()?.repos[0].id;
+    if (!id) throw new Error('expected repo id');
+    await store.updateRepoByIdAt(projectDir, id, {
+      setupScript: 'pnpm install',
+      env: 'API_KEY=local',
+    });
+
+    await store.applyCloudRepoBindings(projectDir, rootB, [
+      {
+        id,
+        name: 'Cloud repo',
+        rootPath: rootB,
+        baseBranch: 'release',
+      },
+    ]);
+
+    const repos = await store.getReposAt(projectDir);
+    expect(repos[0]).toMatchObject({
+      id,
+      name: 'Cloud repo',
+      rootPath: path.resolve(rootB),
+      baseBranch: 'release',
+      setupScript: 'pnpm install',
+      env: 'API_KEY=local',
+    });
+  });
+
   it('addRepoAt appends a git repo and rejects duplicates', async () => {
     const rootA = path.join(tmp, 'a');
     const rootB = path.join(tmp, 'b');
