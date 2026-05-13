@@ -3,6 +3,7 @@ import { Droppable } from '@hello-pangea/dnd';
 import { Session, Task, TaskStatus } from '../types';
 import TaskCard from './TaskCard';
 import type { TaskAgentSpawnPatch } from './TaskCardAgentSpawnMenu';
+import type { TaskPatch } from '../renderer/tasks/TaskProvider';
 import type { ProjectMember } from '../renderer/projects/members';
 
 interface Props {
@@ -17,7 +18,7 @@ interface Props {
   onCardClick: (id: string) => void;
   onLabelClick?: (label: string) => void;
   autoStartWhenUnblockedProject: boolean;
-  onToggleTaskAutoStartOnUnblock: (taskId: string, enabled: boolean) => void;
+  onPatchTaskAutoStartOnUnblock: (taskId: string, patch: Pick<TaskPatch, 'autoStartOnUnblock'>) => void;
   emptyState?: ReactNode;
   membersMap?: Map<string, ProjectMember>;
   /** Cloud: full member list for card footer assignee menu (same source as `membersMap`). */
@@ -45,7 +46,7 @@ export default function Column({
   onCardClick,
   onLabelClick,
   autoStartWhenUnblockedProject,
-  onToggleTaskAutoStartOnUnblock,
+  onPatchTaskAutoStartOnUnblock,
   emptyState,
   membersMap,
   projectMembers,
@@ -134,7 +135,7 @@ export default function Column({
                     onCardClick={onCardClick}
                     onLabelClick={onLabelClick}
                     autoStartWhenUnblockedProject={autoStartWhenUnblockedProject}
-                    onToggleTaskAutoStartOnUnblock={onToggleTaskAutoStartOnUnblock}
+                    onPatchTaskAutoStartOnUnblock={onPatchTaskAutoStartOnUnblock}
                     assigneeMember={task.assigneeId ? membersMap?.get(task.assigneeId) : undefined}
                     cloudProjectMembers={projectMembers}
                     onTaskAssigneeChange={onTaskAssigneeChange}

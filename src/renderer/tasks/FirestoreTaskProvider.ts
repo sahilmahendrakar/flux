@@ -224,10 +224,10 @@ export class FirestoreTaskProvider implements TaskProvider {
       }
     }
     if (patch.autoStartOnUnblock !== undefined) {
-      if (patch.autoStartOnUnblock) {
-        updates.autoStartOnUnblock = true;
-      } else {
+      if (patch.autoStartOnUnblock === null) {
         updates.autoStartOnUnblock = deleteField();
+      } else {
+        updates.autoStartOnUnblock = patch.autoStartOnUnblock;
       }
     }
     if (patch.assigneeId !== undefined) {
@@ -359,9 +359,12 @@ function parseAssigneeIdField(
 
 function parseAutoStartOnUnblockField(
   val: unknown,
-): { autoStartOnUnblock: true } | Record<string, never> {
+): { autoStartOnUnblock: true } | { autoStartOnUnblock: false } | Record<string, never> {
   if (val === true) {
     return { autoStartOnUnblock: true };
+  }
+  if (val === false) {
+    return { autoStartOnUnblock: false };
   }
   return {};
 }
