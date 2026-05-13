@@ -153,6 +153,43 @@ describe('WorktreeService.create integration', () => {
     }
   });
 
+  it('writes env contents and runs the selected repo setup script', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'flux-wt-env-'));
+    const gitRoot = path.join(root, 'repo');
+    const projectDir = path.join(root, 'flux-project');
+    try {
+      await initGitRepo(gitRoot);
+      const svc = new WorktreeService(gitRoot, projectDir);
+      const { worktreePath } = await svc.create({
+        taskId: 'task-env-setup',
+        repo: {
+          repoId:
+            '1212121212121212121212121212121212121212121212121212121212121212',
+          gitRootPath: gitRoot,
+          baseBranch: 'main',
+          env: 'TOKEN=repo-specific\n',
+          setupScript: 'printf setup-ok > setup-result.txt',
+        },
+        source: {
+          sourceBranchShort: 'main',
+          createSourceBranchIfMissing: false,
+        },
+        layout: 'repo-scoped',
+      });
+
+      await expect(fs.readFile(path.join(worktreePath, '.env'), 'utf8')).resolves.toBe(
+        'TOKEN=repo-specific\n',
+      );
+      await expect(
+        fs.readFile(path.join(worktreePath, 'setup-result.txt'), 'utf8'),
+      ).resolves.toBe('setup-ok');
+
+      await svc.remove(worktreePath, path.resolve(gitRoot));
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('throws WORKTREE_SOURCE_BRANCH_MISSING when branch missing and creation disabled', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'flux-wt-'));
     const gitRoot = path.join(root, 'repo');
