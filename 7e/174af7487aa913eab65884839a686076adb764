@@ -1,0 +1,96 @@
+src/mcpBridge.ts
+  s_66982ecb2b0175::t_d3febc48609cc1 48
+src/renderer/tasks/FirestoreTaskProvider.ts
+  s_66982ecb2b0175::t_658b1fc1b98c08 362,366-367
+  s_66982ecb2b0175::t_9cb8b50142699a 227,229-230
+src/components/TaskCard.tsx
+  s_66982ecb2b0175::t_0aa731eb8cd0eb 246
+  s_66982ecb2b0175::t_cd93d61059f2b3 288-290,294-296
+  s_66982ecb2b0175::t_e2c7df87c10425 23
+  s_66982ecb2b0175::t_34344d1284a6e7 219
+  s_66982ecb2b0175::t_813d6ff92ec618 420,422,425
+  s_66982ecb2b0175::t_fb3ce06dc11a7a 410-413
+  s_66982ecb2b0175::t_dffc88614c259d 265
+  s_66982ecb2b0175::t_989c251d9ecbb0 20-22,24
+src/unblockAutostart.ts
+  s_66982ecb2b0175::t_17c5173554c705 9-10
+  s_66982ecb2b0175::t_c920793a890b97 33-43,59-65,67-80,87
+  s_66982ecb2b0175::t_de8b988fe344aa 44-58,66
+src/unblockAutostart.test.ts
+  s_66982ecb2b0175::t_eb7f3de7b25ba1 62-128,159-175,182-212
+  s_66982ecb2b0175::t_3faac0c0e1bfca 129-158
+  s_66982ecb2b0175::t_6386992af4b361 5,8
+  s_66982ecb2b0175::t_d0301ff0916a53 10
+  s_66982ecb2b0175::t_b8e9d4136f3147 176-181
+  s_66982ecb2b0175::t_f0e71d758517f9 61
+src/renderer/tasks/TaskProvider.ts
+  s_66982ecb2b0175::t_6a0ae492d3e4fe 20-25
+src/main.ts
+  s_66982ecb2b0175::t_428f269ef17eb8 933-941
+  s_66982ecb2b0175::t_d273c5307aa4e6 1981-1985
+src/main/TaskStore.ts
+  s_66982ecb2b0175::t_25353aa8ae811e 234-238
+  s_66982ecb2b0175::t_07e47aab3c2b45 138-165
+  s_66982ecb2b0175::t_6a5e3a60b883aa 248-253
+  s_66982ecb2b0175::t_13c38ac7cd36a7 266-267,270
+  s_66982ecb2b0175::t_9392a15b293c0c 269
+  s_66982ecb2b0175::t_c27764bc1a5f4f 7
+src/App.tsx
+  s_66982ecb2b0175::t_51e0dcee4c4a0e 3125
+  s_66982ecb2b0175::t_1fddc69a1d14c4 1712-1713
+  s_66982ecb2b0175::t_f73117d0cd95e9 2969-2970
+  s_66982ecb2b0175::t_6fa585d8632bdb 129
+  s_66982ecb2b0175::t_b77bee121c3387 173-180
+  s_66982ecb2b0175::t_00548ecaec7869 70
+  s_66982ecb2b0175::t_e4d854c67883e4 1749-1762
+  s_66982ecb2b0175::t_1d1b5a9db0094a 1629-1634,1639-1654
+  s_66982ecb2b0175::t_dc889fce186fb5 1638,1655-1662
+  s_66982ecb2b0175::t_1653f5554eb497 1628
+src/preload.ts
+  s_66982ecb2b0175::t_f776a7897c799e 232-235
+src/components/Board.tsx
+  s_66982ecb2b0175::t_ffc8a1b0df0f69 205
+  s_66982ecb2b0175::t_943d4e5b55d4cf 17
+  s_66982ecb2b0175::t_29aa20a6cc6c12 36
+  s_66982ecb2b0175::t_f32551541e76e2 68
+src/components/Column.tsx
+  s_66982ecb2b0175::t_1456496454433d 49
+  s_66982ecb2b0175::t_a261e17c17a3f2 21
+  s_66982ecb2b0175::t_1521c5c834d8a7 138
+  s_66982ecb2b0175::t_e2d35a5de39b05 6
+src/main/McpServer.ts
+  s_66982ecb2b0175::t_7e8a6457233483 402
+src/taskDependencies.test.ts
+  s_66982ecb2b0175::t_45e0799add5ca9 19-20,33
+  s_66982ecb2b0175::t_0beba5e692ebae 7
+  s_66982ecb2b0175::t_4f18020890589b 21-32,34
+src/types.ts
+  s_66982ecb2b0175::t_9b62dd08508b1f 257-261
+src/env.d.ts
+  s_66982ecb2b0175::t_c98349808bdd31 194-197
+src/components/TaskDetailPanel.tsx
+  s_66982ecb2b0175::t_0f8bed8c832549 1414,1417-1422,1431-1433
+  s_66982ecb2b0175::t_4c8e8f5edd40da 29
+  s_66982ecb2b0175::t_436979286f94c4 105
+  s_66982ecb2b0175::t_3a3e0af0f8a1e0 39-41,43
+  s_66982ecb2b0175::t_f06c63e39eecc7 42
+  s_66982ecb2b0175::t_9255c1517e182b 832-835
+src/taskDependencies.ts
+  s_66982ecb2b0175::t_b31b1457d7775e 23-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "7e174af7487aa913eab65884839a686076adb764",
+  "prompts": {},
+  "sessions": {
+    "s_66982ecb2b0175": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "caa0f05a-5312-42d6-9dfd-da75966d9534",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
