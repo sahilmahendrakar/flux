@@ -1,0 +1,22 @@
+src/components/TaskDetailPanel.tsx
+  s_1d12a2af0d4c15::t_ce9d1005c1a0d6 54
+  s_1d12a2af0d4c15::t_0e762b64f6cdbe 1869
+  s_1d12a2af0d4c15::t_cc44017ad1d86a 1868
+  s_1d12a2af0d4c15::t_d3b1f1ad2f1e44 736-740,745
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "17e2b3556b3b14b277084a65a94d43e48da3ac75",
+  "prompts": {},
+  "sessions": {
+    "s_1d12a2af0d4c15": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "489ff8d2-ca7f-4fc1-a2b5-aebc0e59c9f9",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
