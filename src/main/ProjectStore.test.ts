@@ -8,17 +8,22 @@ import {
   ProjectStore,
 } from './ProjectStore';
 import { deriveStablePrimaryRepoIdForProject } from '../repoIdentity';
+import { stableLocalProjectIdForRoot } from './projectDirLayout';
 
-const PROJECT_ID = 'p1';
+const TEST_PROJECT_ID = 'p1';
 
 async function writeLegacyConfig(
   projectDir: string,
   rootPath: string,
   body: Record<string, unknown> = {},
 ): Promise<void> {
+  const id =
+    typeof body.id === 'string'
+      ? body.id
+      : stableLocalProjectIdForRoot(rootPath);
   // Legacy single-repo config: `repos[0]` lacks `id` and `name`.
   const config = {
-    id: PROJECT_ID,
+    id,
     name: 'Demo',
     rootPath,
     addedAt: '2025-01-01T00:00:00.000Z',
@@ -43,7 +48,7 @@ async function writeLegacyConfig(
 describe('backfillRepoIdentities (multi-repo2)', () => {
   it('fills missing id/name deterministically and preserves baseBranch / setupScript / env', () => {
     const out = backfillRepoIdentities({
-      projectId: PROJECT_ID,
+      projectId: TEST_PROJECT_ID,
       primaryRootPath: '/abs/repo',
       repos: [
         { rootPath: '/abs/repo', baseBranch: 'main', setupScript: 'pnpm i', env: 'X=1' },
@@ -53,7 +58,7 @@ describe('backfillRepoIdentities (multi-repo2)', () => {
     expect(out.repos).toHaveLength(1);
     expect(out.repos[0].id).toBe(
       deriveStablePrimaryRepoIdForProject({
-        projectId: PROJECT_ID,
+        projectId: TEST_PROJECT_ID,
         rootPath: '/abs/repo',
       }),
     );
@@ -65,12 +70,12 @@ describe('backfillRepoIdentities (multi-repo2)', () => {
 
   it('is idempotent on already-migrated configs', () => {
     const seeded = backfillRepoIdentities({
-      projectId: PROJECT_ID,
+      projectId: TEST_PROJECT_ID,
       primaryRootPath: '/abs/repo',
       repos: [{ rootPath: '/abs/repo', baseBranch: 'main' }],
     });
     const second = backfillRepoIdentities({
-      projectId: PROJECT_ID,
+      projectId: TEST_PROJECT_ID,
       primaryRootPath: '/abs/repo',
       repos: seeded.repos,
     });
@@ -80,7 +85,7 @@ describe('backfillRepoIdentities (multi-repo2)', () => {
 
   it('disambiguates duplicate ids across repos', () => {
     const out = backfillRepoIdentities({
-      projectId: PROJECT_ID,
+      projectId: TEST_PROJECT_ID,
       primaryRootPath: '/abs/repo',
       repos: [
         { id: 'shared', rootPath: '/abs/repo', baseBranch: 'main' },
@@ -113,11 +118,13 @@ describe('ProjectStore.init multi-repo2 migration', () => {
     await store.init(projectDir);
     const project = store.get();
     if (!project) throw new Error('expected loaded project');
+    const projectId = stableLocalProjectIdForRoot(rootPath);
+    expect(project.id).toBe(projectId);
     expect(project.repos).toHaveLength(1);
     const repo = project.repos[0];
     expect(repo.id).toBe(
       deriveStablePrimaryRepoIdForProject({
-        projectId: PROJECT_ID,
+        projectId,
         rootPath,
       }),
     );
@@ -251,10 +258,16 @@ describe('ProjectStore repo-id operations', () => {
 
     const local = new ProjectStore(tmp);
     const { projectDir: localDir } = await local.create(rootA);
+    expect(localDir).toBe(path.join(tmp, 'projects', stableLocalProjectIdForRoot(rootA)));
 
     const cloud = new ProjectStore(tmp);
     const { projectDir: cloudDir } = await cloud.ensureCloudLayoutForRoot('cloud-123', rootA);
     expect(cloudDir).not.toBe(localDir);
+    expect(cloudDir).toBe(path.join(tmp, 'projects', 'cloud-123'));
+    const cloudConfig = JSON.parse(
+      await fs.readFile(path.join(cloudDir, 'config.json'), 'utf8'),
+    ) as { id: string };
+    expect(cloudConfig.id).toBe('cloud-123');
     await cloud.addRepoAt(cloudDir, cloudExtra);
 
     const reopened = new ProjectStore(tmp);
@@ -267,6 +280,96 @@ describe('ProjectStore repo-id operations', () => {
       path.resolve(rootA),
       path.resolve(cloudExtra),
     ]);
+  });
+
+  it('migrates legacy basename Flux dir to ~/.flux/projects/<id>/ on create', async () => {
+    const rootA = path.join(tmp, 'w', 'repo-name');
+    await fs.mkdir(rootA, { recursive: true });
+    await touchGitRepo(rootA);
+    const legacyFluxDir = path.join(tmp, 'repo-name');
+    await writeLegacyConfig(legacyFluxDir, rootA);
+    const expectedId = stableLocalProjectIdForRoot(rootA);
+
+    const store = new ProjectStore(tmp);
+    const { projectDir } = await store.create(rootA);
+    expect(path.resolve(projectDir)).toBe(
+      path.resolve(path.join(tmp, 'projects', expectedId)),
+    );
+    await expect(fs.stat(legacyFluxDir)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('migrates cloud-projects/<id> into projects/<id> when canonical is empty', async () => {
+    const rootA = path.join(tmp, 'r1');
+    await fs.mkdir(rootA, { recursive: true });
+    await touchGitRepo(rootA);
+    const legacyCloud = path.join(tmp, 'cloud-projects', 'acme');
+    await fs.mkdir(legacyCloud, { recursive: true });
+    await writeLegacyConfig(legacyCloud, rootA, { id: stableLocalProjectIdForRoot(rootA) });
+
+    const cloud = new ProjectStore(tmp);
+    const { projectDir } = await cloud.ensureCloudLayoutForRoot('acme', rootA);
+    expect(path.resolve(projectDir)).toBe(path.resolve(path.join(tmp, 'projects', 'acme')));
+    const migratedConfig = JSON.parse(
+      await fs.readFile(path.join(projectDir, 'config.json'), 'utf8'),
+    ) as { id: string };
+    expect(migratedConfig.id).toBe('acme');
+  });
+
+  it('adopts existing canonical cloud configs to the cloud project id', async () => {
+    const rootA = path.join(tmp, 'r2');
+    await fs.mkdir(rootA, { recursive: true });
+    await touchGitRepo(rootA);
+    const canonicalCloud = path.join(tmp, 'projects', 'cloud-existing');
+    await writeLegacyConfig(canonicalCloud, rootA, { id: stableLocalProjectIdForRoot(rootA) });
+
+    const cloud = new ProjectStore(tmp);
+    const { projectDir } = await cloud.ensureCloudLayoutForRoot('cloud-existing', rootA);
+    expect(path.resolve(projectDir)).toBe(path.resolve(canonicalCloud));
+    const adoptedConfig = JSON.parse(
+      await fs.readFile(path.join(projectDir, 'config.json'), 'utf8'),
+    ) as { id: string };
+    expect(adoptedConfig.id).toBe('cloud-existing');
+  });
+
+  it('marks matching legacy cloud dirs superseded when canonical already exists', async () => {
+    const rootA = path.join(tmp, 'r3');
+    await fs.mkdir(rootA, { recursive: true });
+    await touchGitRepo(rootA);
+    const canonicalCloud = path.join(tmp, 'projects', 'cloud-retire');
+    const legacyCloud = path.join(tmp, 'cloud-projects', 'cloud-retire');
+    await writeLegacyConfig(canonicalCloud, rootA, { id: 'cloud-retire' });
+    await writeLegacyConfig(legacyCloud, rootA, { id: stableLocalProjectIdForRoot(rootA) });
+
+    const cloud = new ProjectStore(tmp);
+    await cloud.ensureCloudLayoutForRoot('cloud-retire', rootA);
+
+    await expect(fs.readFile(path.join(legacyCloud, '.flux-superseded-by'), 'utf8')).resolves.toBe(
+      `${canonicalCloud}\n`,
+    );
+  });
+
+  it('writes a conflict artifact when legacy cloud dir does not match canonical', async () => {
+    const rootA = path.join(tmp, 'r4-a');
+    const rootB = path.join(tmp, 'r4-b');
+    await fs.mkdir(rootA, { recursive: true });
+    await fs.mkdir(rootB, { recursive: true });
+    await touchGitRepo(rootA);
+    await touchGitRepo(rootB);
+    const canonicalCloud = path.join(tmp, 'projects', 'cloud-conflict');
+    const legacyCloud = path.join(tmp, 'cloud-projects', 'cloud-conflict');
+    await writeLegacyConfig(canonicalCloud, rootA, { id: 'cloud-conflict' });
+    await writeLegacyConfig(legacyCloud, rootB, { id: stableLocalProjectIdForRoot(rootB) });
+
+    const cloud = new ProjectStore(tmp);
+    await expect(cloud.ensureCloudLayoutForRoot('cloud-conflict', rootA)).rejects.toThrow(
+      /migration conflict/,
+    );
+    const conflict = JSON.parse(
+      await fs.readFile(path.join(legacyCloud, '.flux-migration-conflict.json'), 'utf8'),
+    ) as { legacyDir: string; canonicalDir: string; reason: string };
+    expect(conflict.legacyDir).toBe(legacyCloud);
+    expect(conflict.canonicalDir).toBe(canonicalCloud);
+    expect(conflict.reason).toContain('do not describe the same project');
   });
 
   it('setPrimaryRepoAt moves repo to index 0 and syncs project rootPath', async () => {
