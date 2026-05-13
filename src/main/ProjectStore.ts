@@ -26,6 +26,7 @@ import {
   listNestedProjectDirsUnderProjects,
   markProjectDirSuperseded,
   migrateProjectDirToCanonical,
+  projectDirHasWorktrees,
   readSupersededTarget,
   stableLocalProjectIdForRoot,
   writeProjectDirMigrationConflict,
@@ -899,6 +900,9 @@ export class ProjectStore {
       const legacyConfig = await this.readConfigAt(legacy);
       if (canonicalConfig) {
         if (legacyConfig) {
+          if (await this.shouldDeferLegacyMigrationForWorktrees(legacy, legacyConfig, rootPath)) {
+            return legacy;
+          }
           await this.retireLegacyDirIfSameProjectOrConflict({
             legacyDir: legacy,
             canonicalDir: canonical,
@@ -911,8 +915,8 @@ export class ProjectStore {
         return canonical;
       }
       if (legacyConfig) {
-        await migrateProjectDirToCanonical(legacy, canonical);
-        return canonical;
+        const migrated = await migrateProjectDirToCanonical(legacy, canonical);
+        return migrated ? canonical : legacy;
       }
       return canonical;
     };
@@ -936,6 +940,17 @@ export class ProjectStore {
     }
   }
 
+  private async shouldDeferLegacyMigrationForWorktrees(
+    legacyDir: string,
+    legacyConfig: ConfigFile,
+    expectedRootPath: string,
+  ): Promise<boolean> {
+    return (
+      path.resolve(legacyConfig.rootPath) === path.resolve(expectedRootPath) &&
+      (await projectDirHasWorktrees(legacyDir))
+    );
+  }
+
   private async retireLegacyDirIfSameProjectOrConflict(params: {
     legacyDir: string;
     canonicalDir: string;
@@ -946,6 +961,7 @@ export class ProjectStore {
   }): Promise<void> {
     if (path.resolve(params.legacyDir) === path.resolve(params.canonicalDir)) return;
     if (await readSupersededTarget(params.legacyDir)) return;
+    if (await projectDirHasWorktrees(params.legacyDir)) return;
 
     const expectedRoot = path.resolve(params.expectedRootPath);
     const legacyRootMatches = path.resolve(params.legacyConfig.rootPath) === expectedRoot;
@@ -984,6 +1000,9 @@ export class ProjectStore {
     const legacyCfg = await this.readConfigAt(legacyBasename);
     if (direct) {
       if (legacyCfg && path.resolve(legacyCfg.rootPath) === resolvedRoot) {
+        if (await this.shouldDeferLegacyMigrationForWorktrees(legacyBasename, legacyCfg, resolvedRoot)) {
+          return legacyBasename;
+        }
         await this.retireLegacyDirIfSameProjectOrConflict({
           legacyDir: legacyBasename,
           canonicalDir: canonical,
@@ -998,7 +1017,8 @@ export class ProjectStore {
     if (legacyCfg && path.resolve(legacyCfg.rootPath) === resolvedRoot) {
       const target = canonicalLocalProjectDir(this.fluxBaseDir, legacyCfg.id);
       if (path.resolve(legacyBasename) !== path.resolve(target)) {
-        await migrateProjectDirToCanonical(legacyBasename, target);
+        const migrated = await migrateProjectDirToCanonical(legacyBasename, target);
+        if (!migrated) return legacyBasename;
       }
       return target;
     }
@@ -1006,6 +1026,9 @@ export class ProjectStore {
     const flatRoot = await legacyFlatProjectsDirIfPresent(this.fluxBaseDir);
     const flatCfg = flatRoot ? await this.readConfigAt(flatRoot) : null;
     if (flatCfg && path.resolve(flatCfg.rootPath) === resolvedRoot) {
+      if (await this.shouldDeferLegacyMigrationForWorktrees(flatRoot, flatCfg, resolvedRoot)) {
+        return flatRoot;
+      }
       await hoistLegacyFlatProjectsDirToNested(this.fluxBaseDir);
       return canonicalLocalProjectDir(this.fluxBaseDir, flatCfg.id);
     }

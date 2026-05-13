@@ -298,6 +298,23 @@ describe('ProjectStore repo-id operations', () => {
     await expect(fs.stat(legacyFluxDir)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  it('defers local basename migration when legacy worktrees exist', async () => {
+    const rootA = path.join(tmp, 'w', 'active-repo');
+    await fs.mkdir(rootA, { recursive: true });
+    await touchGitRepo(rootA);
+    const legacyFluxDir = path.join(tmp, 'active-repo');
+    await writeLegacyConfig(legacyFluxDir, rootA);
+    await fs.mkdir(path.join(legacyFluxDir, 'worktrees', 'active-task'), { recursive: true });
+
+    const store = new ProjectStore(tmp);
+    const { projectDir } = await store.create(rootA);
+    expect(path.resolve(projectDir)).toBe(path.resolve(legacyFluxDir));
+    await expect(fs.stat(path.join(legacyFluxDir, 'config.json'))).resolves.toBeTruthy();
+    await expect(
+      fs.stat(path.join(tmp, 'projects', stableLocalProjectIdForRoot(rootA), 'config.json')),
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it('migrates cloud-projects/<id> into projects/<id> when canonical is empty', async () => {
     const rootA = path.join(tmp, 'r1');
     await fs.mkdir(rootA, { recursive: true });
@@ -313,6 +330,23 @@ describe('ProjectStore repo-id operations', () => {
       await fs.readFile(path.join(projectDir, 'config.json'), 'utf8'),
     ) as { id: string };
     expect(migratedConfig.id).toBe('acme');
+  });
+
+  it('defers cloud legacy migration when legacy worktrees exist', async () => {
+    const rootA = path.join(tmp, 'r1-active');
+    await fs.mkdir(rootA, { recursive: true });
+    await touchGitRepo(rootA);
+    const legacyCloud = path.join(tmp, 'cloud-projects', 'acme-active');
+    await fs.mkdir(path.join(legacyCloud, 'worktrees', 'active-task'), { recursive: true });
+    await writeLegacyConfig(legacyCloud, rootA, { id: stableLocalProjectIdForRoot(rootA) });
+
+    const cloud = new ProjectStore(tmp);
+    const { projectDir, project } = await cloud.ensureCloudLayoutForRoot('acme-active', rootA);
+    expect(path.resolve(projectDir)).toBe(path.resolve(legacyCloud));
+    expect(project.id).toBe('acme-active');
+    await expect(
+      fs.stat(path.join(tmp, 'projects', 'acme-active', 'config.json')),
+    ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('adopts existing canonical cloud configs to the cloud project id', async () => {

@@ -124,6 +124,15 @@ export async function writeProjectDirMigrationConflict(params: {
   );
 }
 
+export async function projectDirHasWorktrees(projectDir: string): Promise<boolean> {
+  try {
+    const entries = await fs.readdir(path.join(projectDir, 'worktrees'));
+    return entries.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * When `~/.flux/projects/config.json` exists, `projects` was the repo basename, not the
  * nested layout container. Move the tree to `~/.flux/projects/<id>/` using a temp path so
@@ -170,12 +179,16 @@ export async function hoistLegacyFlatProjectsDirToNested(fluxBaseDir: string): P
 export async function migrateProjectDirToCanonical(
   fromDir: string,
   toDir: string,
-): Promise<void> {
-  if (path.resolve(fromDir) === path.resolve(toDir)) return;
+): Promise<boolean> {
+  if (path.resolve(fromDir) === path.resolve(toDir)) return true;
 
   const fromConfig = path.join(fromDir, 'config.json');
   if (!(await pathExists(fromConfig))) {
-    return;
+    return true;
+  }
+
+  if (await projectDirHasWorktrees(fromDir)) {
+    return false;
   }
 
   const toConfig = path.join(toDir, 'config.json');
@@ -190,7 +203,7 @@ export async function migrateProjectDirToCanonical(
     }
     if (same) {
       await markProjectDirSuperseded(fromDir, toDir);
-      return;
+      return true;
     }
     await writeProjectDirMigrationConflict({
       legacyDir: fromDir,
@@ -207,7 +220,7 @@ export async function migrateProjectDirToCanonical(
 
   try {
     await fs.rename(fromDir, toDir);
-    return;
+    return true;
   } catch (err: unknown) {
     const code = err && typeof err === 'object' && 'code' in err ? (err as NodeJS.ErrnoException).code : undefined;
     if (code !== 'EXDEV' && code !== 'ENOTEMPTY' && code !== 'EPERM') {
@@ -217,6 +230,7 @@ export async function migrateProjectDirToCanonical(
 
   await fs.cp(fromDir, toDir, { recursive: true });
   await markProjectDirSuperseded(fromDir, toDir);
+  return true;
 }
 
 export async function readSupersededTarget(dir: string): Promise<string | null> {
