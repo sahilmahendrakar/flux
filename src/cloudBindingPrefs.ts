@@ -101,6 +101,13 @@ function repoMachineBindingsForHydration(
     const entry = rb?.[repo.id];
     if (entry) out[repo.id] = entry;
   }
+  if (rb) {
+    for (const [id, entry] of Object.entries(rb)) {
+      if (entry && out[id] == null) {
+        out[id] = entry;
+      }
+    }
+  }
   return out;
 }
 
