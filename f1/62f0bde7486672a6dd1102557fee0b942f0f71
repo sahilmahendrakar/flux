@@ -1,0 +1,20 @@
+src/cloudBindingPrefs.ts
+  s_d0f3b7addf4e32::t_a981d2496eaa35 104-108,110
+  s_d0f3b7addf4e32::t_35b742dcf6c627 109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "f162f0bde7486672a6dd1102557fee0b942f0f71",
+  "prompts": {},
+  "sessions": {
+    "s_d0f3b7addf4e32": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ee513479-912e-4ea0-9f1a-ef8a7af7f5b2",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
