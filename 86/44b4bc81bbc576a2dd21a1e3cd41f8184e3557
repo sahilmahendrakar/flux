@@ -1,0 +1,125 @@
+src/main/WorktreeService.integration.test.ts
+  s_313a95a3be8a74::t_ba443c54a9d497 9,37,48,60-63,77,94,106,108,113,125,127,165,203,250,289,311
+src/main/openWorkspacePath.ts
+  s_313a95a3be8a74::t_23683e96868372 7
+  s_313a95a3be8a74::t_7fe9ebaf5a8177 201-204,211
+  s_313a95a3be8a74::t_e544402a4ed397 265-287
+  s_313a95a3be8a74::t_3fc09679ceaa6f 231-246
+src/taskBranch.ts
+  s_313a95a3be8a74::t_b9bf3f0b2fc300 1-4,12-17
+src/renderer/tasks/TaskProvider.ts
+  s_313a95a3be8a74::t_b76faac082cb2d 20
+src/types.ts
+  s_313a95a3be8a74::t_80af20ef0ae0ba 351-352
+  s_313a95a3be8a74::t_d7235ba31cb23a 456
+  s_313a95a3be8a74::t_cf6b5eadcc6e93 369-371,373-374
+  s_313a95a3be8a74::t_12b9dfadb5c309 372
+src/App.tsx
+  s_313a95a3be8a74::t_9fa423424f1b6e 1160-1170
+  s_313a95a3be8a74::t_4f67fb532879d5 752
+  s_313a95a3be8a74::t_6638272a8e4b71 1909-1911,1915
+  s_313a95a3be8a74::t_b1d7b0f90e9975 784-790
+src/main/fluxTaskWorkBranchNaming.ts
+  s_313a95a3be8a74::t_bed2135b9c5472 93,95-104
+  s_313a95a3be8a74::t_b978d1c97119d8 123-127,132-135
+  s_313a95a3be8a74::t_eda7100f252cbd 1-92,94,105-122,128-131,136-165,174-175,177-183
+  s_313a95a3be8a74::t_0aac74ece4ef5f 166-173,176
+src/main/taskEphemeralTeardown.ts
+  s_313a95a3be8a74::t_a67159d63fab7c 45,47-48
+  s_313a95a3be8a74::t_65803fa91672bc 103-121
+  s_313a95a3be8a74::t_db248e79901d85 165-194
+  s_313a95a3be8a74::t_e87a4da9ab7695 6
+src/renderer/tasks/cloudGithubPrRefreshReconcile.ts
+  s_313a95a3be8a74::t_4a34bfbba03aad 55
+src/components/TaskDetailPanel.tsx
+  s_313a95a3be8a74::t_cafbbf530c43dc 920
+  s_313a95a3be8a74::t_1a15fcc450fe36 903
+  s_313a95a3be8a74::t_99c72b61cd5446 427
+src/githubPrReviewWhenOpenAutomation.test.ts
+  s_313a95a3be8a74::t_6d68ccdf7cb6ff 9,17,25,33,41,49,64,79-94
+src/main/fluxTaskBranch.ts
+  s_313a95a3be8a74::t_975198b8481a17 1-3,8-13,16-26
+src/main/gitWorktreeBranch.ts
+  s_313a95a3be8a74::t_bdaa242e9f4fa1 36-40,47-63
+  s_313a95a3be8a74::t_512b47df10b0d3 1-35,41-46,64
+src/renderer/tasks/FirestoreTaskProvider.ts
+  s_313a95a3be8a74::t_8336e2fee1e2e9 210
+  s_313a95a3be8a74::t_db23372cfbf7d1 235
+  s_313a95a3be8a74::t_92c3c55ed83a3a 389,393-399
+  s_313a95a3be8a74::t_a77fec4393dc3f 324-331
+src/main/githubTaskPr.ts
+  s_313a95a3be8a74::t_85274aa090e4c7 5
+  s_313a95a3be8a74::t_8b076ae305f82c 13
+  s_313a95a3be8a74::t_2d5165ad59f78c 166-167,178-180
+  s_313a95a3be8a74::t_1b57148212b4a8 554,560
+  s_313a95a3be8a74::t_bcc42bd99a42ed 579
+src/preload.ts
+  s_313a95a3be8a74::t_09fb9dca026ddb 321
+  s_313a95a3be8a74::t_55af4d2e0bf827 305-308
+  s_313a95a3be8a74::t_12f231b7d70e1a 296
+  s_313a95a3be8a74::t_8f6a9f78f393ca 360-368
+  s_313a95a3be8a74::t_5bf206bc7ddf0f 338-345
+src/env.d.ts
+  s_313a95a3be8a74::t_1365d45c3f3f71 253-266,269-272,279,294,300-302
+src/main/WorktreeService.ts
+  s_313a95a3be8a74::t_7f93cb33f3d4cb 101-118,122,125,127
+  s_313a95a3be8a74::t_ddff702add55fb 31
+  s_313a95a3be8a74::t_7045a9ce413c97 10
+  s_313a95a3be8a74::t_687a7046dbd478 353,355,363
+  s_313a95a3be8a74::t_2632e5bfed12ec 41-42
+  s_313a95a3be8a74::t_95ebf34213cb94 328-330
+  s_313a95a3be8a74::t_6f529fc2dbe704 79,84-85
+  s_313a95a3be8a74::t_3d400ae8ffda28 354,356-362,364-366
+  s_313a95a3be8a74::t_0be84b60f86914 11-17
+src/main.ts
+  s_313a95a3be8a74::t_fe9c40ce1c0352 1857-1860
+  s_313a95a3be8a74::t_b60b659479015d 1884,1891-1894
+  s_313a95a3be8a74::t_a9e1a0ec17a2ae 3206
+  s_313a95a3be8a74::t_805fe0ce50c6d7 2055-2061,2067
+  s_313a95a3be8a74::t_f81da622cbf69a 2796-2800
+  s_313a95a3be8a74::t_77da4df68b5b47 1996-1997,2004
+  s_313a95a3be8a74::t_4ded96532a22ba 1821-1824
+  s_313a95a3be8a74::t_b4ec1978309b65 2888-2909
+  s_313a95a3be8a74::t_9468df829359a2 2024,2032-2046
+  s_313a95a3be8a74::t_76e3800c413378 1707-1708,1714
+  s_313a95a3be8a74::t_923102e7b4bdd3 1928
+  s_313a95a3be8a74::t_378c36fcab88a3 2474,2480,2482,2486-2487
+  s_313a95a3be8a74::t_13b8be8a984397 149
+  s_313a95a3be8a74::t_ebf3d40a29ead9 2936
+  s_313a95a3be8a74::t_5f873d9fc45d20 3128,3135
+  s_313a95a3be8a74::t_dfde38f44a37f4 2015
+  s_313a95a3be8a74::t_0491fc00a3165b 3167,3174
+  s_313a95a3be8a74::t_90453c73a05b7f 2311
+  s_313a95a3be8a74::t_035a4bc8ad26bc 2413
+  s_313a95a3be8a74::t_63fad8840c4f21 1956-1960,1964,1971-1974
+src/main/taskSourceBranchGuard.ts
+  s_313a95a3be8a74::t_ec258aa9449584 53,58-59
+  s_313a95a3be8a74::t_965a853397e2cd 73-83
+  s_313a95a3be8a74::t_3bce7d2cf20387 119-141
+  s_313a95a3be8a74::t_b9651b913fcd01 7-8
+  s_313a95a3be8a74::t_162f9e002caab2 54
+src/main/TaskStore.ts
+  s_313a95a3be8a74::t_8e84d41a25f510 260
+src/githubPrReviewWhenOpenAutomation.ts
+  s_313a95a3be8a74::t_9651cf5b9f83fc 1-2
+  s_313a95a3be8a74::t_5199a640eb490f 20,29
+src/main/fluxTaskWorkBranchNaming.test.ts
+  s_313a95a3be8a74::t_f3db0c6d81ef76 1-37,40-47,49-51
+  s_313a95a3be8a74::t_101e757d165c8a 38-39,48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "8644b4bc81bbc576a2dd21a1e3cd41f8184e3557",
+  "prompts": {},
+  "sessions": {
+    "s_313a95a3be8a74": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "be13f301-b337-459d-ac03-c79a56e62edb",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
