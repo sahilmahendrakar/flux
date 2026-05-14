@@ -1,0 +1,26 @@
+src/cloudBindingPrefs.ts
+  s_96df274a66663b::t_c51f4ccc28f839 57
+  s_96df274a66663b::t_ff30acbcb41314 76-83,87-94
+  s_96df274a66663b::t_78e107ca2b83da 22,26-35
+src/cloudBindingPrefs.test.ts
+  s_96df274a66663b::t_0e9ad608332e93 1-46
+src/main/ProjectStore.ts
+  s_96df274a66663b::t_3391c11b0b25c5 1083-1087
+  s_96df274a66663b::t_6eceec5a05ee6d 34-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "4d39aead8b42320a30eca2cd073fd46bc942cb5f",
+  "prompts": {},
+  "sessions": {
+    "s_96df274a66663b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4e7a6768-c3ba-492a-a944-fed9900d015a",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
