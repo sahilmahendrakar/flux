@@ -1,0 +1,119 @@
+src/main/LocalBindingStore.ts
+  s_ac98e4064c8146::t_c519052cf2916e 97-99
+  s_ac98e4064c8146::t_d66f4cbdbe5770 220-222
+  s_ac98e4064c8146::t_120c552133f0b4 179
+  s_ac98e4064c8146::t_baeb4056d5b097 277-279
+  s_ac98e4064c8146::t_20b54ade6b98fd 344-346
+src/daemon/protocol.ts
+  s_ac98e4064c8146::t_f55a458f61fbb2 315-316
+  s_ac98e4064c8146::t_df6c11f9610cf2 255-256
+  s_ac98e4064c8146::t_c930f35866be16 129-138
+  s_ac98e4064c8146::t_788facaf13ac5c 283-291
+src/env.d.ts
+  s_ac98e4064c8146::t_38b107c2af8e09 362-365
+  s_ac98e4064c8146::t_b8c0b048bc21d3 179-182
+  s_ac98e4064c8146::t_e59bc37751972b 322-325
+src/daemon/trustPromptAutoresponderRules.ts
+  s_ac98e4064c8146::t_07c3fe7514d7f4 1-70
+src/daemon/trustPromptAutoresponderRules.test.ts
+  s_ac98e4064c8146::t_9a8be9cad39f46 1-33
+src/daemon/PromptAutoresponder.ts
+  s_ac98e4064c8146::t_094b3c8b8b29d3 58-61,63-64,66-71,73-85
+  s_ac98e4064c8146::t_7863262090a602 1-57,62,65,72,86-88
+src/main/DaemonClient.ts
+  s_ac98e4064c8146::t_8543d687592c90 787
+  s_ac98e4064c8146::t_4d90f5395e503b 771-786
+src/components/ProjectSettingsView.tsx
+  s_ac98e4064c8146::t_594f1178ec5c83 886,888-894,896-904
+  s_ac98e4064c8146::t_87bf2155776118 232-235
+  s_ac98e4064c8146::t_08278c9d5e793a 887,895
+  s_ac98e4064c8146::t_ba6d5c7ec0acea 518-535
+  s_ac98e4064c8146::t_ef5100ec9cc00b 401-423
+src/components/SessionTerminalView.tsx
+  s_ac98e4064c8146::t_ed6b71669ad7c5 112
+  s_ac98e4064c8146::t_e7a35f346e42dd 223-230
+  s_ac98e4064c8146::t_629b7750a9752a 18
+src/cloudBindingPrefs.test.ts
+  s_ac98e4064c8146::t_996712213664e6 18
+  s_ac98e4064c8146::t_b1a4f28936c53d 5
+src/main/trustPromptAutorespondRoots.test.ts
+  s_ac98e4064c8146::t_7d423d440b0c0a 2-10,12-23
+  s_ac98e4064c8146::t_63cb793ce63a37 1,11
+src/components/PlanningPanel.tsx
+  s_ac98e4064c8146::t_b4a25348d4d986 27
+  s_ac98e4064c8146::t_a6ef4b04e2976a 106
+  s_ac98e4064c8146::t_d5a65b4970d2ec 160-167
+src/main/trustPromptAutorespondRoots.ts
+  s_ac98e4064c8146::t_1c9822fc6714b4 1-4,7-31
+  s_ac98e4064c8146::t_31392033363394 5-6
+src/types.ts
+  s_ac98e4064c8146::t_aeb398237a9482 138-139
+  s_ac98e4064c8146::t_66f428ea386465 210,246
+src/daemon/renderedScreenText.test.ts
+  s_ac98e4064c8146::t_30246de0e9faab 20
+  s_ac98e4064c8146::t_623fe47f4a8b81 1-10,12-19,21-22
+  s_ac98e4064c8146::t_ae6b59912b3000 11
+src/cloudBindingPrefs.ts
+  s_ac98e4064c8146::t_0bcecf6ab40a25 82-85
+  s_ac98e4064c8146::t_a668913d6f9195 28
+  s_ac98e4064c8146::t_b816e6dd01cff7 46
+src/preload.ts
+  s_ac98e4064c8146::t_99b7a689812008 409-419
+  s_ac98e4064c8146::t_fa10c16b22ef54 184-189
+  s_ac98e4064c8146::t_5632e713329a9a 507-517
+src/main/ProjectStore.test.ts
+  s_ac98e4064c8146::t_652aa901150b3d 33
+src/components/TaskDetailPanel.tsx
+  s_ac98e4064c8146::t_40c9d50aa7786f 1884-1891
+  s_ac98e4064c8146::t_59c8aede9804db 63
+  s_ac98e4064c8146::t_eb42b430fc5ead 945-951
+src/hooks/useTrustAutorespondNotice.ts
+  s_ac98e4064c8146::t_fa23fdb946b886 1-58
+src/main/ProjectStore.ts
+  s_ac98e4064c8146::t_7c76deed10196c 38
+  s_ac98e4064c8146::t_3c44a373dca8ef 109
+  s_ac98e4064c8146::t_cb6bdc7f5909ae 266
+  s_ac98e4064c8146::t_1f6788821a28fb 791-817
+  s_ac98e4064c8146::t_18651bdcad7cc7 1066
+  s_ac98e4064c8146::t_85f60ae70f56c9 1115
+  s_ac98e4064c8146::t_e95086d58dabf8 68
+src/daemon/SessionRuntime.ts
+  s_ac98e4064c8146::t_c5c89c0fbe86b1 159-163,169-174
+  s_ac98e4064c8146::t_06b1a2569b1d63 7
+src/main.ts
+  s_ac98e4064c8146::t_e5e0669fd50551 30-33
+  s_ac98e4064c8146::t_a1b9c7d161539d 2839-2848,2860
+  s_ac98e4064c8146::t_c61c17e1976d6b 3470-3476,3485
+  s_ac98e4064c8146::t_44e090368d7706 1454-1482
+src/daemon/renderedScreenText.ts
+  s_ac98e4064c8146::t_eb29bf2864cef2 1-32
+src/daemon/DaemonCore.ts
+  s_ac98e4064c8146::t_d1ff7786073a26 124,130
+  s_ac98e4064c8146::t_e518f38ac4f9d6 430
+  s_ac98e4064c8146::t_9dd561469fc3dc 374,379
+  s_ac98e4064c8146::t_6ef15fafdfca8a 29
+  s_ac98e4064c8146::t_7cb69ad8512b1a 40
+  s_ac98e4064c8146::t_23f98c73cb026f 243
+  s_ac98e4064c8146::t_be01541c0bf3a6 350-360
+  s_ac98e4064c8146::t_9f58d7a69e1aa6 1
+  s_ac98e4064c8146::t_7471fcb99bf402 22-23
+  s_ac98e4064c8146::t_e4b9a90aaae4a1 99-109
+  s_ac98e4064c8146::t_e6215a0db5a93e 148-167
+  s_ac98e4064c8146::t_d2684092adf1c6 398-417
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "2c6141c13ff385a6902cf205e10688489f563349",
+  "prompts": {},
+  "sessions": {
+    "s_ac98e4064c8146": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "60b07dfd-1ab0-409c-9e45-22e88361cccc",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
