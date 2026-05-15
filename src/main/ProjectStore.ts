@@ -35,6 +35,7 @@ import {
   DEFAULT_AUTO_CLEANUP_WORKSPACE_WHEN_DONE,
   DEFAULT_AUTO_MARK_DONE_WHEN_PR_MERGED,
   DEFAULT_AUTO_MOVE_TO_REVIEW_WHEN_PR_OPEN,
+  DEFAULT_AUTO_RESPOND_TO_TRUST_PROMPTS,
   DEFAULT_AUTO_START_SESSION_ON_IN_PROGRESS,
   DEFAULT_AUTO_START_WHEN_UNBLOCKED,
 } from '../cloudBindingPrefs';
@@ -64,6 +65,7 @@ export interface ConfigFile {
   taskDefaultModels?: AgentSessionModelDefaults;
   defaultTaskAgentYolo?: boolean;
   autoStartSessionOnInProgress: boolean;
+  autoRespondToTrustPrompts: boolean;
   autoStartWhenUnblocked: boolean;
   autoCleanupWorkspaceWhenDone: boolean;
   autoMarkDoneWhenPrMerged: boolean;
@@ -116,6 +118,7 @@ function configToLocalProject(c: ConfigFile): LocalProject {
     planningAgent: c.planningAgent ?? DEFAULT_AGENT,
     defaultTaskAgent: c.defaultTaskAgent ?? DEFAULT_AGENT,
     autoStartSessionOnInProgress: c.autoStartSessionOnInProgress === true,
+    autoRespondToTrustPrompts: c.autoRespondToTrustPrompts === true,
     autoStartWhenUnblocked: c.autoStartWhenUnblocked === true,
     autoCleanupWorkspaceWhenDone: c.autoCleanupWorkspaceWhenDone === true,
     autoMarkDoneWhenPrMerged: c.autoMarkDoneWhenPrMerged === true,
@@ -272,6 +275,7 @@ function parseConfig(raw: string): ConfigFile | null {
         ? p.defaultTaskAgent
         : DEFAULT_AGENT,
     autoStartSessionOnInProgress: p.autoStartSessionOnInProgress === true,
+    autoRespondToTrustPrompts: p.autoRespondToTrustPrompts === true,
     autoStartWhenUnblocked: p.autoStartWhenUnblocked === true,
     autoCleanupWorkspaceWhenDone:
       p.autoCleanupWorkspaceWhenDone === true ||
@@ -796,6 +800,33 @@ export class ProjectStore {
     return next.autoStartWhenUnblocked;
   }
 
+  async getAutoRespondToTrustPromptsAt(projectDir: string): Promise<boolean> {
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    return parsed.autoRespondToTrustPrompts === true;
+  }
+
+  async setAutoRespondToTrustPromptsAt(
+    projectDir: string,
+    enabled: boolean,
+  ): Promise<boolean> {
+    const configPath = path.join(projectDir, 'config.json');
+    const raw = await fs.readFile(configPath, 'utf8');
+    const parsed = parseConfig(raw);
+    if (!parsed) throw new Error(`Invalid config.json at ${configPath}`);
+    const next: ConfigFile = {
+      ...parsed,
+      autoRespondToTrustPrompts: enabled === true,
+    };
+    await atomicWriteFile(configPath, `${JSON.stringify(next, null, 2)}\n`);
+    if (this.projectDir === projectDir && this.project) {
+      this.project = configToLocalProject(next);
+    }
+    return next.autoRespondToTrustPrompts;
+  }
+
   async getAutoCleanupWorkspaceWhenDoneAt(projectDir: string): Promise<boolean> {
     const configPath = path.join(projectDir, 'config.json');
     const raw = await fs.readFile(configPath, 'utf8');
@@ -1098,6 +1129,7 @@ export class ProjectStore {
         planningAgent: DEFAULT_AGENT,
         defaultTaskAgent: DEFAULT_AGENT,
         autoStartSessionOnInProgress: DEFAULT_AUTO_START_SESSION_ON_IN_PROGRESS,
+        autoRespondToTrustPrompts: DEFAULT_AUTO_RESPOND_TO_TRUST_PROMPTS,
         autoStartWhenUnblocked: DEFAULT_AUTO_START_WHEN_UNBLOCKED,
         autoCleanupWorkspaceWhenDone: DEFAULT_AUTO_CLEANUP_WORKSPACE_WHEN_DONE,
         autoMarkDoneWhenPrMerged: DEFAULT_AUTO_MARK_DONE_WHEN_PR_MERGED,
