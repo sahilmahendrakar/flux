@@ -1,0 +1,62 @@
+src/components/TaskDetailPanel.tsx
+  s_b99728386a71b0::t_4bf84349bf0e1a 237
+  s_b99728386a71b0::t_ef2b2980cff75a 1798-1800,1802
+  s_b99728386a71b0::t_823980debb2910 117
+  s_b99728386a71b0::t_8d2f0a9fd6d046 856,858
+src/components/AppShell.tsx
+  s_b99728386a71b0::t_c1f4402bba3c0f 106
+  s_b99728386a71b0::t_ed231c64e90e5b 33
+  s_b99728386a71b0::t_ec3072cc974d51 80
+src/projectTabRestore.test.ts
+  s_b99728386a71b0::t_daccbf474da02f 82-107
+src/components/Sidebar.tsx
+  s_b99728386a71b0::t_ee69305d0b0f10 195
+  s_b99728386a71b0::t_b66ce4d4c81ecb 248
+  s_b99728386a71b0::t_9a1160921a3d93 206
+  s_b99728386a71b0::t_a94d44310a2e39 57
+  s_b99728386a71b0::t_4a9e4c0201c886 430-431
+  s_b99728386a71b0::t_c2c32b98e2f44f 464,466-467,470
+  s_b99728386a71b0::t_765dd4feb4a46d 488
+src/types.ts
+  s_b99728386a71b0::t_ab876479929aad 46-50
+src/projectTabRestore.ts
+  s_b99728386a71b0::t_9170e3a95e1cd6 14
+  s_b99728386a71b0::t_58ca7fb345ce02 52
+  s_b99728386a71b0::t_4da1b60c49f69e 24,29-30
+src/App.tsx
+  s_b99728386a71b0::t_13374db563630c 2865-2867,2869,2881-2886
+  s_b99728386a71b0::t_733b4e5055e11e 2690-2695
+  s_b99728386a71b0::t_5cb3b32ce50177 273-276
+  s_b99728386a71b0::t_df592900f032ba 1481-1485
+  s_b99728386a71b0::t_1b36323f3d35b7 3201
+  s_b99728386a71b0::t_6c989594c5150e 1217-1223
+  s_b99728386a71b0::t_3570b74733b967 3341
+  s_b99728386a71b0::t_0686d38271b681 1387
+  s_b99728386a71b0::t_5112b8a4914c5f 3092,3094
+  s_b99728386a71b0::t_10d57b8827ec9a 1437
+  s_b99728386a71b0::t_3d4d0d2f339524 1422
+  s_b99728386a71b0::t_b2a6ee8db13f43 1313
+  s_b99728386a71b0::t_95909dd1ab64ec 1294
+  s_b99728386a71b0::t_b99d87286cfdbd 2922-2926
+  s_b99728386a71b0::t_5fa41aa7fa8807 2721-2726
+src/main/projectTabStateDiskParse.test.ts
+  s_b99728386a71b0::t_806646bdc7fa19 41-85
+src/main/projectTabStateDiskParse.ts
+  s_b99728386a71b0::t_a579a896243dfc 23-26,35-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "149c24b7e00a4d5bbb335606e6bd781bf61acf0c",
+  "prompts": {},
+  "sessions": {
+    "s_b99728386a71b0": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5d50b5f9-65ed-4bbd-a134-ed20edac287e",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
