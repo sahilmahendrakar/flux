@@ -13,12 +13,18 @@ export type TaskPatch = Partial<
     | 'workspaceCleanedAt'
     | 'blockedByTaskIds'
     | 'labels'
-    | 'autoStartOnUnblock'
     | 'assigneeId'
     | 'sourceBranch'
     | 'createSourceBranchIfMissing'
+    | 'repoId'
+    | 'fluxWorkBranch'
   >
-> & { workspaceCleanedAt?: string | null; githubPr?: TaskGithubPr | null };
+> & {
+  workspaceCleanedAt?: string | null;
+  githubPr?: TaskGithubPr | null;
+  /** True/false persist; `null` clears the field so the task inherits the project default. */
+  autoStartOnUnblock?: boolean | null;
+};
 
 export type TaskCreateInput = {
   title: string;
@@ -32,6 +38,8 @@ export type TaskCreateInput = {
   createSourceBranchIfMissing?: boolean;
   agentModel?: string;
   agentYolo?: boolean;
+  /** Multi-repo2: must belong to the active project when set; otherwise the primary repo is used. */
+  repoId?: string;
 };
 
 /**

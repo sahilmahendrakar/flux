@@ -4,12 +4,19 @@ import type {
   Agent,
   AgentSpawnDefaultsPatch,
   CloudProjectLocalBinding,
+  CloudRepoBindingOverview,
+  CloudSharedRepo,
   LocalProject,
   OpenWorkspaceTarget,
   PlanningSession,
   ProjectTabState,
+  RepoBranchDiscoveryRequest,
   RepoBranchDiscoveryResponse,
   RepoConfig,
+  RepoManagementState,
+  RepoSettingsPatch,
+  ResolveTaskWorktreeIpcPayload,
+  ResolveTaskWorktreeIpcResult,
   Session,
   SessionStartOptions,
   SessionStartResult,
@@ -48,6 +55,7 @@ import type {
 import type {
   PlanningDocsCloudMigrationPersistedV1,
   PlanningDocsListResult,
+  PlanningDocsWriteResult,
 } from './planningDocs/types';
 import { ipcSubscribe } from './ipcSubscribe';
 import type { AppUpdateState } from './appUpdateState';
@@ -79,8 +87,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('workspace:openPath', dirPath, target) as Promise<
         { ok: true } | { error: string }
       >,
-    resolveTaskWorktree: (taskId: string) =>
-      ipcRenderer.invoke('workspace:resolveTaskWorktree', taskId) as Promise<string | null>,
+    resolveTaskWorktree: (payload: ResolveTaskWorktreeIpcPayload) =>
+      ipcRenderer.invoke('workspace:resolveTaskWorktree', payload) as Promise<ResolveTaskWorktreeIpcResult>,
   },
   project: {
     get: () => ipcRenderer.invoke('project:get') as Promise<LocalProject | null>,
@@ -104,12 +112,63 @@ contextBridge.exposeInMainWorld('electronAPI', {
       >,
     getRepos: () =>
       ipcRenderer.invoke('project:getRepos') as Promise<RepoConfig[]>,
-    updateRepo: (payload: {
-      rootPath: string;
-      patch: Partial<Pick<RepoConfig, 'baseBranch' | 'setupScript' | 'env'>>;
-    }) =>
+    getRepoManagementStates: () =>
+      ipcRenderer.invoke('project:getRepoManagementStates') as Promise<
+        | Record<string, RepoManagementState>
+        | { error: string }
+      >,
+    pickRepoDirectory: () =>
+      ipcRenderer.invoke('project:pickRepoDirectory') as Promise<
+        | { rootPath: string }
+        | { error: 'NOT_GIT_REPO' }
+        | { error: string }
+        | null
+      >,
+    updateRepo: (payload: { rootPath: string; patch: RepoSettingsPatch }) =>
       ipcRenderer.invoke('project:updateRepo', payload) as Promise<
         { ok: true; repos: RepoConfig[] } | { error: string }
+      >,
+    updateRepoById: (payload: { repoId: string; patch: RepoSettingsPatch }) =>
+      ipcRenderer.invoke('project:updateRepoById', payload) as Promise<
+        | { ok: true; repos: RepoConfig[] }
+        | { error: string }
+      >,
+    addRepo: (payload: { rootPath: string }) =>
+      ipcRenderer.invoke('project:addRepo', payload) as Promise<
+        | { ok: true; repos: RepoConfig[] }
+        | { error: string }
+      >,
+    removeRepo: (payload: { repoId: string }) =>
+      ipcRenderer.invoke('project:removeRepo', payload) as Promise<
+        | { ok: true; repos: RepoConfig[] }
+        | { error: string }
+      >,
+    setPrimaryRepo: (payload: { repoId: string }) =>
+      ipcRenderer.invoke('project:setPrimaryRepo', payload) as Promise<
+        | { ok: true; repos: RepoConfig[] }
+        | { error: string }
+      >,
+    getPrimaryRepoId: () =>
+      ipcRenderer.invoke('project:getPrimaryRepoId') as Promise<
+        { ok: true; repoId: string | null } | { error: string }
+      >,
+    getCloudRepoBindingOverview: (sharedRepos: CloudSharedRepo[]) =>
+      ipcRenderer.invoke('project:getCloudRepoBindingOverview', sharedRepos) as Promise<
+        | CloudRepoBindingOverview
+        | { error: string; code?: string }
+      >,
+    bindCloudSharedRepo: (payload: {
+      repoId: string;
+      rootPath: string;
+      sharedRepos: CloudSharedRepo[];
+    }) =>
+      ipcRenderer.invoke('project:bindCloudSharedRepo', payload) as Promise<
+        | { ok: true; binding: CloudProjectLocalBinding }
+        | { error: string; code?: 'NOT_GIT_REPO' }
+      >,
+    syncCloudSharedRepos: (sharedRepos: CloudSharedRepo[]) =>
+      ipcRenderer.invoke('project:syncCloudSharedRepos', sharedRepos) as Promise<
+        { ok: true } | { error: string }
       >,
     getAutoStartSessionOnInProgress: () =>
       ipcRenderer.invoke('project:getAutoStartSessionOnInProgress') as Promise<boolean>,
@@ -121,6 +180,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('project:getAutoStartWhenUnblocked') as Promise<boolean>,
     setAutoStartWhenUnblocked: (enabled: boolean) =>
       ipcRenderer.invoke('project:setAutoStartWhenUnblocked', enabled) as Promise<
+        { ok: true; enabled: boolean } | { error: string }
+      >,
+    getAutoRespondToTrustPrompts: () =>
+      ipcRenderer.invoke('project:getAutoRespondToTrustPrompts') as Promise<boolean>,
+    setAutoRespondToTrustPrompts: (enabled: boolean) =>
+      ipcRenderer.invoke('project:setAutoRespondToTrustPrompts', enabled) as Promise<
         { ok: true; enabled: boolean } | { error: string }
       >,
     getAutoCleanupWorkspaceWhenDone: () =>
@@ -153,6 +218,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('projects:activateLocal', id) as Promise<LocalProject | null>,
     removeLocal: (id: string) =>
       ipcRenderer.invoke('projects:removeLocal', id) as Promise<void>,
+    removeFluxOwnedLocalState: (key: ActiveProjectKey) =>
+      ipcRenderer.invoke('projects:removeFluxOwnedLocalState', key) as Promise<{
+        ok: boolean;
+        warnings: string[];
+        errors: string[];
+        deletedMaterializationDirs: string[];
+      }>,
     getActiveKey: () =>
       ipcRenderer.invoke('projects:getActiveKey') as Promise<ActiveProjectKey | null>,
     clearActive: () => ipcRenderer.invoke('projects:clearActive') as Promise<void>,
@@ -170,14 +242,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
         'projects:pickDirectoryForCloud',
         cloudProjectId,
       ) as Promise<DirPickResult>,
-    activateCloud: (payload: { id: string; rootPath: string }) =>
+    activateCloud: (payload: {
+      id: string;
+      rootPath: string;
+      sharedRepos?: CloudSharedRepo[];
+    }) =>
       ipcRenderer.invoke('projects:activateCloud', payload) as Promise<ActivateCloudResult>,
     clearLocalBinding: (cloudProjectId: string) =>
-      ipcRenderer.invoke('projects:clearLocalBinding', cloudProjectId) as Promise<void      >,
+      ipcRenderer.invoke('projects:clearLocalBinding', cloudProjectId) as Promise<void>,
   },
   repo: {
-    getBranchDiscovery: (requestedBranch?: string) =>
-      ipcRenderer.invoke('repo:getBranchDiscovery', requestedBranch) as Promise<
+    getBranchDiscovery: (arg?: string | RepoBranchDiscoveryRequest) =>
+      ipcRenderer.invoke('repo:getBranchDiscovery', arg) as Promise<
         RepoBranchDiscoveryResponse | { error: string }
       >,
   },
@@ -211,6 +287,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       createSourceBranchIfMissing?: boolean;
       agentModel?: string;
       agentYolo?: boolean;
+      repoId?: string;
     }) => ipcRenderer.invoke('tasks:create', input) as Promise<Task>,
     update: (
       id: string,
@@ -227,18 +304,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
           | 'workspaceCleanedAt'
           | 'blockedByTaskIds'
           | 'labels'
-          | 'autoStartOnUnblock'
           | 'sourceBranch'
           | 'createSourceBranchIfMissing'
+          | 'repoId'
+          | 'fluxWorkBranch'
         >
-      > & { githubPr?: TaskGithubPr | null },
+      > & {
+        githubPr?: TaskGithubPr | null;
+        autoStartOnUnblock?: boolean | null;
+      },
     ) => ipcRenderer.invoke('tasks:update', id, patch) as Promise<Task>,
     assertSourceBranchEditable: (
       taskId: string,
-      previous: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'> & {
+      previous: Pick<
+        Task,
+        'sourceBranch' | 'createSourceBranchIfMissing' | 'repoId' | 'fluxWorkBranch'
+      > & {
         githubPr?: TaskGithubPr;
       },
-      patch: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'>,
+      patch: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing' | 'repoId'>,
     ) =>
       ipcRenderer.invoke(
         'tasks:assertSourceBranchEditable',
@@ -246,20 +330,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
         previous,
         patch,
       ) as Promise<{ ok: true } | { ok: false; message: string }>,
+    assertRepoIdEditable: (
+      taskId: string,
+      previous: Pick<Task, 'repoId' | 'fluxWorkBranch'> & { githubPr?: TaskGithubPr },
+      patch: Pick<Task, 'repoId'>,
+    ) =>
+      ipcRenderer.invoke(
+        'tasks:assertRepoIdEditable',
+        taskId,
+        previous,
+        patch,
+      ) as Promise<{ ok: true } | { ok: false; message: string }>,
     delete: (id: string) =>
       ipcRenderer.invoke('tasks:delete', id) as Promise<void>,
-    requestPullRequestFromAgent: (payload: {
-      taskId: string;
-      title?: string;
-      description?: string;
-    }) =>
+    requestPullRequestFromAgent: (payload: { taskId: string; title?: string }) =>
       ipcRenderer.invoke('tasks:requestPullRequestFromAgent', payload) as Promise<
         TaskRequestPullRequestFromAgentResult
       >,
     refreshPullRequest: (payload: { taskId: string; githubPr?: TaskGithubPr }) =>
       ipcRenderer.invoke('tasks:refreshPullRequest', payload) as Promise<TaskPullRequestIpcResult>,
-    resolveWorktrees: (taskIds: string[]) =>
-      ipcRenderer.invoke('tasks:resolveWorktrees', taskIds) as Promise<Record<string, boolean>>,
+    resolveWorktrees: (
+      taskIdsOrEntries:
+        | string[]
+        | { taskId: string; repoId?: string | null; fluxWorkBranch?: string | null }[],
+    ) =>
+      ipcRenderer.invoke('tasks:resolveWorktrees', taskIdsOrEntries) as Promise<
+        Record<string, boolean>
+      >,
     cleanupResources: (id: string) =>
       ipcRenderer.invoke('tasks:cleanupResources', id) as Promise<{ errors: string[] }>,
     onChanged: (cb: () => void) => {
@@ -273,6 +370,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_e: unknown, p: { sessionId: string; taskId: string }) => cb(p);
       ipcRenderer.on('task:userInput', handler);
       return () => ipcRenderer.removeListener('task:userInput', handler as Parameters<typeof ipcRenderer.removeListener>[1]);
+    },
+    onPersistFluxWorkBranch: (cb: (p: { taskId: string; fluxWorkBranch: string }) => void) => {
+      const handler = (_e: unknown, p: { taskId: string; fluxWorkBranch: string }) => cb(p);
+      ipcRenderer.on('task:persistFluxWorkBranch', handler);
+      return () =>
+        ipcRenderer.removeListener(
+          'task:persistFluxWorkBranch',
+          handler as Parameters<typeof ipcRenderer.removeListener>[1],
+        );
     },
   },
   sessions: {
@@ -326,6 +432,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const handler = (_e: unknown, payload: { state: AgentState }) => cb(payload.state);
       ipcRenderer.on(channel, handler);
       return () => ipcRenderer.removeListener(channel, handler);
+    },
+    onTrustPromptAutoresponded: (
+      sessionId: string,
+      cb: (payload: { ruleId: string; agent: Agent; sessionId: string }) => void,
+    ) => {
+      const channel = `session:auto-responded:${sessionId}`;
+      const handler = (
+        _e: IpcRendererEvent,
+        payload: { ruleId: string; agent: Agent; sessionId: string },
+      ) => cb(payload);
+      return ipcSubscribe(ipcRenderer, channel, handler);
     },
     getSilenceStates: () =>
       ipcRenderer.invoke('session:getSilenceStates') as Promise<
@@ -414,6 +531,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
         cb(session);
       return ipcSubscribe(ipcRenderer, 'planning:exited', handler);
     },
+    onTrustPromptAutoresponded: (
+      sessionId: string,
+      cb: (payload: { ruleId: string; agent: Agent; sessionId: string }) => void,
+    ) => {
+      const channel = `planning:auto-responded:${sessionId}`;
+      const handler = (
+        _e: IpcRendererEvent,
+        payload: { ruleId: string; agent: Agent; sessionId: string },
+      ) => cb(payload);
+      return ipcSubscribe(ipcRenderer, channel, handler);
+    },
   },
   cursorAgent: {
     listModels: () =>
@@ -426,6 +554,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('planningDocs:read', relativePath) as Promise<
         { content: string } | { error: string }
       >,
+    write: (relativePath: string, content: string) =>
+      ipcRenderer.invoke('planningDocs:write', relativePath, content) as Promise<PlanningDocsWriteResult>,
     applyFirestoreSnapshot: (payload: {
       projectId: string;
       docs: Array<{

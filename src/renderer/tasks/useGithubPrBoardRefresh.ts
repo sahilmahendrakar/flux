@@ -26,10 +26,12 @@ async function runPool<T>(items: T[], concurrency: number, fn: (item: T) => Prom
 }
 
 /**
- * Refreshes linked GitHub PR metadata for tasks that already have a PR URL (debounced).
- * Local rows persist in the main process when the IPC row exists; cloud tasks get
- * `githubPr` updates when metadata changes, and may get status-only writes when
- * metadata already matches GitHub but merge/review prefs still require a move.
+ * Refreshes GitHub PR metadata for tasks with a linked PR URL (debounced), and
+ * optionally runs branch-level discovery for tasks awaiting a first link after
+ * agent-driven `gh pr create`. Local rows persist in the main process when the
+ * IPC row exists; cloud tasks get `githubPr` updates when metadata changes, and
+ * may get status-only writes when metadata already matches GitHub but merge/review
+ * prefs still require a move.
  */
 export function useGithubPrBoardRefresh(input: {
   projectId: string | undefined;
@@ -44,8 +46,15 @@ export function useGithubPrBoardRefresh(input: {
   /**
    * When false and no task has a linked PR URL, periodic and debounced refresh is skipped
    * (e.g. user is on a session terminal tab). Linked PRs still refresh in the background.
+   * Tasks in {@link awaitingGithubPrLinkTaskIds} without a URL are exempt: branch discovery
+   * runs so post-agent PR linking is not board-tab-only.
    */
   surfaceActive: boolean;
+  /**
+   * Task ids waiting for first `githubPr` link after delegating PR creation to the agent.
+   * These receive `refreshPullRequest` branch lookups even when no task has a PR URL yet.
+   */
+  awaitingGithubPrLinkTaskIds?: readonly string[];
   /**
    * After a cloud task is written as Done from merged PR metadata, run the same
    * follow-up as an explicit Done transition (unblock autostart, optional cleanup).
@@ -61,6 +70,7 @@ export function useGithubPrBoardRefresh(input: {
     autoMarkDoneWhenPrMerged,
     autoMoveToReviewWhenPrOpen,
     surfaceActive,
+    awaitingGithubPrLinkTaskIds = [],
     onCloudPrMergedAutoDone,
   } = input;
   const generationRef = useRef(0);
@@ -78,6 +88,13 @@ export function useGithubPrBoardRefresh(input: {
   onCloudPrMergedAutoDoneRef.current = onCloudPrMergedAutoDone;
   const surfaceActiveRef = useRef(surfaceActive);
   surfaceActiveRef.current = surfaceActive;
+  const awaitingGithubPrLinkTaskIdsRef = useRef<readonly string[]>(awaitingGithubPrLinkTaskIds);
+  awaitingGithubPrLinkTaskIdsRef.current = awaitingGithubPrLinkTaskIds;
+
+  const awaitingGithubPrLinkKey = useMemo(
+    () => [...awaitingGithubPrLinkTaskIds].sort().join('|'),
+    [awaitingGithubPrLinkTaskIds],
+  );
 
   const tasksGithubPrKey = useMemo(() => {
     return tasks
@@ -100,8 +117,23 @@ export function useGithubPrBoardRefresh(input: {
     if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
     const snapshot = tasksRef.current;
     const hasLinkedPr = snapshot.some((t) => Boolean(t.githubPr?.url?.trim()));
-    if (!surfaceActiveRef.current && !hasLinkedPr) return;
-    const list = snapshot.filter((t) => Boolean(t.githubPr?.url?.trim()));
+    const awaitingSet = new Set(awaitingGithubPrLinkTaskIdsRef.current);
+    const hasAwaitingBranchDiscovery = [...awaitingSet].some((id) => {
+      const row = snapshot.find((t) => t.id === id);
+      return row && !row.githubPr?.url?.trim();
+    });
+    if (!surfaceActiveRef.current && !hasLinkedPr && !hasAwaitingBranchDiscovery) return;
+    const linked = snapshot.filter((t) => Boolean(t.githubPr?.url?.trim()));
+    const branchAwaiting = snapshot.filter(
+      (t) => !t.githubPr?.url?.trim() && awaitingSet.has(t.id),
+    );
+    const seen = new Set<string>();
+    const list: Task[] = [];
+    for (const t of [...linked, ...branchAwaiting]) {
+      if (seen.has(t.id)) continue;
+      seen.add(t.id);
+      list.push(t);
+    }
     if (list.length === 0) return;
     const gen = generationRef.current;
     await runPool(list, CONCURRENCY, async (task) => {
@@ -152,7 +184,12 @@ export function useGithubPrBoardRefresh(input: {
     if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
     const snap = tasksRef.current;
     const hasLinkedPr = snap.some((t) => Boolean(t.githubPr?.url?.trim()));
-    if (!surfaceActiveRef.current && !hasLinkedPr) return;
+    const awaitingSet = new Set(awaitingGithubPrLinkTaskIdsRef.current);
+    const hasAwaitingBranchDiscovery = [...awaitingSet].some((id) => {
+      const row = snap.find((t) => t.id === id);
+      return row && !row.githubPr?.url?.trim();
+    });
+    if (!surfaceActiveRef.current && !hasLinkedPr && !hasAwaitingBranchDiscovery) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
@@ -183,7 +220,7 @@ export function useGithubPrBoardRefresh(input: {
         debounceRef.current = null;
       }
     };
-  }, [tasksGithubPrKey, enabled, projectId, projectKind, provider, schedule]);
+  }, [tasksGithubPrKey, awaitingGithubPrLinkKey, enabled, projectId, projectKind, provider, schedule]);
 
   useEffect(() => {
     if (!enabled || !projectId || !projectKind || !provider) return;
@@ -216,7 +253,12 @@ export function useGithubPrBoardRefresh(input: {
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       const snap = tasksRef.current;
       const hasLinkedPr = snap.some((t) => Boolean(t.githubPr?.url?.trim()));
-      if (!surfaceActiveRef.current && !hasLinkedPr) return;
+      const awaitingSet = new Set(awaitingGithubPrLinkTaskIdsRef.current);
+      const hasAwaitingBranchDiscovery = [...awaitingSet].some((id) => {
+        const row = snap.find((t) => t.id === id);
+        return row && !row.githubPr?.url?.trim();
+      });
+      if (!surfaceActiveRef.current && !hasLinkedPr && !hasAwaitingBranchDiscovery) return;
       schedule();
     }, POLL_MS);
     return () => clearInterval(id);

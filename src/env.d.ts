@@ -4,10 +4,17 @@ import type {
   Agent,
   AgentSpawnDefaultsPatch,
   CloudProjectLocalBinding,
+  CloudRepoBindingOverview,
+  CloudSharedRepo,
   LocalProject,
   OpenWorkspaceTarget,
+  RepoBranchDiscoveryRequest,
   RepoBranchDiscoveryResponse,
   RepoConfig,
+  RepoManagementState,
+  RepoSettingsPatch,
+  ResolveTaskWorktreeIpcPayload,
+  ResolveTaskWorktreeIpcResult,
   Session,
   SessionStartOptions,
   SessionStartResult,
@@ -45,6 +52,7 @@ import type {
 import type {
   PlanningDocsCloudMigrationPersistedV1,
   PlanningDocsListResult,
+  PlanningDocsWriteResult,
 } from './planningDocs/types';
 import type { AppUpdateState } from './appUpdateState';
 
@@ -84,7 +92,9 @@ declare global {
           dirPath: string,
           target: OpenWorkspaceTarget,
         ) => Promise<{ ok: true } | { error: string }>;
-        resolveTaskWorktree: (taskId: string) => Promise<string | null>;
+        resolveTaskWorktree: (
+          payload: ResolveTaskWorktreeIpcPayload,
+        ) => Promise<ResolveTaskWorktreeIpcResult>;
       };
       project: {
         get: () => Promise<LocalProject | null>;
@@ -103,14 +113,72 @@ declare global {
         getRepos: () => Promise<RepoConfig[]>;
         updateRepo: (payload: {
           rootPath: string;
-          patch: Partial<Pick<RepoConfig, 'baseBranch' | 'setupScript' | 'env'>>;
+          patch: RepoSettingsPatch;
         }) => Promise<{ ok: true; repos: RepoConfig[] } | { error: string }>;
+        getRepoManagementStates: () => Promise<
+          | Record<string, RepoManagementState>
+          | { error: string }
+        >;
+        pickRepoDirectory: () => Promise<
+          | { rootPath: string }
+          | { error: 'NOT_GIT_REPO' }
+          | { error: string }
+          | null
+        >;
+        updateRepoById: (payload: {
+          repoId: string;
+          patch: RepoSettingsPatch;
+        }) => Promise<
+          | { ok: true; repos: RepoConfig[] }
+          | { error: string }
+        >;
+        addRepo: (payload: {
+          rootPath: string;
+        }) => Promise<
+          | { ok: true; repos: RepoConfig[] }
+          | { error: string }
+        >;
+        removeRepo: (payload: {
+          repoId: string;
+        }) => Promise<
+          | { ok: true; repos: RepoConfig[] }
+          | { error: string }
+        >;
+        setPrimaryRepo: (payload: {
+          repoId: string;
+        }) => Promise<
+          | { ok: true; repos: RepoConfig[] }
+          | { error: string }
+        >;
+        getPrimaryRepoId: () => Promise<
+          { ok: true; repoId: string | null } | { error: string }
+        >;
+        getCloudRepoBindingOverview: (
+          sharedRepos: CloudSharedRepo[],
+        ) => Promise<
+          CloudRepoBindingOverview | { error: string; code?: string }
+        >;
+        bindCloudSharedRepo: (payload: {
+          repoId: string;
+          rootPath: string;
+          sharedRepos: CloudSharedRepo[];
+        }) => Promise<
+          | { ok: true; binding: CloudProjectLocalBinding }
+          | { error: string; code?: 'NOT_GIT_REPO' }
+        >;
+        syncCloudSharedRepos: (
+          sharedRepos: CloudSharedRepo[],
+        ) => Promise<{ ok: true } | { error: string }>;
         getAutoStartSessionOnInProgress: () => Promise<boolean>;
         setAutoStartSessionOnInProgress: (
           enabled: boolean,
         ) => Promise<{ ok: true; enabled: boolean } | { error: string }>;
         getAutoStartWhenUnblocked: () => Promise<boolean>;
         setAutoStartWhenUnblocked: (
+          enabled: boolean,
+        ) => Promise<{ ok: true; enabled: boolean } | { error: string }>;
+        getAutoRespondToTrustPrompts: () => Promise<boolean>;
+        setAutoRespondToTrustPrompts: (
           enabled: boolean,
         ) => Promise<{ ok: true; enabled: boolean } | { error: string }>;
         getAutoCleanupWorkspaceWhenDone: () => Promise<boolean>;
@@ -131,6 +199,12 @@ declare global {
         addLocal: () => Promise<LocalProject | { error: 'NOT_GIT_REPO' } | null>;
         activateLocal: (id: string | null) => Promise<LocalProject | null>;
         removeLocal: (id: string) => Promise<void>;
+        removeFluxOwnedLocalState: (key: ActiveProjectKey) => Promise<{
+          ok: boolean;
+          warnings: string[];
+          errors: string[];
+          deletedMaterializationDirs: string[];
+        }>;
         getActiveKey: () => Promise<ActiveProjectKey | null>;
         clearActive: () => Promise<void>;
         getTabs: (key: ActiveProjectKey) => Promise<ProjectTabState>;
@@ -142,6 +216,7 @@ declare global {
         activateCloud: (payload: {
           id: string;
           rootPath: string;
+          sharedRepos?: CloudSharedRepo[];
         }) => Promise<ActivateCloudResult>;
         clearLocalBinding: (cloudProjectId: string) => Promise<void>;
       };
@@ -159,7 +234,7 @@ declare global {
       };
       repo: {
         getBranchDiscovery: (
-          requestedBranch?: string,
+          arg?: string | RepoBranchDiscoveryRequest,
         ) => Promise<RepoBranchDiscoveryResponse | { error: string }>;
       };
       tasks: {
@@ -173,6 +248,7 @@ declare global {
           createSourceBranchIfMissing?: boolean;
           agentModel?: string;
           agentYolo?: boolean;
+          repoId?: string;
         }) => Promise<Task>;
         update: (
           id: string,
@@ -185,38 +261,56 @@ declare global {
               | 'agentModel'
               | 'agentYolo'
               | 'description'
-            | 'orderKey'
-            | 'workspaceCleanedAt'
-            | 'blockedByTaskIds'
-            | 'labels'
-            | 'autoStartOnUnblock'
-            | 'sourceBranch'
-            | 'createSourceBranchIfMissing'
-          >
-        > & { githubPr?: TaskGithubPr | null },
-      ) => Promise<Task>;
+              | 'orderKey'
+              | 'workspaceCleanedAt'
+              | 'blockedByTaskIds'
+              | 'labels'
+              | 'sourceBranch'
+              | 'createSourceBranchIfMissing'
+              | 'repoId'
+              | 'fluxWorkBranch'
+            >
+          > & {
+            githubPr?: TaskGithubPr | null;
+            autoStartOnUnblock?: boolean | null;
+          },
+        ) => Promise<Task>;
         assertSourceBranchEditable: (
           taskId: string,
-          previous: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'> & {
+          previous: Pick<
+            Task,
+            'sourceBranch' | 'createSourceBranchIfMissing' | 'repoId' | 'fluxWorkBranch'
+          > & {
             githubPr?: TaskGithubPr;
           },
-          patch: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing'>,
+          patch: Pick<Task, 'sourceBranch' | 'createSourceBranchIfMissing' | 'repoId'>,
+        ) => Promise<{ ok: true } | { ok: false; message: string }>;
+        assertRepoIdEditable: (
+          taskId: string,
+          previous: Pick<Task, 'repoId' | 'fluxWorkBranch'> & { githubPr?: TaskGithubPr },
+          patch: Pick<Task, 'repoId'>,
         ) => Promise<{ ok: true } | { ok: false; message: string }>;
         delete: (id: string) => Promise<void>;
         requestPullRequestFromAgent: (payload: {
           taskId: string;
           title?: string;
-          description?: string;
         }) => Promise<TaskRequestPullRequestFromAgentResult>;
         refreshPullRequest: (payload: {
           taskId: string;
           githubPr?: TaskGithubPr;
         }) => Promise<TaskPullRequestIpcResult>;
-        resolveWorktrees: (taskIds: string[]) => Promise<Record<string, boolean>>;
+        resolveWorktrees: (
+          taskIdsOrEntries:
+            | string[]
+            | { taskId: string; repoId?: string | null; fluxWorkBranch?: string | null }[],
+        ) => Promise<Record<string, boolean>>;
         cleanupResources: (id: string) => Promise<{ errors: string[] }>;
         onChanged: (cb: () => void) => () => void;
         onUserInput: (
           cb: (p: { sessionId: string; taskId: string }) => void,
+        ) => () => void;
+        onPersistFluxWorkBranch: (
+          cb: (p: { taskId: string; fluxWorkBranch: string }) => void,
         ) => () => void;
       };
       sessions: {
@@ -239,6 +333,10 @@ declare global {
         ) => () => void;
         onExit: (cb: (session: Session) => void) => () => void;
         onAgentState: (sessionId: string, cb: (state: AgentState) => void) => () => void;
+        onTrustPromptAutoresponded: (
+          sessionId: string,
+          cb: (payload: { ruleId: string; agent: Agent; sessionId: string }) => void,
+        ) => () => void;
         getSilenceStates: () => Promise<
           { id: string; taskId?: string; state: AgentState }[]
         >;
@@ -275,6 +373,10 @@ declare global {
           cb: (data: string, streamSeq?: number) => void,
         ) => () => void;
         onExit: (cb: (session: PlanningSession) => void) => () => void;
+        onTrustPromptAutoresponded: (
+          sessionId: string,
+          cb: (payload: { ruleId: string; agent: Agent; sessionId: string }) => void,
+        ) => () => void;
       };
       cursorAgent: {
         listModels: () => Promise<ListCursorAgentModelsResult>;
@@ -284,6 +386,10 @@ declare global {
         read: (relativePath: string) => Promise<
           { content: string } | { error: string }
         >;
+        write: (
+          relativePath: string,
+          content: string,
+        ) => Promise<PlanningDocsWriteResult>;
         applyFirestoreSnapshot: (payload: {
           projectId: string;
           docs: Array<{

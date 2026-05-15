@@ -3,6 +3,8 @@ import type { IPty } from 'node-pty';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import { Terminal as HeadlessTerminal } from '@xterm/headless';
 import type { AttachResult, TerminalSnapshot } from './protocol';
+import { buildPtyEnv, PTY_TERM_NAME } from './terminalEnv';
+import { collapsedBottomScreenText } from './renderedScreenText';
 import { buildRehydrateSequences, captureSerializedSnapshot } from './terminalSnapshot';
 
 const DEFAULT_REPLAY_BYTES = 256 * 1024;
@@ -71,12 +73,17 @@ export class SessionRuntime {
     this.rows = spec.rows;
     this.cwd = spec.cwd;
 
+    // Force a curated terminal env (TERM=xterm-256color, COLORTERM=truecolor,
+    // LANG=<utf-8>, TERM_PROGRAM=kitty for CSI-u Shift+Enter, COLORFGBG=15;0).
+    // Without this, packaged GUI launches inherit launchd's bare env and TUIs
+    // like claude-code fall back to ANSI-16 + stripped banners. See
+    // `terminalEnv.ts` and `docs/daemon-packaging.md`.
     this.pty = pty.spawn(spec.command, spec.args, {
-      name: 'xterm-color',
+      name: PTY_TERM_NAME,
       cols: spec.cols,
       rows: spec.rows,
       cwd: spec.cwd,
-      env: spec.env ?? { ...process.env },
+      env: buildPtyEnv(spec.env ?? process.env),
     });
 
     this.headless = new HeadlessTerminal({
@@ -149,9 +156,22 @@ export class SessionRuntime {
 
   /** Ensures all bytes fed into the headless terminal have been parsed. */
   private flushHeadlessWrites(): Promise<void> {
+    return this.flushHeadlessParser();
+  }
+
+  /** Public flush for consumers that read the parsed buffer (e.g. trust autoresponder). */
+  flushHeadlessParser(): Promise<void> {
     return new Promise((resolve) => {
       this.headless.write('', () => resolve());
     });
+  }
+
+  /**
+   * Rendered screen tail for prompt detection: bottom lines of the active buffer with
+   * whitespace collapsed (matches what users see, modulo theming).
+   */
+  getCollapsedBottomScreenText(maxLines = 40): string {
+    return collapsedBottomScreenText(this.headless, maxLines);
   }
 
   write(data: string): void {

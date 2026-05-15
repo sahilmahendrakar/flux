@@ -114,11 +114,28 @@ export interface CreateSessionParams {
   branch: string;
   taskId: string;
   projectId: string;
+  /**
+   * Multi-repo2: stable id of the {@link RepoConfig} this worktree belongs
+   * to. Optional for backward compatibility — daemon copies it onto the
+   * returned `Session.repoId` when present, and renderer/main treat
+   * missing values as the project's primary repo.
+   */
+  repoId?: string;
   agent: Agent;
   command: string;
   args: string[];
   cols: number;
   rows: number;
+  /**
+   * When true with non-empty {@link CreateSessionParams.trustPromptAutorespondRoots},
+   * the daemon may auto-answer known trust prompts for this PTY (project opt-in).
+   */
+  trustPromptAutorespond?: boolean;
+  /**
+   * Resolved absolute path prefixes (Flux `worktrees/`, `planning/`, optional `~/.flux/worktrees`).
+   * Empty or omitted disables cwd-gated autoresponse even if `trustPromptAutorespond` is true.
+   */
+  trustPromptAutorespondRoots?: string[];
 }
 
 export type CreateSessionResult =
@@ -235,6 +252,8 @@ export interface StartPlanningParams {
   args: string[];
   cols: number;
   rows: number;
+  trustPromptAutorespond?: boolean;
+  trustPromptAutorespondRoots?: string[];
 }
 
 export type StartPlanningResult =
@@ -261,7 +280,15 @@ export type StreamFrame =
   | { kind: 'session-exit'; id: string; session: Session }
   | { kind: 'shell-exit'; id: string; shell: Shell }
   | { kind: 'planning-exit'; id: string; session: PlanningSession }
-  | { kind: 'agent-state'; id: string; state: AgentState };
+  | { kind: 'agent-state'; id: string; state: AgentState }
+  | {
+      kind: 'auto-responded';
+      target: 'session' | 'planning';
+      id: string;
+      ruleId: string;
+      agent: Agent;
+      sessionId: string;
+    };
 
 /** IPC payload when the main↔daemon stream socket reconnects after a drop. */
 export interface DaemonStreamCatchupPayload {
@@ -285,7 +312,8 @@ export function isStreamControlFrame(frame: StreamFrame): boolean {
     frame.kind === 'agent-state' ||
     frame.kind === 'session-exit' ||
     frame.kind === 'shell-exit' ||
-    frame.kind === 'planning-exit'
+    frame.kind === 'planning-exit' ||
+    frame.kind === 'auto-responded'
   );
 }
 

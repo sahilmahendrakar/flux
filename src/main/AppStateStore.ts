@@ -2,6 +2,7 @@ import { app } from 'electron';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ActiveProjectKey, ProjectTabState } from '../types';
+import { parseProjectTabStateDiskValue } from './projectTabStateDiskParse';
 
 export type { ProjectTabState };
 
@@ -31,8 +32,8 @@ export class AppStateStore {
     projectTabs: {},
   };
 
-  constructor() {
-    this.filePath = path.join(app.getPath('userData'), 'app-state.json');
+  constructor(opts?: { filePath?: string }) {
+    this.filePath = opts?.filePath ?? path.join(app.getPath('userData'), 'app-state.json');
   }
 
   async init(): Promise<void> {
@@ -72,33 +73,8 @@ export class AppStateStore {
       for (const [key, value] of Object.entries(
         o.projectTabs as Record<string, unknown>,
       )) {
-        if (!value || typeof value !== 'object') continue;
-        const v = value as Partial<ProjectTabState>;
-        const ids = Array.isArray(v.openTaskIds)
-          ? v.openTaskIds.filter((x): x is string => typeof x === 'string')
-          : [];
-        const active =
-          typeof v.activeTaskId === 'string' && v.activeTaskId
-            ? v.activeTaskId
-            : null;
-        const openPlanning =
-          Array.isArray(v.openPlanningTabIds) && v.openPlanningTabIds.length > 0
-            ? v.openPlanningTabIds.filter((x): x is string => typeof x === 'string')
-            : undefined;
-        const planningSidebarActive =
-          typeof v.planningSidebarActiveSessionId === 'string'
-            ? v.planningSidebarActiveSessionId
-            : v.planningSidebarActiveSessionId === null
-              ? null
-              : undefined;
-        tabs[key] = {
-          openTaskIds: ids,
-          activeTaskId: active,
-          ...(openPlanning ? { openPlanningTabIds: openPlanning } : {}),
-          ...(planningSidebarActive !== undefined
-            ? { planningSidebarActiveSessionId: planningSidebarActive }
-            : {}),
-        };
+        const parsed = parseProjectTabStateDiskValue(value);
+        if (parsed) tabs[key] = parsed;
       }
       this.state.projectTabs = tabs;
     }
@@ -127,6 +103,25 @@ export class AppStateStore {
       [projectStateKey(key)]: tabs,
     };
     await this.set({ projectTabs: next });
+  }
+
+  /**
+   * Removes persisted tab strip state for a project. When `clearActiveNavigation` is true
+   * (removed project was active), also clears `activeProjectKey` and `lastOpenedProjectDir`.
+   */
+  async clearProjectFluxState(
+    key: ActiveProjectKey,
+    options: { clearActiveNavigation: boolean },
+  ): Promise<void> {
+    const sk = projectStateKey(key);
+    const nextTabs = { ...this.state.projectTabs };
+    delete nextTabs[sk];
+    const partial: Partial<AppState> = { projectTabs: nextTabs };
+    if (options.clearActiveNavigation) {
+      partial.activeProjectKey = null;
+      partial.lastOpenedProjectDir = null;
+    }
+    await this.set(partial);
   }
 
   async set(partial: Partial<AppState>): Promise<void> {

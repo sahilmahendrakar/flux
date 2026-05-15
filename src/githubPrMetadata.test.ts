@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   githubPrRefreshViewEqual,
+  githubPrUrlMatchesGitRemote,
+  parseGithubOwnerRepoFromPrUrl,
+  parseGithubOwnerRepoFromRemote,
   parseGithubPrField,
   parseGhPrViewJsonStdout,
+  parseGhPrViewJsonStdoutList,
   parseGhPrViewRecord,
 } from './githubPrMetadata';
 import { isGithubHostingRemote } from './main/githubTaskPr';
@@ -95,6 +99,40 @@ describe('parseGhPrViewRecord / parseGhPrViewJsonStdout', () => {
     });
   });
 
+  it('parses every row from gh pr list JSON arrays', () => {
+    const json = JSON.stringify([
+      {
+        url: 'https://github.com/o/r/pull/9',
+        state: 'CLOSED',
+        headRefName: 'flux/task-x',
+        updatedAt: '2024-01-01T00:00:00Z',
+      },
+      {
+        url: 'https://github.com/o/r/pull/10',
+        state: 'MERGED',
+        headRefName: 'flux/task-x',
+        mergedAt: '2024-01-02T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z',
+      },
+    ]);
+    expect(parseGhPrViewJsonStdoutList(json)).toEqual([
+      {
+        url: 'https://github.com/o/r/pull/9',
+        state: 'closed',
+        headBranch: 'flux/task-x',
+        updatedAt: '2024-01-01T00:00:00Z',
+      },
+      {
+        url: 'https://github.com/o/r/pull/10',
+        state: 'merged',
+        headBranch: 'flux/task-x',
+        mergedAt: '2024-01-02T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z',
+      },
+    ]);
+    expect(parseGhPrViewJsonStdoutList('[]')).toEqual([]);
+  });
+
   it('returns null for invalid JSON', () => {
     expect(parseGhPrViewJsonStdout('not json')).toBeNull();
     expect(parseGhPrViewJsonStdout('[]')).toBeNull();
@@ -161,6 +199,28 @@ describe('githubPrRefreshViewEqual', () => {
       baseBranch: 'main',
     };
     expect(githubPrRefreshViewEqual(prev, next)).toBe(false);
+  });
+});
+
+describe('GitHub owner/repo parsing (repo-aware PR validation)', () => {
+  it('parses PR urls and remotes to comparable slugs', () => {
+    expect(parseGithubOwnerRepoFromPrUrl('https://github.com/Org/MyRepo/pull/12')).toEqual({
+      owner: 'org',
+      repo: 'myrepo',
+    });
+    expect(parseGithubOwnerRepoFromRemote('git@github.com:Org/MyRepo.git')).toEqual({
+      owner: 'org',
+      repo: 'myrepo',
+    });
+    expect(githubPrUrlMatchesGitRemote('https://github.com/Org/MyRepo/pull/1', 'git@github.com:Org/MyRepo')).toBe(
+      true,
+    );
+    expect(
+      githubPrUrlMatchesGitRemote(
+        'https://github.com/other/other/pull/1',
+        'git@github.com:Org/MyRepo.git',
+      ),
+    ).toBe(false);
   });
 });
 

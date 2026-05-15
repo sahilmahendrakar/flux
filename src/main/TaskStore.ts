@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Agent, Task, TaskGithubPr } from '../types';
 import { DEFAULT_CURSOR_AGENT_MODEL } from '../types';
-import { validateBlockedByTaskIds } from '../taskDependencies';
+import { validateBlockedByTaskIds, taskIdsToClearAutoStartOnUnblockWhenAutomationEnables } from '../taskDependencies';
 import { normalizeTaskLabels } from '../taskLabels';
 
 type TaskInput = {
@@ -17,6 +17,8 @@ type TaskInput = {
   createSourceBranchIfMissing?: boolean;
   agentModel?: string;
   agentYolo?: boolean;
+  /** Multi-repo2: identity of the {@link RepoConfig} this task belongs to. Optional — falls back to primary. */
+  repoId?: string;
 };
 
 function errnoCode(err: unknown): string | undefined {
@@ -108,6 +110,27 @@ export class TaskStore {
     }
   }
 
+  /**
+   * Multi-repo2 migration: assign a primary `repoId` to tasks that predate
+   * the multi-repo data model, then persist if any rows changed. Idempotent
+   * — running on already-migrated tasks is a no-op.
+   */
+  async migrateMissingRepoIds(primaryRepoId: string): Promise<void> {
+    if (!this.filePath) return;
+    if (!primaryRepoId) return;
+    let changed = false;
+    this.tasks = this.tasks.map((t) => {
+      if (t.repoId == null || t.repoId === '') {
+        changed = true;
+        return { ...t, repoId: primaryRepoId };
+      }
+      return t;
+    });
+    if (changed) {
+      await this.save();
+    }
+  }
+
   async remapProjectId(from: string, to: string): Promise<void> {
     if (!this.filePath || from === to) {
       return;
@@ -133,6 +156,34 @@ export class TaskStore {
       return this.tasks;
     }
     return this.tasks.filter((t) => t.projectId === projectId);
+  }
+
+  /**
+   * When project “auto-start when unblocked” is turned on, drop per-task `autoStartOnUnblock`
+   * on blocked tasks so prior opt-in/opt-out choices are not carried over.
+   */
+  async bulkClearAutoStartOnUnblockForBlockedTasks(projectId: string): Promise<number> {
+    if (!this.filePath) {
+      return 0;
+    }
+    const ids = new Set(taskIdsToClearAutoStartOnUnblockWhenAutomationEnables(this.getAll(projectId)));
+    if (ids.size === 0) {
+      return 0;
+    }
+    let cleared = 0;
+    this.tasks = this.tasks.map((t) => {
+      if (!ids.has(t.id) || t.autoStartOnUnblock === undefined) {
+        return t;
+      }
+      const next = { ...t };
+      delete next.autoStartOnUnblock;
+      cleared += 1;
+      return next;
+    });
+    if (cleared > 0) {
+      await this.save();
+    }
+    return cleared;
   }
 
   async create(input: TaskInput): Promise<Task> {
@@ -180,6 +231,9 @@ export class TaskStore {
     if (input.agentYolo === true) {
       task.agentYolo = true;
     }
+    if (input.repoId != null && input.repoId.length > 0) {
+      task.repoId = input.repoId;
+    }
     this.tasks.push(task);
     await this.save();
     return task;
@@ -200,11 +254,16 @@ export class TaskStore {
         | 'workspaceCleanedAt'
         | 'blockedByTaskIds'
         | 'labels'
-        | 'autoStartOnUnblock'
         | 'sourceBranch'
         | 'createSourceBranchIfMissing'
+        | 'repoId'
+        | 'fluxWorkBranch'
       >
-    > & { assigneeId?: string | null; githubPr?: TaskGithubPr | null },
+    > & {
+      autoStartOnUnblock?: boolean | null;
+      assigneeId?: string | null;
+      githubPr?: TaskGithubPr | null;
+    },
   ): Promise<Task> {
     if (!this.filePath) {
       throw new Error('No project directory open for tasks');
@@ -214,7 +273,12 @@ export class TaskStore {
       throw new Error(`Task not found: ${id}`);
     }
     const current = this.tasks[index];
-    const { assigneeId: patchAssigneeId, githubPr: patchGithubPr, ...patchRest } = patch;
+    const {
+      assigneeId: patchAssigneeId,
+      githubPr: patchGithubPr,
+      autoStartOnUnblock: patchAsou,
+      ...patchRest
+    } = patch;
     const updated: Task = {
       ...current,
       ...patchRest,
@@ -227,11 +291,11 @@ export class TaskStore {
         delete updated.labels;
       }
     }
-    if (patch.autoStartOnUnblock !== undefined) {
-      if (patch.autoStartOnUnblock) {
-        updated.autoStartOnUnblock = true;
-      } else {
+    if (patchAsou !== undefined) {
+      if (patchAsou === null) {
         delete updated.autoStartOnUnblock;
+      } else {
+        updated.autoStartOnUnblock = patchAsou;
       }
     }
     if (patchAssigneeId !== undefined) {
@@ -263,11 +327,12 @@ export class TaskStore {
         delete updated.createSourceBranchIfMissing;
       }
     }
-    if (patchGithubPr !== undefined) {
-      if (patchGithubPr === null) {
-        delete updated.githubPr;
+    if (patch.repoId !== undefined) {
+      const nextRepo = (patch.repoId ?? '').trim();
+      if (nextRepo.length === 0) {
+        delete updated.repoId;
       } else {
-        updated.githubPr = patchGithubPr;
+        updated.repoId = nextRepo;
       }
     }
     this.tasks[index] = updated;

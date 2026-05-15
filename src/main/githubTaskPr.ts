@@ -1,9 +1,17 @@
 import { execFile as execFileCallback } from 'node:child_process';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { promisify } from 'node:util';
-import type { TaskGithubPr, TaskPrErrorCode } from '../types';
-import { branchForTaskId } from '../taskBranch';
+import type { RepoConfig, Task, TaskGithubPr, TaskPrErrorCode } from '../types';
+import {
+  parseGithubOwnerRepoFromPrUrl,
+  parseGithubOwnerRepoFromRemote,
+  parseGhPrViewJsonStdout,
+  parseGhPrViewJsonStdoutList,
+} from '../githubPrMetadata';
+import { resolveRepoForBranchDiscovery } from '../repoIdentity';
+import { expectedTaskFluxWorkBranch } from '../taskBranch';
 import { normalizeGitBranchShortName } from '../taskBranches';
-import { parseGhPrViewJsonStdout } from '../githubPrMetadata';
 
 const execFile = promisify(execFileCallback);
 
@@ -155,8 +163,8 @@ export async function readCurrentBranch(worktreePath: string): Promise<string | 
   }
 }
 
-export function expectTaskBranch(taskId: string, branch: string): TaskPrError | null {
-  const expected = branchForTaskId(taskId);
+export function expectTaskWorkBranch(task: Pick<Task, 'id' | 'fluxWorkBranch'>, branch: string): TaskPrError | null {
+  const expected = expectedTaskFluxWorkBranch(task);
   if (branch !== expected) {
     return {
       ok: false,
@@ -165,6 +173,11 @@ export function expectTaskBranch(taskId: string, branch: string): TaskPrError | 
     };
   }
   return null;
+}
+
+/** @deprecated Use {@link expectTaskWorkBranch}. */
+export function expectTaskBranch(taskId: string, branch: string): TaskPrError | null {
+  return expectTaskWorkBranch({ id: taskId }, branch);
 }
 
 async function gitPushHead(worktreePath: string): Promise<TaskPrError | null> {
@@ -390,27 +403,64 @@ export async function ghPrViewJson(
   return { ok: true, githubPr: parsed };
 }
 
-function noOpenPullRequest(message = 'No open pull request found for this task worktree'): TaskPrError {
+function noPrForTaskBranch(message = 'No pull request found for this task branch'): TaskPrError {
   return { ok: false, code: 'NO_OPEN_PR', message };
 }
 
-export async function ghPrViewCurrentBranchOpen(worktreePath: string): Promise<TaskPrOk | TaskPrError> {
+/** True when GitHub’s head ref matches the task worktree branch (both normalized). */
+export function githubPrHeadMatchesTaskBranch(pr: TaskGithubPr, taskBranchShort: string): boolean {
+  const want = normalizeGitBranchShortName(taskBranchShort);
+  if (!want) return false;
+  const head = normalizeGitBranchShortName(pr.headBranch ?? '');
+  if (!head) return true;
+  return head === want;
+}
+
+/**
+ * Picks one PR for a head branch when `gh pr list` returns multiple rows (e.g.
+ * closed attempts plus a merged PR). Prefers merged, then open, then closed,
+ * breaking ties with newest `updatedAt` / `mergedAt`.
+ */
+export function selectPreferredGithubPrForHead(
+  candidates: TaskGithubPr[],
+  taskBranchShort: string,
+): TaskGithubPr | null {
+  const matching = candidates.filter((c) => githubPrHeadMatchesTaskBranch(c, taskBranchShort));
+  if (matching.length === 0) return null;
+  const rank = (s: TaskGithubPr['state'] | undefined): number =>
+    s === 'merged' ? 3 : s === 'open' ? 2 : s === 'closed' ? 1 : 0;
+  matching.sort((a, b) => {
+    const byState = rank(b.state) - rank(a.state);
+    if (byState !== 0) return byState;
+    const tb = Date.parse(b.updatedAt ?? b.mergedAt ?? '') || 0;
+    const ta = Date.parse(a.updatedAt ?? a.mergedAt ?? '') || 0;
+    return tb - ta;
+  });
+  return matching[0] ?? null;
+}
+
+/**
+ * Resolves the PR for the current worktree branch using `gh`, including **merged**
+ * and **closed** PRs (not only open). Used when the task has no stored PR URL so
+ * fast create-then-merge races still link metadata.
+ */
+export async function discoverGithubPrForTaskWorktree(worktreePath: string): Promise<TaskPrOk | TaskPrError> {
   const pre = await assertGhAvailable(worktreePath);
   if (pre) return pre;
+
+  const branchResult = await readCurrentBranch(worktreePath);
+  if (typeof branchResult !== 'string') {
+    return noPrForTaskBranch(branchResult.message);
+  }
 
   const viewed = await gh(['pr', 'view', '--json', PR_VIEW_FIELDS], worktreePath);
   if (viewed.ok) {
     const parsed = parseGhPrViewJsonStdout(viewed.stdout);
-    if (parsed?.state === 'open') {
+    if (parsed?.url && githubPrHeadMatchesTaskBranch(parsed, branchResult)) {
       return { ok: true, githubPr: parsed };
     }
   } else if (viewed.notFound) {
     return { ok: false, code: 'GH_NOT_INSTALLED', message: viewed.message };
-  }
-
-  const branchResult = await readCurrentBranch(worktreePath);
-  if (typeof branchResult !== 'string') {
-    return noOpenPullRequest(branchResult.message);
   }
 
   const listed = await gh(
@@ -418,11 +468,11 @@ export async function ghPrViewCurrentBranchOpen(worktreePath: string): Promise<T
       'pr',
       'list',
       '--state',
-      'open',
+      'all',
       '--head',
       branchResult,
       '--limit',
-      '1',
+      '30',
       '--json',
       PR_VIEW_FIELDS,
     ],
@@ -435,23 +485,79 @@ export async function ghPrViewCurrentBranchOpen(worktreePath: string): Promise<T
     return { ok: false, code: 'PR_VIEW_FAILED', message: listed.stderr || listed.message };
   }
 
-  const parsed = parseGhPrViewJsonStdout(listed.stdout);
-  if (parsed?.state === 'open') {
-    return { ok: true, githubPr: parsed };
+  const rows = parseGhPrViewJsonStdoutList(listed.stdout);
+  const best = selectPreferredGithubPrForHead(rows, branchResult);
+  if (best) {
+    return { ok: true, githubPr: best };
   }
-  return noOpenPullRequest();
+  return noPrForTaskBranch();
+}
+
+/**
+ * Resolves cwd for `gh` (prefer the task worktree when present) and the repo root
+ * used to read `origin` / validate PR URLs (`multi-repo2`).
+ */
+export async function resolveGithubPrGitOperationPaths(params: {
+  repos: RepoConfig[];
+  taskRepoId: string | undefined;
+  worktreePath: string | null;
+}): Promise<
+  | { ok: true; ghCwd: string; gitRootPath: string; repo: RepoConfig }
+  | TaskPrError
+> {
+  if (!params.repos.length) {
+    return {
+      ok: false,
+      code: 'NO_PROJECT',
+      message: 'No git repositories are configured for this Flux project.',
+    };
+  }
+  const repoCfg = resolveRepoForBranchDiscovery(params.repos, params.taskRepoId);
+  if (!repoCfg) {
+    return {
+      ok: false,
+      code: 'NO_PROJECT',
+      message:
+        'This task targets a repository that is not configured in this project. Check Project Settings or the task repository field.',
+    };
+  }
+  const gitRootPath = path.resolve(repoCfg.rootPath);
+  let ghCwd = gitRootPath;
+  const wt = params.worktreePath?.trim();
+  if (wt) {
+    try {
+      const st = await fs.stat(wt);
+      if (st.isDirectory()) ghCwd = wt;
+    } catch {
+      /* use repo root */
+    }
+  }
+  return { ok: true, ghCwd, gitRootPath, repo: repoCfg };
+}
+
+/** When both URLs parse as github.com owner/repo slugs, rejects PRs that are not from this clone's origin. */
+export function validateGithubPrMatchesTaskRemote(prUrl: string, originRemoteUrl: string): TaskPrError | null {
+  const prSlug = parseGithubOwnerRepoFromPrUrl(prUrl);
+  const originSlug = parseGithubOwnerRepoFromRemote(originRemoteUrl);
+  if (!prSlug || !originSlug) return null;
+  if (prSlug.owner === originSlug.owner && prSlug.repo === originSlug.repo) return null;
+  return {
+    ok: false,
+    code: 'PR_REPO_MISMATCH',
+    message: `This pull request is on GitHub at ${prSlug.owner}/${prSlug.repo}, but this task's clone uses origin ${originSlug.owner}/${originSlug.repo}.`,
+  };
 }
 
 export async function createPullRequestForTaskWorktree(params: {
   worktreePath: string;
   gitRootPath: string;
-  taskId: string;
+  task: Pick<Task, 'id' | 'fluxWorkBranch'>;
   title: string;
   body: string;
   /** Normalized short branch name: task source branch, else project default. */
   baseBranch: string;
 }): Promise<TaskPrCreateOk | TaskPrError> {
-  const { worktreePath, gitRootPath, taskId, title, body, baseBranch } = params;
+  const { worktreePath, gitRootPath, task, title, body, baseBranch } = params;
   const prBase = normalizeGitBranchShortName(baseBranch);
   if (!prBase) {
     return {
@@ -470,7 +576,7 @@ export async function createPullRequestForTaskWorktree(params: {
   const branchResult = await readCurrentBranch(worktreePath);
   if (typeof branchResult !== 'string') return branchResult;
 
-  const branchCheck = expectTaskBranch(taskId, branchResult);
+  const branchCheck = expectTaskWorkBranch(task, branchResult);
   if (branchCheck) return branchCheck;
 
   const baseReady = await ensureRemotePrBaseBranch(gitRootPath, prBase);
@@ -483,7 +589,7 @@ export async function createPullRequestForTaskWorktree(params: {
   const existing = await gh(['pr', 'view', '--json', PR_VIEW_FIELDS], worktreePath);
   if (existing.ok) {
     const parsedExisting = parseGhPrViewJsonStdout(existing.stdout);
-    if (parsedExisting?.state === 'open') {
+    if (parsedExisting?.url && githubPrHeadMatchesTaskBranch(parsedExisting, branchResult)) {
       return {
         ok: true,
         pushedBaseBranch,

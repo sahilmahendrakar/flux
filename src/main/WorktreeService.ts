@@ -2,13 +2,19 @@ import { execFile as execFileCallback, spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { promisify } from 'node:util';
-import type { RepoConfig } from '../types';
 import {
   fetchOriginBranchBestEffort,
   resolveLocalOrOriginRefWithAmbiguity,
 } from './repoGit';
 import { WorktreeCreateError } from './worktreeCreateError';
-import { fluxTaskWorkBranchName } from './fluxTaskBranch';
+import { resolveLocalBranchShortForWorktreePath, readHeadBranchShortAtPath } from './gitWorktreeBranch';
+import {
+  chooseFluxTaskWorkBranchName,
+  collectTakenFluxWorkBranchNames,
+  resolveFluxAuthorSlugForBranches,
+  worktreePathSegmentsForFluxBranch,
+} from './fluxTaskWorkBranchNaming';
+import { normalizeGitBranchShortName, validateStoredTaskSourceBranchName } from '../taskBranches';
 
 const execFile = promisify(execFileCallback);
 
@@ -22,14 +28,7 @@ function gitErrText(err: unknown): string {
   return String(err);
 }
 
-/**
- * Async getter that returns the per-repo config for the given rootPath, or
- * null if none is configured yet. Injected so the service stays decoupled
- * from ProjectStore (which it shares a circular boot relationship with).
- */
-export type RepoConfigGetter = (rootPath: string) => Promise<RepoConfig | null>;
-
-/** Options for basing a new `flux/task-*` worktree on `Task.sourceBranch`. */
+/** Options for basing a new Flux task worktree on `Task.sourceBranch`. */
 export type WorktreeSourceBranchOptions = {
   /** Normalized short branch name (task source / PR base intent). */
   sourceBranchShort: string;
@@ -37,9 +36,23 @@ export type WorktreeSourceBranchOptions = {
   createSourceBranchIfMissing: boolean;
 };
 
-export class WorktreeService {
-  private repoConfigGetter: RepoConfigGetter | null = null;
+/**
+ * Flux layout directory name under `<project>/worktrees/`.
+ * Legacy single-repo installs used `{taskId}`; multi-repo2 used `{repoId}/{taskId}`.
+ * New worktrees nest under `{repoId}/<branch-path-segments>` mirroring the task work branch.
+ */
+export type WorktreeLayoutMode = 'legacy-flat' | 'repo-scoped';
 
+/** Per-repo inputs for creating a task worktree. */
+export type WorktreeRepoCreateParams = {
+  repoId: string;
+  gitRootPath: string;
+  baseBranch: string;
+  setupScript?: string;
+  env?: string;
+};
+
+export class WorktreeService {
   constructor(
     private rootPath: string,
     private projectDir: string,
@@ -53,49 +66,78 @@ export class WorktreeService {
     this.projectDir = nextDir;
   }
 
-  setRepoConfigGetter(getter: RepoConfigGetter | null): void {
-    this.repoConfigGetter = getter;
-  }
-
   getProjectDir(): string {
     return this.projectDir;
   }
 
+  /** Primary repo root for UX that still assumes a single main clone (IPC, legacy paths). */
   getRootPath(): string {
     return this.rootPath;
   }
 
-  async create(
-    taskId: string,
-    sourceOpts: WorktreeSourceBranchOptions,
-  ): Promise<{ worktreePath: string; branch: string }> {
-    if (!this.rootPath) {
-      throw new Error('WorktreeService: no project root path set');
-    }
+  async create(params: {
+    task: { id: string; title: string; fluxWorkBranch?: string };
+    repo: WorktreeRepoCreateParams;
+    source: WorktreeSourceBranchOptions;
+    layout: WorktreeLayoutMode;
+  }): Promise<{ worktreePath: string; branch: string }> {
+    const { task, repo, source: sourceOpts, layout } = params;
+    const taskId = task.id;
     if (!this.projectDir) {
       throw new Error('WorktreeService: no project directory set');
     }
 
-    const branch = fluxTaskWorkBranchName(taskId);
+    const gitRootResolved = path.resolve(repo.gitRootPath);
+    await this.ensureGitRepo(gitRootResolved);
+
+    const repoIdTrim = repo.repoId.trim();
+    if (!repoIdTrim) {
+      throw new WorktreeCreateError(
+        'WORKTREE_REPO_INVALID_STATE',
+        'Worktree create requires a non-empty repo id.',
+      );
+    }
+
+    const persisted = normalizeGitBranchShortName(task.fluxWorkBranch ?? '');
+    const persistedOk =
+      persisted.length > 0 && validateStoredTaskSourceBranchName(persisted).ok;
+
+    const taken = await collectTakenFluxWorkBranchNames(gitRootResolved);
+    let branch: string;
+    if (persistedOk) {
+      branch = persisted;
+    } else {
+      const authorSlug = await resolveFluxAuthorSlugForBranches(gitRootResolved);
+      branch = chooseFluxTaskWorkBranchName({
+        authorSlug,
+        taskTitle: task.title,
+        taskId: task.id,
+        takenShortNames: taken,
+      });
+    }
+
     const worktreesRoot = path.join(this.projectDir, 'worktrees');
     await fs.mkdir(worktreesRoot, { recursive: true });
-    const worktreePath = path.join(worktreesRoot, taskId);
 
-    await this.reclaimStaleWorktree(worktreePath);
+    const branchSegments = worktreePathSegmentsForFluxBranch(branch);
+    let worktreePath: string;
+    if (layout === 'repo-scoped') {
+      worktreePath = path.join(worktreesRoot, repoIdTrim, ...branchSegments);
+    } else {
+      worktreePath = path.join(worktreesRoot, ...branchSegments);
+    }
+
+    await this.reclaimStaleWorktree(worktreePath, gitRootResolved);
 
     let branchExists = false;
     try {
       await execFile('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`], {
-        cwd: this.rootPath,
+        cwd: gitRootResolved,
       });
       branchExists = true;
     } catch {
       branchExists = false;
     }
-
-    const repoConfig = this.repoConfigGetter
-      ? await this.repoConfigGetter(this.rootPath).catch(() => null)
-      : null;
 
     const sourceShort = sourceOpts.sourceBranchShort.trim();
     if (!sourceShort) {
@@ -105,15 +147,15 @@ export class WorktreeService {
       );
     }
 
-    await fetchOriginBranchBestEffort(this.rootPath, sourceShort);
+    await fetchOriginBranchBestEffort(gitRootResolved, sourceShort);
 
     try {
       if (branchExists) {
         await execFile('git', ['worktree', 'add', worktreePath, branch], {
-          cwd: this.rootPath,
+          cwd: gitRootResolved,
         });
       } else {
-        const resolved = await resolveLocalOrOriginRefWithAmbiguity(this.rootPath, sourceShort, {
+        const resolved = await resolveLocalOrOriginRefWithAmbiguity(gitRootResolved, sourceShort, {
           onDivergence: 'prefer-origin',
         });
         if (resolved.kind === 'ambiguous') {
@@ -125,7 +167,7 @@ export class WorktreeService {
         }
         let startRef = resolved.kind === 'ok' ? resolved.ref : null;
         if (!startRef && sourceOpts.createSourceBranchIfMissing) {
-          const base = await this.resolveBaseRef(repoConfig?.baseBranch);
+          const base = await this.resolveBaseRef(gitRootResolved, repo.baseBranch);
           if (!base.ref) {
             const hint = base.fetchError
               ? ` Last fetch attempt failed: ${base.fetchError}`
@@ -140,7 +182,7 @@ export class WorktreeService {
           }
           try {
             await execFile('git', ['branch', sourceShort, base.ref], {
-              cwd: this.rootPath,
+              cwd: gitRootResolved,
             });
           } catch (branchErr: unknown) {
             const detail = gitErrText(branchErr);
@@ -150,7 +192,7 @@ export class WorktreeService {
               sourceShort,
             );
           }
-          const again = await resolveLocalOrOriginRefWithAmbiguity(this.rootPath, sourceShort, {
+          const again = await resolveLocalOrOriginRefWithAmbiguity(gitRootResolved, sourceShort, {
             onDivergence: 'prefer-local',
           });
           if (again.kind === 'ambiguous') {
@@ -171,7 +213,7 @@ export class WorktreeService {
         await execFile(
           'git',
           ['worktree', 'add', worktreePath, '-b', branch, startRef],
-          { cwd: this.rootPath },
+          { cwd: gitRootResolved },
         );
       }
     } catch (err: unknown) {
@@ -184,9 +226,9 @@ export class WorktreeService {
       );
     }
 
-    if (repoConfig?.env && repoConfig.env.length > 0) {
+    if (repo.env && repo.env.length > 0) {
       try {
-        await fs.writeFile(path.join(worktreePath, '.env'), repoConfig.env, 'utf8');
+        await fs.writeFile(path.join(worktreePath, '.env'), repo.env, 'utf8');
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         console.warn(
@@ -195,11 +237,30 @@ export class WorktreeService {
       }
     }
 
-    if (repoConfig?.setupScript && repoConfig.setupScript.trim().length > 0) {
-      await this.runSetupScript(worktreePath, repoConfig.setupScript);
+    if (repo.setupScript && repo.setupScript.trim().length > 0) {
+      await this.runSetupScript(worktreePath, repo.setupScript);
     }
 
     return { worktreePath, branch };
+  }
+
+  private async ensureGitRepo(gitRootResolved: string): Promise<void> {
+    try {
+      await fs.access(gitRootResolved);
+    } catch {
+      throw new WorktreeCreateError(
+        'WORKTREE_REPO_PATH_MISSING',
+        `The repository clone path does not exist: ${gitRootResolved}`,
+      );
+    }
+    try {
+      await fs.access(path.join(gitRootResolved, '.git'));
+    } catch {
+      throw new WorktreeCreateError(
+        'WORKTREE_REPO_NOT_GIT',
+        `Expected a Git repository at ${gitRootResolved}, but no .git entry was found.`,
+      );
+    }
   }
 
   /**
@@ -248,12 +309,11 @@ export class WorktreeService {
     });
   }
 
-  async remove(worktreePath: string): Promise<void> {
-    if (!this.rootPath) {
-      console.warn('[WorktreeService.remove] no root path set, skipping');
-      return;
-    }
-
+  /**
+   * Removes a Flux task worktree. `gitRepoRoot` is the owning repository (where `git worktree`
+   * was run). Pass `null` to skip git metadata cleanup and delete only on-disk paths.
+   */
+  async remove(worktreePath: string, gitRepoRoot: string | null): Promise<void> {
     try {
       await fs.access(worktreePath);
     } catch {
@@ -263,23 +323,48 @@ export class WorktreeService {
       return;
     }
 
-    const taskId = path.basename(worktreePath);
-    const branch = fluxTaskWorkBranchName(taskId);
+    if (gitRepoRoot) {
+      const cwd = path.resolve(gitRepoRoot);
+      const fromList = await resolveLocalBranchShortForWorktreePath(cwd, worktreePath);
+      const fromHead = await readHeadBranchShortAtPath(worktreePath);
+      const branchToDelete = fromList ?? fromHead;
+      try {
+        await execFile('git', ['worktree', 'remove', worktreePath, '--force'], {
+          cwd,
+        });
+      } catch (err: unknown) {
+        const stderr =
+          err && typeof err === 'object' && 'stderr' in err
+            ? String((err as { stderr?: Buffer | string }).stderr ?? '')
+            : '';
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(
+          `[WorktreeService.remove] git worktree remove failed: ${worktreePath}`,
+          stderr || message,
+        );
+      }
 
-    try {
-      await execFile('git', ['worktree', 'remove', worktreePath, '--force'], {
-        cwd: this.rootPath,
-      });
-    } catch (err: unknown) {
-      const stderr =
-        err && typeof err === 'object' && 'stderr' in err
-          ? String((err as { stderr?: Buffer | string }).stderr ?? '')
-          : '';
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(
-        `[WorktreeService.remove] git worktree remove failed: ${worktreePath}`,
-        stderr || message,
-      );
+      try {
+        await execFile('git', ['worktree', 'prune'], { cwd });
+      } catch {
+        // best-effort
+      }
+
+      if (branchToDelete) {
+        try {
+          await execFile('git', ['branch', '-D', branchToDelete], { cwd });
+        } catch (err: unknown) {
+          const stderr =
+            err && typeof err === 'object' && 'stderr' in err
+              ? String((err as { stderr?: Buffer | string }).stderr ?? '')
+              : '';
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[WorktreeService.remove] git branch -D failed for ${branchToDelete}:`,
+            stderr || message,
+          );
+        }
+      }
     }
 
     try {
@@ -291,23 +376,6 @@ export class WorktreeService {
         message,
       );
     }
-
-    try {
-      await execFile('git', ['worktree', 'prune'], { cwd: this.rootPath });
-    } catch {
-      // best-effort
-    }
-
-    try {
-      await execFile('git', ['branch', '-D', branch], { cwd: this.rootPath });
-    } catch (err: unknown) {
-      const stderr =
-        err && typeof err === 'object' && 'stderr' in err
-          ? String((err as { stderr?: Buffer | string }).stderr ?? '')
-          : '';
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[WorktreeService.remove] git branch -D failed for ${branch}:`, stderr || message);
-    }
   }
 
   /**
@@ -315,18 +383,18 @@ export class WorktreeService {
    * `origin/<branch>` after a best-effort fetch, then a local `refs/heads`
    * branch matching the project default name.
    */
-  private async resolveBaseRef(configuredBranch?: string): Promise<{
+  private async resolveBaseRef(gitRootResolved: string, configuredBranch?: string): Promise<{
     ref: string | null;
     defaultBranchShort: string;
     fetchError?: string;
   }> {
     let defaultBranch = configuredBranch?.trim() || 'main';
-    if (!configuredBranch) {
+    if (!configuredBranch?.trim()) {
       try {
         const { stdout } = await execFile(
           'git',
           ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'],
-          { cwd: this.rootPath, encoding: 'utf8' },
+          { cwd: gitRootResolved, encoding: 'utf8' },
         );
         const ref = stdout.trim();
         if (ref.startsWith('origin/')) {
@@ -340,7 +408,7 @@ export class WorktreeService {
     let fetchError: string | undefined;
     try {
       await execFile('git', ['fetch', 'origin', defaultBranch], {
-        cwd: this.rootPath,
+        cwd: gitRootResolved,
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -355,7 +423,7 @@ export class WorktreeService {
       await execFile(
         'git',
         ['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${defaultBranch}`],
-        { cwd: this.rootPath },
+        { cwd: gitRootResolved },
       );
       return { ref: `origin/${defaultBranch}`, defaultBranchShort: defaultBranch };
     } catch {
@@ -366,7 +434,7 @@ export class WorktreeService {
       await execFile(
         'git',
         ['rev-parse', '--verify', '--quiet', `refs/heads/${defaultBranch}`],
-        { cwd: this.rootPath },
+        { cwd: gitRootResolved },
       );
       return { ref: defaultBranch, defaultBranchShort: defaultBranch, fetchError };
     } catch {
@@ -379,7 +447,7 @@ export class WorktreeService {
    * hard crash where onExit cleanup never ran), reclaim it so `git worktree add`
    * can succeed. Clears both the on-disk directory and git's worktree metadata.
    */
-  private async reclaimStaleWorktree(worktreePath: string): Promise<void> {
+  private async reclaimStaleWorktree(worktreePath: string, gitRootResolved: string): Promise<void> {
     let exists = false;
     try {
       await fs.access(worktreePath);
@@ -390,7 +458,7 @@ export class WorktreeService {
 
     if (!exists) {
       try {
-        await execFile('git', ['worktree', 'prune'], { cwd: this.rootPath });
+        await execFile('git', ['worktree', 'prune'], { cwd: gitRootResolved });
       } catch {
         // best-effort
       }
@@ -403,7 +471,7 @@ export class WorktreeService {
 
     try {
       await execFile('git', ['worktree', 'remove', worktreePath, '--force'], {
-        cwd: this.rootPath,
+        cwd: gitRootResolved,
       });
     } catch {
       // git may not know about the path; fall through to fs.rm
@@ -417,18 +485,23 @@ export class WorktreeService {
     }
 
     try {
-      await execFile('git', ['worktree', 'prune'], { cwd: this.rootPath });
+      await execFile('git', ['worktree', 'prune'], { cwd: gitRootResolved });
     } catch {
       // best-effort
     }
   }
 
-  async listWorktrees(): Promise<string[]> {
-    if (!this.rootPath) {
+  async listWorktrees(gitRootPath: string): Promise<string[]> {
+    const cwd = gitRootPath?.trim()
+      ? path.resolve(gitRootPath)
+      : this.rootPath
+        ? path.resolve(this.rootPath)
+        : '';
+    if (!cwd) {
       return [];
     }
     const { stdout } = await execFile('git', ['worktree', 'list', '--porcelain'], {
-      cwd: this.rootPath,
+      cwd,
       encoding: 'utf8',
     });
     const paths: string[] = [];

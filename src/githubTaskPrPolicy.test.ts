@@ -5,6 +5,8 @@ import {
   extractPrUrlFromGhOutput,
   mergeTaskPrPersistFields,
   prMetadataRefMismatchWarning,
+  selectPreferredGithubPrForHead,
+  validateGithubPrMatchesTaskRemote,
 } from './main/githubTaskPr';
 
 describe('classifyRemotePrBaseReadiness', () => {
@@ -61,6 +63,39 @@ describe('extractPrUrlFromGhOutput', () => {
   });
 });
 
+describe('selectPreferredGithubPrForHead', () => {
+  it('prefers merged over open for the same head branch', () => {
+    const merged = {
+      url: 'https://github.com/o/r/pull/2',
+      state: 'merged' as const,
+      headBranch: 'flux/task-a',
+      mergedAt: '2024-02-01T00:00:00Z',
+      updatedAt: '2024-02-01T00:00:00Z',
+    };
+    const open = {
+      url: 'https://github.com/o/r/pull/1',
+      state: 'open' as const,
+      headBranch: 'flux/task-a',
+      updatedAt: '2024-01-15T00:00:00Z',
+    };
+    expect(selectPreferredGithubPrForHead([open, merged], 'flux/task-a')).toEqual(merged);
+  });
+
+  it('ignores PRs whose head does not match the task branch', () => {
+    const picked = selectPreferredGithubPrForHead(
+      [
+        {
+          url: 'https://github.com/o/r/pull/3',
+          state: 'merged' as const,
+          headBranch: 'other-branch',
+        },
+      ],
+      'flux/task-a',
+    );
+    expect(picked).toBeNull();
+  });
+});
+
 describe('mergeTaskPrPersistFields', () => {
   it('pins head and base from Flux session and task source', () => {
     const merged = mergeTaskPrPersistFields(
@@ -77,6 +112,37 @@ describe('mergeTaskPrPersistFields', () => {
     expect(merged.headBranch).toBe('flux/task-x');
     expect(merged.baseBranch).toBe('feature/foo');
     expect(merged.url).toContain('/pull/1');
+  });
+});
+
+describe('validateGithubPrMatchesTaskRemote (multi-repo2 PR isolation)', () => {
+  it('returns null when PR URL or origin cannot be parsed as github slugs', () => {
+    expect(validateGithubPrMatchesTaskRemote('not-a-url', 'git@github.com:o/r.git')).toBeNull();
+    expect(
+      validateGithubPrMatchesTaskRemote('https://github.com/o/r/pull/1', 'https://gitlab.com/x/y.git'),
+    ).toBeNull();
+  });
+
+  it('returns null when PR repo matches origin', () => {
+    expect(
+      validateGithubPrMatchesTaskRemote(
+        'https://github.com/acme/widget/pull/9',
+        'git@github.com:acme/widget.git',
+      ),
+    ).toBeNull();
+  });
+
+  it('rejects PR from a different GitHub repo than the task clone origin', () => {
+    const err = validateGithubPrMatchesTaskRemote(
+      'https://github.com/org/repo-b/pull/3',
+      'https://github.com/org/repo-a.git',
+    );
+    expect(err).toEqual({
+      ok: false,
+      code: 'PR_REPO_MISMATCH',
+      message:
+        'This pull request is on GitHub at org/repo-b, but this task\'s clone uses origin org/repo-a.',
+    });
   });
 });
 

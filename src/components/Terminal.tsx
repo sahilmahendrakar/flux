@@ -7,6 +7,8 @@ import {
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { WebglAddon } from '@xterm/addon-webgl';
+import { interactiveXtermCompatibilityOptions } from '../terminal/interactiveXtermOptions';
 
 export interface TerminalProps {
   sessionId: string | null;
@@ -117,6 +119,7 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
     }
 
     const term = new XTerm({
+      ...interactiveXtermCompatibilityOptions,
       theme: {
         background: '#09090b',
         foreground: '#d4d4d8',
@@ -128,7 +131,14 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
       },
       fontFamily: '"JetBrains Mono", "Fira Code", "Cascadia Code", monospace',
       fontSize: 12,
-      lineHeight: 1.4,
+      // Keep at xterm.js's default of 1.0. TUIs (claude-code's banner, fzf
+      // panels, separators, progress bars) draw with half-block characters
+      // like `▀ ▄ █`. Any lineHeight > 1.0 inserts a transparent stripe
+      // between rows, turning what should be a solid block into horizontal
+      // slats — what made the Claude robot look fuzzy / "off". Native
+      // terminals (iTerm, Terminal.app) and Superset's xterm.js setup also
+      // default to 1.0 for this reason.
+      lineHeight: 1.0,
       cursorBlink: !hideCursor,
       cursorStyle: 'block',
       cursorInactiveStyle: 'none',
@@ -149,6 +159,36 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
 
     term.open(container);
     termRef.current = term;
+
+    // Swap xterm's default DOM renderer for the GPU-accelerated WebGL one.
+    // Why: the DOM renderer paints each row as a separate HTML element and
+    // relies on sub-pixel glyph hinting, so adjacent rows often don't meet
+    // flush — produces 1-px hairlines between the half-block (`▀ ▄`) tiles
+    // that TUIs use to draw pixel-art logos / box borders (the eyes↔body
+    // and body↔legs gaps in claude-code's banner). WebGL renders the whole
+    // grid as one pixel-aligned GPU texture, so cells tile perfectly.
+    // Lazy-load after `term.open(container)` and guard against
+    // unsupported / lost contexts; fall back to DOM if anything goes wrong.
+    // Pattern lifted from Superset's terminal setup.
+    let webglAddon: WebglAddon | null = null;
+    const webglRaf = requestAnimationFrame(() => {
+      try {
+        const addon = new WebglAddon();
+        addon.onContextLoss(() => {
+          addon.dispose();
+          webglAddon = null;
+          if (!cancelled && term.rows > 0) {
+            term.refresh(0, term.rows - 1);
+          }
+        });
+        term.loadAddon(addon);
+        webglAddon = addon;
+      } catch {
+        // WebGL unavailable (e.g. blocked GPU, headless context) — leave
+        // the DOM renderer in place. Functional, just slightly less crisp.
+        webglAddon = null;
+      }
+    });
 
     let cancelled = false;
     let immediateRaf = 0;
@@ -277,6 +317,12 @@ const Terminal = forwardRef<TerminalHandle, TerminalProps>(function Terminal(
         cancelAnimationFrame(immediateRaf);
         immediateRaf = 0;
       }
+      cancelAnimationFrame(webglRaf);
+      // Dispose BEFORE term.dispose() — WebglAddon holds GPU resources tied
+      // to the terminal's <canvas>, and disposing it after the terminal
+      // leaves orphaned GL contexts.
+      webglAddon?.dispose();
+      webglAddon = null;
       scheduleFitRef.current = null;
       ro?.disconnect();
       d1.dispose();

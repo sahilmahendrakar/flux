@@ -19,8 +19,10 @@ import {
   LocalProject,
   Session,
   type ActiveProjectKey,
+  type CloudRepoBindingOverview,
   type PlanningSession,
   type ProjectTabState,
+  type RepoConfig,
   type TaskPrErrorCode,
   type TaskPullRequestIpcResult,
   type TaskRequestPullRequestFromAgentResult,
@@ -38,6 +40,7 @@ import { ProjectSettingsView } from './components/ProjectSettingsView';
 import { TabBar, buildSessionTabs } from './components/TabBar';
 import { SessionTerminalView } from './components/SessionTerminalView';
 import ConfirmDialog from './components/ConfirmDialog';
+import { taskDeleteNeedsWorkspaceConfirmation } from './taskDeleteWorkspaceConfirmation';
 import { useAuth } from './renderer/auth/useAuth';
 import { useCloudProjects } from './renderer/projects/useCloudProjects';
 import { useMembers } from './renderer/projects/useMembers';
@@ -65,8 +68,9 @@ import {
 } from './renderer/tasks/useCloudSilenceReconciliation';
 import { keyForInsert, sortColumn } from './renderer/tasks/orderKey';
 import { normalizeTaskLabels } from './taskLabels';
+import { selectSessionForTaskWorkspace } from './sessionWorkspacePick';
 import { invalidateSessionAttachCache } from './terminal/warmAttach';
-import { isTaskBlocked } from './taskDependencies';
+import { isTaskBlocked, taskIdsToClearAutoStartOnUnblockWhenAutomationEnables } from './taskDependencies';
 import { useCloudPlanningDocsMigration } from './renderer/planningDocs/useCloudPlanningDocsMigration';
 import { useMcpRendererBridge } from './renderer/mcp/useMcpRendererBridge';
 import { usePlanningDocsFirestorePush } from './renderer/planningDocs/usePlanningDocsFirestorePush';
@@ -80,6 +84,7 @@ import type { UnblockAutostartPolicy } from './unblockAutostart';
 import {
   defaultTaskAgentForProject,
   hydrateCloudProject,
+  primaryRootPathFromCloudBinding,
 } from './cloudBindingPrefs';
 import type { PlanningDocFileEntry, PlanningDocsCloudListMeta } from './planningDocs/types';
 import { mergedTaskCreateAgentFields } from './projectAgentDefaults';
@@ -91,6 +96,7 @@ import {
   replaceProjectWorkspaceRoute,
   useProjectHashRoute,
 } from './projectHashRoute';
+import { normalizeRestoredProjectTabState } from './projectTabRestore';
 
 type ActiveProject = LocalProject | CloudProject;
 
@@ -125,6 +131,8 @@ function mergeServerTaskWithPendingPatch(task: Task, patch: TaskPatch | undefine
     githubPr,
     sourceBranch,
     createSourceBranchIfMissing,
+    autoStartOnUnblock,
+    repoId,
     ...rest
   } = patch;
   let next: Task = { ...task, ...rest };
@@ -168,6 +176,22 @@ function mergeServerTaskWithPendingPatch(task: Task, patch: TaskPatch | undefine
       delete next.createSourceBranchIfMissing;
     }
   }
+  if (autoStartOnUnblock !== undefined) {
+    if (autoStartOnUnblock === null) {
+      next = { ...next };
+      delete next.autoStartOnUnblock;
+    } else {
+      next = { ...next, autoStartOnUnblock };
+    }
+  }
+  if (repoId !== undefined) {
+    if (typeof repoId === 'string' && repoId.trim() === '') {
+      next = { ...next };
+      delete next.repoId;
+    } else {
+      next = { ...next, repoId };
+    }
+  }
   return next;
 }
 
@@ -198,6 +222,8 @@ const TASK_PR_ERROR_HINTS: Partial<Record<TaskPrErrorCode, string>> = {
   BRANCH_PUSH_FAILED: 'Fix the push error shown above (permissions, network, or diverged history), then retry.',
   PR_CREATE_FAILED: 'Check the GitHub CLI output for details, then retry.',
   TASK_METADATA_REQUIRED: 'Ensure this task has a title (edit the task if needed), then try again.',
+  PR_REPO_MISMATCH:
+    "This pull request is for a different GitHub repository than this task's clone. Check the task's repository and the linked PR URL, then try again.",
 };
 
 type TaskPrIpcFailure = Extract<
@@ -252,6 +278,7 @@ export default function App() {
     }
   });
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [taskDeleteConfirmId, setTaskDeleteConfirmId] = useState<string | null>(null);
   const [cleanupConfirmTaskId, setCleanupConfirmTaskId] = useState<string | null>(null);
   const [cleanupLoadingTaskId, setCleanupLoadingTaskId] = useState<string | null>(null);
   const [cleanupError, setCleanupError] = useState<string | null>(null);
@@ -260,6 +287,8 @@ export default function App() {
   /** Per-task: Flux task worktree exists on disk or is tied to a session worktree path. */
   const [taskHasWorktreeById, setTaskHasWorktreeById] = useState<Record<string, boolean>>({});
   const [planPanelOpen, setPlanPanelOpen] = useState(false);
+  /** Persisted: user wants the board planning strip open (see {@link ProjectTabState.planningSidebarOpen}). */
+  const [planningSidebarOpen, setPlanningSidebarOpen] = useState(false);
   const [planPanelWidth, setPlanPanelWidth] = useState(DEFAULT_PLANNING_PANEL_WIDTH);
   const [planningSessions, setPlanningSessions] = useState<PlanningSession[]>([]);
   const [planningSidebarActiveId, setPlanningSidebarActiveId] = useState<string | null>(
@@ -280,6 +309,13 @@ export default function App() {
     string | null
   >(null);
   const [planningDocFileRevision, setPlanningDocFileRevision] = useState(0);
+  const planningDocsDirtyRef = useRef(false);
+  /** Bumped when `project` changes so in-flight tab restore cannot unlock persistence for a newer project. */
+  const tabRestoreGenerationRef = useRef(0);
+  /** False until the current project's async tab restore finishes (avoids empty defaults overwriting disk on startup). */
+  const tabsPersistAllowedRef = useRef(false);
+  /** Bumps when restore completes so the persist effect re-evaluates `tabsPersistAllowedRef`. */
+  const [tabPersistNonce, setTabPersistNonce] = useState(0);
   const boardRowRef = useRef<HTMLDivElement>(null);
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
@@ -310,8 +346,14 @@ export default function App() {
   const pendingAgentPrDiscoveryLastAtRef = useRef<Map<string, number>>(new Map());
   const worktreeResolveGenRef = useRef(0);
   const memberPhotoRefreshKeyRef = useRef('');
+  const projectReposLoadSeqRef = useRef(0);
   const [autoStartWhenUnblockedProject, setAutoStartWhenUnblockedProject] = useState(false);
   const [repoDefaultBranchShort, setRepoDefaultBranchShort] = useState('main');
+  /** Loaded for task UI (repo picker + labels). Null while loading. */
+  const [projectRepos, setProjectRepos] = useState<RepoConfig[] | null>(null);
+  /** Cloud multi-repo: local clone path/status per shared repo id for board tooltips. */
+  const [cloudRepoBindingOverview, setCloudRepoBindingOverview] =
+    useState<CloudRepoBindingOverview | null>(null);
 
   const auth = useAuth();
   const uid = auth.user?.uid ?? null;
@@ -342,6 +384,11 @@ export default function App() {
   const cloudProjectId = project?.kind === 'cloud' ? project.id : null;
   const runners = useRunners(cloudProjectId);
 
+  const cloudSharedRepoIdsKey = useMemo(() => {
+    if (project?.kind !== 'cloud') return '';
+    return project.sharedRepos.map((s) => s.id).join(',');
+  }, [project]);
+
   useEffect(() => {
     if (!project) {
       setRepoDefaultBranchShort('main');
@@ -364,6 +411,63 @@ export default function App() {
       cancelled = true;
     };
   }, [project?.id, project?.rootPath, project?.kind]);
+
+  const refreshProjectRepos = useCallback(async (): Promise<RepoConfig[]> => {
+    const seq = ++projectReposLoadSeqRef.current;
+    if (!project) {
+      setProjectRepos(null);
+      return [];
+    }
+    try {
+      const repos = await window.electronAPI.project.getRepos();
+      if (seq === projectReposLoadSeqRef.current) setProjectRepos(repos);
+      return repos;
+    } catch (err) {
+      console.warn('[App] project.getRepos failed', err);
+      const fallback = project.kind === 'local' ? project.repos : [];
+      if (seq === projectReposLoadSeqRef.current) setProjectRepos(fallback);
+      return fallback;
+    }
+  }, [project]);
+
+  useEffect(() => {
+    void refreshProjectRepos();
+    return () => {
+      projectReposLoadSeqRef.current += 1;
+    };
+  }, [refreshProjectRepos]);
+
+  useEffect(() => {
+    if (
+      !project ||
+      project.kind !== 'cloud'
+    ) {
+      setCloudRepoBindingOverview(null);
+      return;
+    }
+    if (project.sharedRepos.length <= 1) {
+      setCloudRepoBindingOverview(null);
+      return;
+    }
+    let cancelled = false;
+    void window.electronAPI.project
+      .getCloudRepoBindingOverview(project.sharedRepos)
+      .then((r) => {
+        if (cancelled) return;
+        if (r && typeof r === 'object' && 'error' in r) {
+          setCloudRepoBindingOverview(null);
+          return;
+        }
+        setCloudRepoBindingOverview(r as CloudRepoBindingOverview);
+      })
+      .catch(() => {
+        if (!cancelled) setCloudRepoBindingOverview(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.id, project?.kind, cloudSharedRepoIdsKey]);
+
   const membersState = useMembers(cloudProjectId);
   const { cloudPlanningDocsSeedModal } = useCloudPlanningDocsMigration(
     project?.kind === 'cloud' ? project : null,
@@ -411,6 +515,7 @@ export default function App() {
               ownerId: cur.ownerId,
               memberIds: cur.memberIds,
               createdAt: cur.createdAt,
+              repos: cur.sharedRepos,
             },
             binding,
           )
@@ -491,12 +596,21 @@ export default function App() {
     refreshPlanningDocList,
   ]);
 
+  // Stable ref for cloud sharedRepos + membership checks (avoid stale closures).
+  const projectRef = useRef(project);
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
+
   // ----- Task provider per active project -----
   const provider = useMemo<TaskProvider | null>(() => {
     if (!project) return null;
     if (project.kind === 'local') return new LocalTaskProvider();
     if (!uid) return null;
-    return new FirestoreTaskProvider(project.id, uid);
+    return new FirestoreTaskProvider(project.id, uid, () => {
+      const p = projectRef.current;
+      return p?.kind === 'cloud' ? p.sharedRepos : [];
+    });
   }, [project?.kind, project?.id, uid]);
 
   useEffect(() => {
@@ -642,7 +756,7 @@ export default function App() {
   const tasksWorktreeIdsKey = useMemo(
     () =>
       tasks
-        .map((t) => t.id)
+        .map((t) => `${t.id}\t${t.repoId ?? ''}\t${t.fluxWorkBranch ?? ''}`)
         .sort()
         .join('\0'),
     [tasks],
@@ -667,15 +781,20 @@ export default function App() {
       setTaskHasWorktreeById({});
       return;
     }
-    const ids = tasksRef.current.map((t) => t.id);
-    if (ids.length === 0) {
+    if (tasksRef.current.length === 0) {
       setTaskHasWorktreeById({});
       return;
     }
     const gen = ++worktreeResolveGenRef.current;
     const handle = window.setTimeout(() => {
       void api
-        .resolveWorktrees(ids)
+        .resolveWorktrees(
+          tasksRef.current.map((t) => ({
+            taskId: t.id,
+            repoId: t.repoId,
+            fluxWorkBranch: t.fluxWorkBranch,
+          })),
+        )
         .then((map) => {
           if (worktreeResolveGenRef.current !== gen) return;
           setTaskHasWorktreeById(map);
@@ -751,9 +870,25 @@ export default function App() {
         }
         return;
       }
+      const primaryPath = primaryRootPathFromCloudBinding(
+        match.id,
+        binding,
+        match.repos,
+      );
+      if (!primaryPath) {
+        await window.electronAPI.projects.clearActive();
+        if (!cancelled) {
+          setPendingCloudActive(null);
+          setActivationLoading(false);
+        }
+        return;
+      }
       const result = await window.electronAPI.projects.activateCloud({
         id: match.id,
-        rootPath: binding.rootPath,
+        rootPath: primaryPath,
+        ...(match.repos?.length
+          ? { sharedRepos: match.repos }
+          : {}),
       });
       if (cancelled) return;
       if (!result || 'error' in result) {
@@ -777,19 +912,58 @@ export default function App() {
     cloudProjectsState.projects,
   ]);
 
+  // Multi-repo2 cloud: keep ~/.flux/projects/<cloudId>/ workspace `repos[]` aligned with shared repo ids + bindings.
+  useEffect(() => {
+    if (!project || project.kind !== 'cloud') return;
+    if (project.sharedRepos.length === 0) return;
+    let cancelled = false;
+    void window.electronAPI.project
+      .syncCloudSharedRepos(project.sharedRepos)
+      .then((result) => {
+        if (cancelled) return;
+        if ('error' in result) {
+          console.warn('[App] syncCloudSharedRepos failed', result.error);
+          return;
+        }
+        void refreshProjectRepos();
+      })
+      .catch((err) => {
+        console.warn('[App] syncCloudSharedRepos', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    project?.id,
+    project?.kind,
+    project?.kind === 'cloud' ? project.sharedRepos : undefined,
+    refreshProjectRepos,
+  ]);
+
   // Keep cloud project's Firestore-side fields fresh when the snapshot updates.
   useEffect(() => {
     if (!project || project.kind !== 'cloud') return;
     if (cloudProjectsState.status !== 'ready') return;
     const fresh = cloudProjectsState.projects.find((p) => p.id === project.id);
     if (!fresh) return;
+    const reposChanged =
+      fresh.repos !== undefined &&
+      JSON.stringify(fresh.repos) !== JSON.stringify(project.sharedRepos);
     const changed =
       fresh.name !== project.name ||
       fresh.ownerId !== project.ownerId ||
       fresh.memberIds.join(',') !== project.memberIds.join(',') ||
-      fresh.createdAt !== project.createdAt;
+      fresh.createdAt !== project.createdAt ||
+      reposChanged;
     if (!changed) return;
-    setProject({ ...project, ...fresh });
+    setProject({
+      ...project,
+      name: fresh.name,
+      ownerId: fresh.ownerId,
+      memberIds: fresh.memberIds,
+      createdAt: fresh.createdAt,
+      ...(fresh.repos !== undefined ? { sharedRepos: fresh.repos } : {}),
+    });
   }, [project, cloudProjectsState.status, cloudProjectsState.projects]);
 
   useEffect(() => {
@@ -857,10 +1031,6 @@ export default function App() {
   useEffect(() => {
     providerRef.current = provider;
   }, [provider]);
-  const projectRef = useRef(project);
-  useEffect(() => {
-    projectRef.current = project;
-  }, [project]);
 
   useCloudSilenceReconciliation({
     enabled: project?.kind === 'cloud',
@@ -994,6 +1164,18 @@ export default function App() {
   }, [project?.kind]);
 
   useEffect(() => {
+    if (project?.kind !== 'cloud') return;
+    return window.electronAPI.tasks.onPersistFluxWorkBranch(({ taskId, fluxWorkBranch }) => {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, fluxWorkBranch } : t)),
+      );
+      void providerRef.current?.update(taskId, { fluxWorkBranch }).catch((err) => {
+        console.error('[task:fluxWorkBranch] Firestore write failed', { taskId, err });
+      });
+    });
+  }, [project?.kind]);
+
+  useEffect(() => {
     setSessionStartPendingTaskIds(new Set());
   }, [project?.id]);
 
@@ -1093,6 +1275,8 @@ export default function App() {
 
   useEffect(() => {
     if (!project) {
+      tabRestoreGenerationRef.current += 1;
+      tabsPersistAllowedRef.current = false;
       setSessions([]);
       setSessionStartPendingTaskIds(new Set());
       setOpenTabIds(new Set());
@@ -1100,8 +1284,21 @@ export default function App() {
       setPlanningSessions([]);
       setPlanningSidebarActiveId(null);
       setOpenPlanningMainTabIds(new Set());
+      setPlanningSidebarOpen(false);
+      setPlanPanelOpen(false);
       return;
     }
+    tabRestoreGenerationRef.current += 1;
+    const restoreGen = tabRestoreGenerationRef.current;
+    tabsPersistAllowedRef.current = false;
+
+    // Clear strip state immediately so we never persist another project's tabs under
+    // this project key while the daemon + disk restore is in flight.
+    setOpenTabIds(new Set());
+    setOpenPlanningMainTabIds(new Set());
+    setPlanningSidebarActiveId(null);
+    setPlanningSidebarOpen(false);
+
     setSessions((prev) => prev.filter((s) => s.projectId === project.id));
     setActiveTabId((prev) => {
       if (prev === 'settings') return 'board';
@@ -1172,25 +1369,24 @@ export default function App() {
         const persisted = await window.electronAPI.projects.getTabs(projectKey);
         if (cancelled) return;
         const aliveIds = new Set(projectSessions.map((s) => s.id));
-        const restoredOpen = persisted.openTaskIds.filter((id) =>
-          aliveIds.has(id),
-        );
-        setOpenTabIds(new Set(restoredOpen));
-        setOpenPlanningMainTabIds(new Set(persisted.openPlanningTabIds ?? []));
-        setPlanningSidebarActiveId(persisted.planningSidebarActiveSessionId ?? null);
-        if (persisted.activeTaskId === 'settings') {
+        const normalized = normalizeRestoredProjectTabState(persisted, aliveIds);
+        setOpenTabIds(new Set(normalized.openTaskIds));
+        setOpenPlanningMainTabIds(new Set(normalized.openPlanningTabIds));
+        setPlanningSidebarActiveId(normalized.planningSidebarActiveSessionId);
+        setPlanningSidebarOpen(normalized.planningSidebarOpen);
+        if (normalized.openSettingsRoute) {
           setActiveTabId('board');
           pushProjectSettingsRoute();
-        } else if (
-          persisted.activeTaskId &&
-          (STATIC_TAB_IDS.has(persisted.activeTaskId) ||
-            persisted.activeTaskId.startsWith(PLAN_TAB_PREFIX) ||
-            aliveIds.has(persisted.activeTaskId))
-        ) {
-          setActiveTabId(persisted.activeTaskId);
+        } else {
+          setActiveTabId(normalized.activeTabId);
         }
       } catch (err) {
         console.error('[App] restore tabs failed', err);
+      } finally {
+        if (!cancelled && tabRestoreGenerationRef.current === restoreGen) {
+          tabsPersistAllowedRef.current = true;
+          setTabPersistNonce((n) => n + 1);
+        }
       }
     })();
     return () => {
@@ -1201,12 +1397,14 @@ export default function App() {
   // Persist tab strip whenever it changes for the active project.
   useEffect(() => {
     if (!project) return;
+    if (!tabsPersistAllowedRef.current) return;
     const projectKey: ActiveProjectKey = { kind: project.kind, id: project.id };
     const tabs: ProjectTabState = {
       openTaskIds: Array.from(openTabIds),
       activeTaskId: activeTabId,
       openPlanningTabIds: Array.from(openPlanningMainTabIds),
       planningSidebarActiveSessionId: planningSidebarActiveId,
+      planningSidebarOpen,
     };
     void window.electronAPI.projects
       .setTabs(projectKey, tabs)
@@ -1220,7 +1418,24 @@ export default function App() {
     activeTabId,
     openPlanningMainTabIds,
     planningSidebarActiveId,
+    planningSidebarOpen,
+    tabPersistNonce,
   ]);
+
+  useEffect(() => {
+    const onBoardWorkspace = activeTabId === 'board' && !settingsRouteActive;
+    if (!onBoardWorkspace) {
+      setPlanPanelOpen(false);
+      return;
+    }
+    if (!planningSidebarOpen) {
+      setPlanPanelOpen(false);
+      return;
+    }
+    // Match pre-persist behavior: user can open the strip before any planning session exists;
+    // child UI handles empty / loading / remapped active session.
+    setPlanPanelOpen(true);
+  }, [activeTabId, settingsRouteActive, planningSidebarOpen]);
 
   const pendingRef = useRef<
     Map<
@@ -1393,7 +1608,7 @@ export default function App() {
       cancelPrAgentFollowupTimersForTask(taskId);
       const nextGen = (taskPrDiscoveryGenRef.current.get(taskId) ?? 0) + 1;
       taskPrDiscoveryGenRef.current.set(taskId, nextGen);
-      const delays = [3200, 10_000, 26_000];
+      const delays = [15_000, 30_000, 45_000, 60_000, 75_000, 90_000];
       const timers: number[] = [];
       for (const delay of delays) {
         timers.push(
@@ -1441,6 +1656,16 @@ export default function App() {
     [activeTabId, isFullscreenPlanTab],
   );
 
+  /** Tasks where the user asked the agent to open a PR but Flux has not linked `githubPr` yet. */
+  const awaitingGithubPrLinkTaskIds = useMemo(
+    () =>
+      Object.entries(prAgentAwaitingByTaskId)
+        .filter(([, awaiting]) => awaiting)
+        .map(([taskId]) => taskId)
+        .sort(),
+    [prAgentAwaitingByTaskId],
+  );
+
   useGithubPrBoardRefresh({
     projectId: project?.id,
     projectKind: project?.kind,
@@ -1450,6 +1675,7 @@ export default function App() {
     autoMarkDoneWhenPrMerged: project?.autoMarkDoneWhenPrMerged === true,
     autoMoveToReviewWhenPrOpen: project?.autoMoveToReviewWhenPrOpen === true,
     surfaceActive: isBoardOrPlanTab,
+    awaitingGithubPrLinkTaskIds,
     onCloudPrMergedAutoDone: handleCloudPrRefreshMergedAutoDone,
   });
 
@@ -1592,11 +1818,41 @@ export default function App() {
   );
 
   const handleUpdateTask = useCallback(
-    (id: string, patch: Partial<Task>) => {
+    (id: string, patch: TaskPatch) => {
+      const {
+        autoStartOnUnblock: patchAsou,
+        githubPr: patchGh,
+        workspaceCleanedAt: patchWsc,
+        ...patchRest
+      } = patch;
       setTasks((prev) =>
         prev.map((t) => {
           if (t.id !== id) return t;
-          let next: Task = { ...t, ...patch };
+          let next: Task = { ...t, ...patchRest };
+          if (patchGh !== undefined) {
+            if (patchGh === null) {
+              next = { ...next };
+              delete next.githubPr;
+            } else {
+              next = { ...next, githubPr: patchGh };
+            }
+          }
+          if (patchWsc !== undefined) {
+            if (patchWsc === null) {
+              next = { ...next };
+              delete next.workspaceCleanedAt;
+            } else {
+              next = { ...next, workspaceCleanedAt: patchWsc };
+            }
+          }
+          if (patchAsou !== undefined) {
+            if (patchAsou === null) {
+              next = { ...next };
+              delete next.autoStartOnUnblock;
+            } else {
+              next = { ...next, autoStartOnUnblock: patchAsou };
+            }
+          }
           if (patch.labels !== undefined) {
             const n = normalizeTaskLabels(patch.labels);
             if (n.length > 0) {
@@ -1604,14 +1860,6 @@ export default function App() {
             } else {
               next = { ...next };
               delete next.labels;
-            }
-          }
-          if (patch.autoStartOnUnblock !== undefined) {
-            if (patch.autoStartOnUnblock) {
-              next = { ...next, autoStartOnUnblock: true };
-            } else {
-              next = { ...next };
-              delete next.autoStartOnUnblock;
             }
           }
           if (patch.sourceBranch !== undefined) {
@@ -1623,6 +1871,15 @@ export default function App() {
           if (patch.createSourceBranchIfMissing !== undefined && !patch.createSourceBranchIfMissing) {
             next = { ...next };
             delete next.createSourceBranchIfMissing;
+          }
+          if (patch.repoId !== undefined) {
+            const rid = typeof patch.repoId === 'string' ? patch.repoId.trim() : '';
+            if (rid.length === 0) {
+              next = { ...next };
+              delete next.repoId;
+            } else {
+              next = { ...next, repoId: rid };
+            }
           }
           next = {
             ...next,
@@ -1654,8 +1911,8 @@ export default function App() {
       if (patch.labels !== undefined) {
         persistable.labels = normalizeTaskLabels(patch.labels);
       }
-      if (patch.autoStartOnUnblock !== undefined) {
-        persistable.autoStartOnUnblock = patch.autoStartOnUnblock;
+      if (patchAsou !== undefined) {
+        persistable.autoStartOnUnblock = patchAsou;
       }
       if (patch.assigneeId !== undefined) {
         persistable.assigneeId = patch.assigneeId;
@@ -1665,6 +1922,15 @@ export default function App() {
       }
       if (patch.createSourceBranchIfMissing !== undefined) {
         persistable.createSourceBranchIfMissing = patch.createSourceBranchIfMissing;
+      }
+      if (patch.repoId !== undefined) {
+        persistable.repoId = patch.repoId;
+      }
+      if (patch.fluxWorkBranch !== undefined) {
+        persistable.fluxWorkBranch = patch.fluxWorkBranch;
+      }
+      if (patchGh !== undefined) {
+        persistable.githubPr = patchGh;
       }
       if (Object.keys(persistable).length === 0) return;
 
@@ -1689,6 +1955,20 @@ export default function App() {
       pendingRef.current.set(id, { patch: merged, timer, preFlushTask });
     },
     [flushUpdate, project?.kind, uid],
+  );
+
+  const handleAutoStartWhenUnblockedProjectChange = useCallback(
+    (enabled: boolean) => {
+      setAutoStartWhenUnblockedProject(enabled);
+      if (!enabled || project?.kind !== 'cloud' || !provider) {
+        return;
+      }
+      const ids = taskIdsToClearAutoStartOnUnblockWhenAutomationEnables(tasksRef.current);
+      for (const id of ids) {
+        void handleUpdateTask(id, { autoStartOnUnblock: null });
+      }
+    },
+    [project?.kind, provider, handleUpdateTask],
   );
 
   const handleDragEnd = useCallback(
@@ -1964,7 +2244,11 @@ export default function App() {
       agent: Agent,
       labelInput?: string[],
       assigneeId?: string,
-      branch?: { sourceBranch?: string; createSourceBranchIfMissing?: boolean },
+      branch?: {
+        sourceBranch?: string;
+        createSourceBranchIfMissing?: boolean;
+        repoId?: string;
+      },
     ) => {
       if (!provider) return;
       try {
@@ -1991,6 +2275,7 @@ export default function App() {
           ...(branch?.createSourceBranchIfMissing !== undefined
             ? { createSourceBranchIfMissing: branch.createSourceBranchIfMissing }
             : {}),
+          ...(branch?.repoId !== undefined ? { repoId: branch.repoId } : {}),
         });
         setTasks((prev) => {
           if (prev.some((t) => t.id === task.id)) return prev;
@@ -2033,6 +2318,29 @@ export default function App() {
     [provider, stripLocalSessionStateForTask],
   );
 
+  const requestDeleteTask = useCallback(
+    (id: string, opts?: { closeDetail?: boolean }) => {
+      if (taskDeleteNeedsWorkspaceConfirmation(id, sessions, taskHasWorktreeById)) {
+        setTaskDeleteConfirmId(id);
+        return;
+      }
+      if (opts?.closeDetail) setSelectedTaskId(null);
+      void handleDeleteTask(id);
+    },
+    [sessions, taskHasWorktreeById, handleDeleteTask],
+  );
+
+  const cancelTaskDeleteConfirm = useCallback(() => {
+    setTaskDeleteConfirmId(null);
+  }, []);
+
+  const confirmTaskDelete = useCallback(() => {
+    const id = taskDeleteConfirmId;
+    if (!id) return;
+    setTaskDeleteConfirmId(null);
+    void handleDeleteTask(id);
+  }, [taskDeleteConfirmId, handleDeleteTask]);
+
   const requestCleanupTask = useCallback(
     (taskId: string) => {
       const task = tasks.find((t) => t.id === taskId);
@@ -2067,7 +2375,6 @@ export default function App() {
         const result = await window.electronAPI.tasks.requestPullRequestFromAgent({
           taskId,
           ...(title ? { title } : {}),
-          ...(task.description !== undefined ? { description: task.description } : {}),
         });
         if (!result.ok) {
           setTaskPrError(formatTaskPullRequestError(result));
@@ -2126,6 +2433,7 @@ export default function App() {
   const handleProjectActivated = useCallback((p: ActiveProject) => {
     setProject(p);
     setSelectedTaskId(null);
+    setTaskDeleteConfirmId(null);
     setCleanupConfirmTaskId(null);
     setCleanupLoadingTaskId(null);
     setCleanupError(null);
@@ -2138,6 +2446,7 @@ export default function App() {
     prAgentPromptSentTaskIdsRef.current.clear();
     setPrAgentAwaitingByTaskId({});
     setPlanPanelOpen(false);
+    setPlanningSidebarOpen(false);
     replaceProjectWorkspaceRoute();
     setActiveTabId('board');
     setDocsSidebarExpanded(false);
@@ -2155,6 +2464,7 @@ export default function App() {
     setProject(null);
     setTasks([]);
     setSelectedTaskId(null);
+    setTaskDeleteConfirmId(null);
     setCleanupConfirmTaskId(null);
     setCleanupLoadingTaskId(null);
     setCleanupError(null);
@@ -2167,6 +2477,7 @@ export default function App() {
     prAgentPromptSentTaskIdsRef.current.clear();
     setPrAgentAwaitingByTaskId({});
     setPlanPanelOpen(false);
+    setPlanningSidebarOpen(false);
     replaceProjectWorkspaceRoute();
     setDocsSidebarExpanded(false);
     setPlanningDocFiles([]);
@@ -2181,12 +2492,24 @@ export default function App() {
     setActiveTabId('board');
   }, []);
 
+  const confirmLeaveDocsWithUnsavedEdits = useCallback((): boolean => {
+    if (activeTabId !== 'docs' || !planningDocsDirtyRef.current) return true;
+    return window.confirm(
+      'You have unsaved changes in the open planning document. Leave Docs without saving?',
+    );
+  }, [activeTabId]);
+
+  const handlePlanningDocsDirtyChange = useCallback((dirty: boolean) => {
+    planningDocsDirtyRef.current = dirty;
+  }, []);
+
   const handlePlanNav = useCallback(() => {
+    if (!confirmLeaveDocsWithUnsavedEdits()) return;
     leaveSettingsIfActive();
     const routeSid = parsePlanTabId(activeTabId);
     if (routeSid) {
       setPlanningSidebarActiveId(routeSid);
-      setPlanPanelOpen(true);
+      setPlanningSidebarOpen(true);
       setActiveTabId('board');
       return;
     }
@@ -2196,21 +2519,20 @@ export default function App() {
     }
     if (activeTabId !== 'board') {
       setActiveTabId('board');
-      setPlanPanelOpen(true);
+      setPlanningSidebarOpen(true);
       return;
     }
-    if (!planPanelOpen) {
-      setPlanPanelOpen(true);
+    if (!planningSidebarOpen) {
+      setPlanningSidebarOpen(true);
     } else {
       setActiveTabId('plan');
-      setPlanPanelOpen(false);
+      setPlanningSidebarOpen(false);
     }
-  }, [activeTabId, planPanelOpen]);
+  }, [activeTabId, planningSidebarOpen, confirmLeaveDocsWithUnsavedEdits]);
 
   const handleDocsNav = useCallback(() => {
     leaveSettingsIfActive();
     setActiveTabId('docs');
-    setPlanPanelOpen(false);
     setDocsSidebarExpanded(true);
   }, []);
 
@@ -2218,24 +2540,24 @@ export default function App() {
     setDocsSidebarExpanded((v) => !v);
   }, []);
 
-  const handleSelectPlanningDoc = useCallback((relativePath: string) => {
-    leaveSettingsIfActive();
-    setSelectedPlanningDocPath(relativePath);
-    setActiveTabId('docs');
-    setPlanPanelOpen(false);
-  }, []);
-
-  useEffect(() => {
-    if (activeTabId === 'docs') {
-      setPlanPanelOpen(false);
-    }
-  }, [activeTabId]);
-
-  useEffect(() => {
-    if (settingsRouteActive) {
-      setPlanPanelOpen(false);
-    }
-  }, [settingsRouteActive]);
+  const handleSelectPlanningDoc = useCallback(
+    (relativePath: string) => {
+      leaveSettingsIfActive();
+      if (
+        planningDocsDirtyRef.current &&
+        selectedPlanningDocPath != null &&
+        relativePath !== selectedPlanningDocPath &&
+        !window.confirm(
+          'Switch documents without saving? Unsaved changes to the current file will be lost.',
+        )
+      ) {
+        return;
+      }
+      setSelectedPlanningDocPath(relativePath);
+      setActiveTabId('docs');
+    },
+    [selectedPlanningDocPath],
+  );
 
   const maxPlanningWidthForRow = useCallback(() => {
     const row = boardRowRef.current;
@@ -2329,6 +2651,7 @@ export default function App() {
   );
 
   const handleOpenSessionTab = useCallback((session: Session) => {
+    if (!confirmLeaveDocsWithUnsavedEdits()) return;
     leaveSettingsIfActive();
     setSessions((prev) => {
       const exists = prev.some((s) => s.id === session.id);
@@ -2345,10 +2668,20 @@ export default function App() {
     });
     setActiveTabId(session.id);
     setSelectedTaskId(null);
-  }, []);
+  }, [confirmLeaveDocsWithUnsavedEdits]);
+
+  const handleOpenTaskWorkspaceFromBoard = useCallback(
+    (taskId: string) => {
+      const session = selectSessionForTaskWorkspace(sessions, taskId);
+      if (!session) return;
+      handleOpenSessionTab(session);
+    },
+    [sessions, handleOpenSessionTab],
+  );
 
   const handleOpenSessionFromSidebar = useCallback(
     (sessionId: string) => {
+      if (!confirmLeaveDocsWithUnsavedEdits()) return;
       leaveSettingsIfActive();
       const session = sessions.find((s) => s.id === sessionId);
       if (!session) return;
@@ -2361,7 +2694,7 @@ export default function App() {
       setActiveTabId(sessionId);
       setSelectedTaskId(null);
     },
-    [sessions],
+    [sessions, confirmLeaveDocsWithUnsavedEdits],
   );
 
   const handleCloseSessionTab = useCallback((sessionId: string) => {
@@ -2374,11 +2707,15 @@ export default function App() {
     setActiveTabId((prev) => (prev === sessionId ? 'board' : prev));
   }, []);
 
-  const handleOpenPlanningInMainTab = useCallback((sessionId: string) => {
-    leaveSettingsIfActive();
-    setOpenPlanningMainTabIds((prev) => new Set(prev).add(sessionId));
-    setActiveTabId(planTabId(sessionId));
-  }, []);
+  const handleOpenPlanningInMainTab = useCallback(
+    (sessionId: string) => {
+      if (!confirmLeaveDocsWithUnsavedEdits()) return;
+      leaveSettingsIfActive();
+      setOpenPlanningMainTabIds((prev) => new Set(prev).add(sessionId));
+      setActiveTabId(planTabId(sessionId));
+    },
+    [confirmLeaveDocsWithUnsavedEdits],
+  );
 
   const handleClosePlanningMainTab = useCallback(
     async (sessionId: string) => {
@@ -2429,37 +2766,57 @@ export default function App() {
     }
     if (activeTabId === 'plan') {
       setActiveTabId('board');
-      setPlanPanelOpen(false);
+      setPlanningSidebarOpen(false);
       return;
     }
-    setPlanPanelOpen(false);
+    setPlanningSidebarOpen(false);
   }, [activeTabId, handleClosePlanningMainTab]);
 
   const handleOpenSettingsTab = useCallback(() => {
+    if (activeTabId === 'docs' && !confirmLeaveDocsWithUnsavedEdits()) {
+      return;
+    }
     if (readProjectHashRoute() !== 'settings') {
       pushProjectSettingsRoute();
     }
-  }, []);
+  }, [activeTabId, confirmLeaveDocsWithUnsavedEdits]);
 
   const handleCloseSettingsTab = useCallback(() => {
     replaceProjectWorkspaceRoute();
   }, []);
 
-  const handleSelectWorkspaceTab = useCallback((tabId: string) => {
-    if (tabId === 'settings') {
-      if (readProjectHashRoute() !== 'settings') {
-        pushProjectSettingsRoute();
+  const handleSelectWorkspaceTab = useCallback(
+    (tabId: string) => {
+      if (tabId === 'settings') {
+        if (activeTabId === 'docs' && !confirmLeaveDocsWithUnsavedEdits()) {
+          return;
+        }
+        if (readProjectHashRoute() !== 'settings') {
+          pushProjectSettingsRoute();
+        }
+        return;
       }
-      return;
-    }
-    leaveSettingsIfActive();
-    setActiveTabId(tabId);
-  }, []);
+      if (
+        activeTabId === 'docs' &&
+        tabId !== 'docs' &&
+        !confirmLeaveDocsWithUnsavedEdits()
+      ) {
+        return;
+      }
+      leaveSettingsIfActive();
+      setActiveTabId(tabId);
+    },
+    [activeTabId, confirmLeaveDocsWithUnsavedEdits],
+  );
 
-  const handleSelectPlanningTabFromBar = useCallback((sessionId: string) => {
-    leaveSettingsIfActive();
-    setActiveTabId(planTabId(sessionId));
-  }, []);
+  const handleSelectPlanningTabFromBar = useCallback(
+    (sessionId: string) => {
+      if (!confirmLeaveDocsWithUnsavedEdits()) return;
+      leaveSettingsIfActive();
+      setActiveTabId(planTabId(sessionId));
+    },
+    [confirmLeaveDocsWithUnsavedEdits],
+  );
 
   useEffect(() => {
     try {
@@ -2553,7 +2910,7 @@ export default function App() {
       return {
         sessionId,
         title,
-        running: s?.status === 'running' ?? false,
+        running: s?.status === 'running',
       };
     });
   }, [openPlanningMainTabIds, planningSessions]);
@@ -2575,6 +2932,12 @@ export default function App() {
         ? tasks.find((t) => t.id === cleanupConfirmTaskId) ?? null
         : null,
     [cleanupConfirmTaskId, tasks],
+  );
+
+  const taskDeleteConfirmTask = useMemo(
+    () =>
+      taskDeleteConfirmId ? tasks.find((t) => t.id === taskDeleteConfirmId) ?? null : null,
+    [taskDeleteConfirmId, tasks],
   );
 
   // Sort tasks per column for the board (orderKey-aware). Falls back to
@@ -2789,7 +3152,7 @@ export default function App() {
                               /* Session workspace Details tab is not a dismissible overlay. */
                             },
                             onUpdate: handleUpdateTask,
-                            onDelete: handleDeleteTask,
+                            onDelete: requestDeleteTask,
                             remoteRunner:
                               tabTask && cloudProjectId
                                 ? findRemoteRunner(
@@ -2817,6 +3180,8 @@ export default function App() {
                             onTaskPrClick: (id) => void handleTaskPrClick(id),
                             prLoading: prLoadingTaskId === item.session.taskId,
                             prAgentAwaiting: Boolean(prAgentAwaitingByTaskId[item.session.taskId]),
+                            projectRepos: projectRepos ?? undefined,
+                            multiRepo2Enabled: true,
                           }
                         : undefined
                     }
@@ -2873,13 +3238,13 @@ export default function App() {
                         onDragEnd={handleDragEnd}
                         onCreateTask={handleCreateTask}
                         defaultTaskAgent={defaultTaskAgentForProject(project)}
-                        onDeleteTask={handleDeleteTask}
+                        onDeleteTask={requestDeleteTask}
                         onRequestCleanupTask={requestCleanupTask}
                         cleanupLoadingTaskId={cleanupLoadingTaskId}
                         onCardClick={(id) => setSelectedTaskId(id)}
                         autoStartWhenUnblockedProject={autoStartWhenUnblockedProject}
-                        onToggleTaskAutoStartOnUnblock={(id, enabled) =>
-                          void handleUpdateTask(id, { autoStartOnUnblock: enabled })
+                        onPatchTaskAutoStartOnUnblock={(id, patch) =>
+                          void handleUpdateTask(id, patch)
                         }
                         onTaskPrClick={(id) => void handleTaskPrClick(id)}
                         prLoadingTaskId={prLoadingTaskId}
@@ -2888,13 +3253,16 @@ export default function App() {
                         onTogglePlanPanel={() => {
                           leaveSettingsIfActive();
                           setActiveTabId('board');
-                          setPlanPanelOpen((v) => !v);
+                          setPlanningSidebarOpen((v) => !v);
                         }}
                         projectMembers={projectMembers}
                         onTaskAssigneeChange={(id, assigneeId) =>
                           void handleUpdateTask(id, { assigneeId })
                         }
                         repoDefaultBranchShort={repoDefaultBranchShort}
+                        projectRepos={projectRepos ?? undefined}
+                        multiRepo2Enabled
+                        cloudRepoBindingOverview={cloudRepoBindingOverview ?? undefined}
                         cloudUnblockAutostartClientUid={
                           project.kind === 'cloud' && uid ? uid : undefined
                         }
@@ -2903,6 +3271,7 @@ export default function App() {
                         onTaskAgentSpawnPrefsChange={(id, patch) =>
                           void handleUpdateTask(id, patch)
                         }
+                        onOpenTaskWorkspaceTab={handleOpenTaskWorkspaceFromBoard}
                       />
                       <TaskDetailPanel
                         task={selectedTask}
@@ -2916,7 +3285,7 @@ export default function App() {
                         onSelectTask={(id) => setSelectedTaskId(id)}
                         onClose={() => setSelectedTaskId(null)}
                         onUpdate={handleUpdateTask}
-                        onDelete={handleDeleteTask}
+                        onDelete={requestDeleteTask}
                         onMarkAsDone={
                           selectedTask && selectedTask.status !== 'done' && !isTaskBlocked(selectedTask, tasks)
                             ? () => void handleMarkTaskDone(selectedTask.id, { closeDetail: true })
@@ -2944,6 +3313,8 @@ export default function App() {
                             ? Boolean(prAgentAwaitingByTaskId[selectedTask.id])
                             : false
                         }
+                        projectRepos={projectRepos ?? undefined}
+                        multiRepo2Enabled
                       />
                     </div>
                     <div
@@ -3014,6 +3385,7 @@ export default function App() {
                     planningDocsFirestoreStream={planningDocsFirestoreStream}
                     firebaseConfigured={isFirebaseConfigured()}
                     onPlanningDocsMutated={() => void refreshPlanningDocList()}
+                    onDirtyChange={handlePlanningDocsDirtyChange}
                   />
                 </div>
               </div>
@@ -3034,8 +3406,15 @@ export default function App() {
                   currentUid={uid}
                   currentUserDisplayName={displayName}
                   currentUserEmail={userEmail ?? undefined}
-                  onAutoStartWhenUnblockedChange={setAutoStartWhenUnblockedProject}
+                  onAutoStartWhenUnblockedChange={handleAutoStartWhenUnblockedProjectChange}
                   onProjectAgentPrefsRefresh={refreshPlanningRelatedProjectState}
+                  onCloudSharedReposChanged={(sharedRepos) => {
+                    setProject((cur) =>
+                      cur && cur.kind === 'cloud'
+                        ? { ...cur, sharedRepos }
+                        : cur,
+                    );
+                  }}
                 />
               </div>
             ) : null}
@@ -3070,6 +3449,22 @@ export default function App() {
           destructive={false}
           onConfirm={() => void confirmCleanupTask()}
           onCancel={cancelCleanupTask}
+        />
+      ) : null}
+      {taskDeleteConfirmTask ? (
+        <ConfirmDialog
+          title="Delete task and workspace?"
+          description={`This removes "${taskDeleteConfirmTask.title}" from the board and tears down its Flux workspace.`}
+          bullets={[
+            'Remove the task from the board',
+            'End agent sessions tied to this task (running agents stop)',
+            'Close terminals opened in those workspaces',
+            'Remove the git worktree from disk when one exists',
+          ]}
+          confirmLabel="Delete task"
+          destructive
+          onConfirm={() => void confirmTaskDelete()}
+          onCancel={cancelTaskDeleteConfirm}
         />
       ) : null}
       {cloudPlanningDocsSeedModal}
