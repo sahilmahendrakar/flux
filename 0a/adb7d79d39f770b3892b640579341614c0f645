@@ -1,0 +1,24 @@
+src/components/TaskRow.tsx
+  s_e59e34253d7f72::t_11e73ab3dba7e0 79
+  s_e59e34253d7f72::t_8cda8ef0488a70 98,129,185
+  s_e59e34253d7f72::t_a4bb7207fcdca3 77
+  s_e59e34253d7f72::t_38c6b3750036cd 3-71,73-76,78,80-97,99-128,130-184,186-187
+  s_e59e34253d7f72::t_83db66b4b9b0dd 72
+  s_e59e34253d7f72::t_3353eb38c9933b 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "0aadb7d79d39f770b3892b640579341614c0f645",
+  "prompts": {},
+  "sessions": {
+    "s_e59e34253d7f72": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "70703b34-bde5-4e0e-ae82-0b8dc2c45194",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
