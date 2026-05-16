@@ -1,0 +1,36 @@
+src/main/terminalBackend/terminalBackend.test.ts
+  s_d5d6cbda015918::t_81eb04209ff72e 13
+src/main/terminalBackend/TerminalBackend.ts
+  s_d5d6cbda015918::t_b0741fbd2bb1f4 57-59,63-70
+src/main/TerminalRuntimeManager.test.ts
+  s_d5d6cbda015918::t_21e788287d6d31 139-164
+src/main/terminalBackend/LocalMainProcessTerminalBackend.ts
+  s_d5d6cbda015918::t_63bed20e6a4292 86-93
+src/main/DaemonClient.ts
+  s_d5d6cbda015918::t_239ad4c6e0943f 825-859
+src/main.ts
+  s_d5d6cbda015918::t_f5abc511581e9f 4033
+  s_d5d6cbda015918::t_65b7162447737b 4013-4023,4036,4039-4068
+  s_d5d6cbda015918::t_af84fc9c60235a 4024-4032,4034-4035,4037-4038
+  s_d5d6cbda015918::t_af5a2f3e16ec83 417,420-423
+src/main/TerminalRuntimeManager.ts
+  s_d5d6cbda015918::t_2e28a2f907d370 250-264
+src/main/terminalBackend/DetachedRpcTerminalBackend.ts
+  s_d5d6cbda015918::t_a20b14d007ee89 60-70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "48762316a57aaa1f431b7213bc0088f40ea937ec",
+  "prompts": {},
+  "sessions": {
+    "s_d5d6cbda015918": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9463420c-05a8-4131-b72b-86dc9696922e",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
