@@ -1,0 +1,97 @@
+forge.config.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 24-25,112-121,156-160,305
+src/cloudInProgressAutostartApply.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 62
+src/agentModelUi.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 136
+src/taskAgentPullRequestPrompt.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 36-38
+package.json
+  s_402b8f7c47f776::t_f0ac037383cc92 4,70-75
+src/main/TaskStore.test.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 148-183
+runtime-dependencies.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 11-12
+src/components/TaskCardAgentSpawnMenu.tsx
+  s_402b8f7c47f776::t_f0ac037383cc92 2,21-24,46-49,52,54-57,74,86-90,93,96-100,117
+src/main.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 142-144,1836,1869-1872,2205-2207,2209,2216,2220,2230-2234,2295,2298,2325,2836-2843,2985,3077-3079,3372-3374
+  s_402b8f7c47f776::t_8f975068e736e8 3045-3046
+src/daemon/terminalEnv.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 48-50
+src/components/BoardFilterBar.tsx
+  s_402b8f7c47f776::t_f0ac037383cc92 19,37-45,236,305
+pnpm-lock.yaml
+  ai_agent 21-22,24-25,27-28,30-31,33-34,36-37,1427-1428,1430-1431,1433-1434,1436-1437,1439-1440,1442-1443,6394,6396,6398,6400,6402,6404
+src/components/Board.tsx
+  s_402b8f7c47f776::t_f0ac037383cc92 33
+src/boardFilter.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 14-16,19-20,24,80-85
+src/unblockAutostartApply.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 76-78
+src/main/TaskStore.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 13,233,361-365
+src/main/composeTaskSessionInitialPrompt.ts
+  s_402b8f7c47f776::t_16a50ad2b579a4 74,78
+src/boardFilter.test.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 7,93-102
+vite.daemon.config.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 7-8,21-22
+src/main/agentSpawn.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 22-24,59-61
+src/components/TaskDetailPanel.tsx
+  s_402b8f7c47f776::t_f0ac037383cc92 21,82,847-850,867-871,995-996,1071-1072,1149,1153-1155,1162,1167,1172,1176-1178,1183,1188,1195-1202,1208,1213,1267,1269-1275,1282-1284,1288-1289,1316,1323-1331,1333-1358,1360-1376,1378-1387
+src/renderer/tasks/TaskProvider.ts
+  s_402b8f7c47f776::t_2d3aacad75ab89 27
+  s_402b8f7c47f776::t_e060d3ee115f8e 1
+  s_402b8f7c47f776::t_f0ac037383cc92 33
+src/types.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 321-329,334-335,415,555-558
+src/taskAgentPullRequestPrompt.test.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 54-56
+src/App.tsx
+  s_402b8f7c47f776::t_f0ac037383cc92 2302,2322-2325,2437-2441
+src/components/AgentSessionPrefsMenu.tsx
+  s_402b8f7c47f776::t_f0ac037383cc92 23-24,29,33,36-40,51,71-72,77,79-86,95-97,100-116,118-130
+src/preload.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 27,284,347
+src/taskRequestPullRequestFromAgentContext.test.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 2-7,9-29,31-106
+src/main/McpServer.ts
+  s_402b8f7c47f776::t_895d94d5c38221 419
+  s_402b8f7c47f776::t_af472bb1430694 627-628
+src/components/NewTaskModal.tsx
+  s_402b8f7c47f776::t_f0ac037383cc92 3-8,20,50,222,226
+src/components/PlanningPanel.tsx
+  s_402b8f7c47f776::t_f0ac037383cc92 308-309
+src/renderer/tasks/FirestoreTaskProvider.ts
+  s_402b8f7c47f776::t_9bfd66a4c81ded 15
+  s_402b8f7c47f776::t_f0ac037383cc92 123,136-138,141,199-201,204,269-284,399-404,411-413,416-417
+src/env.d.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 27,246,298-300
+src/daemon/terminalSnapshot.ts
+  s_402b8f7c47f776::t_6ad3b47c269dfb 17-20,27-34,42
+  s_402b8f7c47f776::t_f0ac037383cc92 37
+src/mcpBridge.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 35,56
+src/components/SessionTerminalView.tsx
+  s_402b8f7c47f776::t_f0ac037383cc92 24
+src/taskRequestPullRequestFromAgentContext.ts
+  s_402b8f7c47f776::t_f0ac037383cc92 1-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "1a09405d868b008e2fb095743125c1543895b5f2",
+  "prompts": {},
+  "sessions": {
+    "s_402b8f7c47f776": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "65ee956a-f19a-4661-8867-7b1ed0f4005d",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
