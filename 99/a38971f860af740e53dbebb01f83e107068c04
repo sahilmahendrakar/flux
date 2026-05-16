@@ -1,0 +1,112 @@
+src/env.d.ts
+  s_1bc3144b9d2b06::t_0ce5296ab6c14a 244
+src/main.ts
+  s_1bc3144b9d2b06::t_ea95043bfc2f25 2972
+  s_1bc3144b9d2b06::t_32411571b9e7e0 3357-3361
+  s_1bc3144b9d2b06::t_68c4bdfc6798a2 2829-2834
+  s_1bc3144b9d2b06::t_08667f4f1784d4 1831,1864-1867
+  s_1bc3144b9d2b06::t_d918ea26eafa95 3062-3064
+src/main/agentSpawn.ts
+  s_1bc3144b9d2b06::t_fc4b1575cc2bfa 59-61
+  s_1bc3144b9d2b06::t_ad1218074a9d55 22-24
+src/components/TaskCardAgentSpawnMenu.tsx
+  s_1bc3144b9d2b06::t_b2b0a4e6b069b5 99
+  s_1bc3144b9d2b06::t_e03821baacf7ad 2
+  s_1bc3144b9d2b06::t_5b6333ac114e93 21-24,46-49,52,54-57,74,86-90,93,96-98,100,117
+src/main/TaskStore.test.ts
+  s_1bc3144b9d2b06::t_d561d288fb0456 148-185
+src/preload.ts
+  s_1bc3144b9d2b06::t_580e41e91ef817 283
+src/boardFilter.ts
+  s_1bc3144b9d2b06::t_50f34be535ff8c 80-85
+  s_1bc3144b9d2b06::t_a8490a265858f9 14-16,19-20,24
+src/components/NewTaskModal.tsx
+  s_1bc3144b9d2b06::t_605cc64365bd44 3-8
+  s_1bc3144b9d2b06::t_7fd06b8f7dc98b 20
+  s_1bc3144b9d2b06::t_3eb7115497274a 222,226
+  s_1bc3144b9d2b06::t_2a573e0acc9d68 50
+src/renderer/tasks/FirestoreTaskProvider.ts
+  s_1bc3144b9d2b06::t_ceb5dd444a45af 192-194,197
+  s_1bc3144b9d2b06::t_5bd3019c2c3909 266-272
+  s_1bc3144b9d2b06::t_51a47ae8069bef 375-380,387-389,392-393
+  s_1bc3144b9d2b06::t_d5a1cfa73b0f93 257-265
+  s_1bc3144b9d2b06::t_0f498bb7a73ab7 122
+  s_1bc3144b9d2b06::t_5483cf231c966e 135-137,140
+src/App.tsx
+  s_1bc3144b9d2b06::t_e7c72a22358d62 2265,2285-2288
+src/components/SessionTerminalView.tsx
+  s_1bc3144b9d2b06::t_b0481f9ef334df 24
+src/main/TaskStore.ts
+  s_1bc3144b9d2b06::t_e301ca9db32433 231
+  s_1bc3144b9d2b06::t_f592dfd5389cd4 12
+  s_1bc3144b9d2b06::t_7957ceecee6e9e 338-342
+src/types.ts
+  s_1bc3144b9d2b06::t_fc317b2e4d0035 536-541
+  s_1bc3144b9d2b06::t_813450587acc26 396
+  s_1bc3144b9d2b06::t_88c83408b43377 320-321
+src/components/BoardFilterBar.tsx
+  s_1bc3144b9d2b06::t_3d1afd13401f6e 236
+  s_1bc3144b9d2b06::t_803a8ba585e55c 305
+  s_1bc3144b9d2b06::t_ceeffe4350e9ac 19
+  s_1bc3144b9d2b06::t_6c873edf945cf7 37-45
+src/components/TaskDetailPanel.tsx
+  s_1bc3144b9d2b06::t_114e963743e2c6 21
+  s_1bc3144b9d2b06::t_00eb971e3ea2d3 1242,1244-1250,1257-1259,1263-1264,1291,1298-1306,1308-1333,1335-1351,1353-1362
+  s_1bc3144b9d2b06::t_87d5a76097b198 79
+  s_1bc3144b9d2b06::t_e4757e59d9847b 971
+  s_1bc3144b9d2b06::t_beaec6789394cc 970
+  s_1bc3144b9d2b06::t_88765620f494ec 1147,1151-1153,1158,1163
+  s_1bc3144b9d2b06::t_cecddbac46b5fc 1170-1177,1183,1188
+  s_1bc3144b9d2b06::t_59e95ca996fcfc 842-846
+  s_1bc3144b9d2b06::t_bb52415d4f9d98 1046-1047
+  s_1bc3144b9d2b06::t_838cec95cc60a6 1124,1128-1130,1137,1142
+  s_1bc3144b9d2b06::t_b1c3e762434d08 822-825
+src/main/McpServer.ts
+  s_1bc3144b9d2b06::t_86f3dfff2ad4c7 608-610
+  s_1bc3144b9d2b06::t_667c14e0e63ac2 668
+  s_1bc3144b9d2b06::t_8fcc9cbf0741ab 697-702
+  s_1bc3144b9d2b06::t_c1682b5f665828 352-359,364-372
+  s_1bc3144b9d2b06::t_9da77c2ec4104a 17
+  s_1bc3144b9d2b06::t_f43eb39957c093 295,297-299
+  s_1bc3144b9d2b06::t_6d457f1deaebd9 468-471
+  s_1bc3144b9d2b06::t_15e7aa0456a0fd 549-551
+  s_1bc3144b9d2b06::t_a04ad620369048 669-673
+src/components/Board.tsx
+  s_1bc3144b9d2b06::t_03e63d258a89a9 33
+src/boardFilter.test.ts
+  s_1bc3144b9d2b06::t_048d5e4953ec84 7
+  s_1bc3144b9d2b06::t_f6f8fef2348058 93-104
+src/cloudInProgressAutostartApply.ts
+  s_1bc3144b9d2b06::t_26a9ecbc8f88e4 62
+src/renderer/tasks/TaskProvider.ts
+  s_1bc3144b9d2b06::t_e417486d0e9054 31
+src/agentModelUi.ts
+  s_1bc3144b9d2b06::t_d5278191131e8e 136
+src/unblockAutostartApply.ts
+  s_1bc3144b9d2b06::t_89a790695daf2d 76-78
+src/components/PlanningPanel.tsx
+  s_1bc3144b9d2b06::t_5c1049c7048289 308-309
+src/mcpBridge.ts
+  s_1bc3144b9d2b06::t_b1e252c738cefb 34
+  s_1bc3144b9d2b06::t_8127086b4b78b3 54
+src/components/AgentSessionPrefsMenu.tsx
+  s_1bc3144b9d2b06::t_b747aa3582d023 51,71-72,77,79-86,100-116,118-130
+  s_1bc3144b9d2b06::t_4f203dd8c5dc5a 23-24,29,33,36-40
+  s_1bc3144b9d2b06::t_a330ab97523c04 95-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "99a38971f860af740e53dbebb01f83e107068c04",
+  "prompts": {},
+  "sessions": {
+    "s_1bc3144b9d2b06": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "96054e8c-3666-4c1a-b67b-bf128851364f",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
