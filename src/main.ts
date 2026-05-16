@@ -132,6 +132,7 @@ import type {
   SessionStartOptions,
   SessionStartResult,
   Task,
+  TaskAttachedPlanningDoc,
   TaskGithubPr,
   TaskPullRequestIpcResult,
   TaskRequestPullRequestFromAgentResult,
@@ -1840,6 +1841,7 @@ app.whenReady().then(async () => {
         agentModel?: string;
         agentYolo?: boolean;
         repoId?: string;
+        attachedPlanningDocs?: TaskAttachedPlanningDoc[];
       },
     ) => {
       const project = projectStore.get();
@@ -3027,6 +3029,8 @@ app.whenReady().then(async () => {
     >
   > & {
     githubPr?: TaskGithubPr | null;
+    /** `null` clears stored attachments. */
+    attachedPlanningDocs?: TaskAttachedPlanningDoc[] | null;
     /** `null` clears stored value (inherit project default for when-unblocked). */
     autoStartOnUnblock?: boolean | null;
   };
