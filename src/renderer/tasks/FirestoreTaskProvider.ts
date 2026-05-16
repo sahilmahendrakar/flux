@@ -12,7 +12,8 @@ import {
   type DocumentData,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
-import { COLUMNS, type Agent, type Task, type TaskGithubPr, type TaskStatus } from '../../types';
+import { COLUMNS, type Agent, type Task, type TaskAttachedPlanningDoc, type TaskGithubPr, type TaskStatus } from '../../types';
+import { parsePersistedTaskAttachedPlanningDocs, sanitizeTaskAttachedPlanningDocsInput } from '../../taskAttachedPlanningDocs';
 import { parseGithubPrField } from '../../githubPrMetadata';
 import { validateBlockedByTaskIds } from '../../taskDependencies';
 import { normalizeTaskLabels } from '../../taskLabels';
@@ -138,6 +139,12 @@ export class FirestoreTaskProvider implements TaskProvider {
         ? { agentModel: input.agentModel.trim() }
         : {}),
       ...(input.agent != null && input.agentYolo === true ? { agentYolo: true } : {}),
+      ...(input.attachedPlanningDocs !== undefined
+        ? (() => {
+            const s = sanitizeTaskAttachedPlanningDocsInput(input.attachedPlanningDocs);
+            return s.length > 0 ? { attachedPlanningDocs: s } : {};
+          })()
+        : {}),
     };
     const ref = await addDoc(col, data);
     let normalizedDeps: string[] | undefined;
@@ -196,6 +203,11 @@ export class FirestoreTaskProvider implements TaskProvider {
         : {}),
       ...(input.agent != null && input.agentYolo === true ? { agentYolo: true } : {}),
       repoId: repoResolved.repoId,
+      ...(() => {
+        if (input.attachedPlanningDocs === undefined) return {};
+        const s = sanitizeTaskAttachedPlanningDocsInput(input.attachedPlanningDocs);
+        return s.length > 0 ? { attachedPlanningDocs: s } : {};
+      })(),
     };
   }
 
@@ -346,6 +358,18 @@ export class FirestoreTaskProvider implements TaskProvider {
         updates.fluxWorkBranch = b;
       }
     }
+    if (patch.attachedPlanningDocs !== undefined) {
+      if (patch.attachedPlanningDocs === null) {
+        updates.attachedPlanningDocs = deleteField();
+      } else {
+        const s = sanitizeTaskAttachedPlanningDocsInput(patch.attachedPlanningDocs);
+        if (s.length > 0) {
+          updates.attachedPlanningDocs = s;
+        } else {
+          updates.attachedPlanningDocs = deleteField();
+        }
+      }
+    }
     await updateDoc(ref, updates);
     const after = await getDoc(ref);
     return toTask(
@@ -409,7 +433,18 @@ function toTask(
     ...parseCreateSourceBranchIfMissingField(data.createSourceBranchIfMissing),
     ...parseRepoIdField(data.repoId, primaryRepoId),
     ...parseFluxWorkBranchField(data.fluxWorkBranch),
+    ...parseAttachedPlanningDocsField(data.attachedPlanningDocs),
   };
+}
+
+function parseAttachedPlanningDocsField(
+  val: unknown,
+): { attachedPlanningDocs: TaskAttachedPlanningDoc[] } | Record<string, never> {
+  const parsed = parsePersistedTaskAttachedPlanningDocs(val);
+  if (!parsed) {
+    return {};
+  }
+  return { attachedPlanningDocs: parsed };
 }
 
 function parseFluxWorkBranchField(

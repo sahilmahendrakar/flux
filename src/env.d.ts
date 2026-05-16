@@ -27,13 +27,13 @@ import type {
   TaskRequestPullRequestFromAgentPayload,
   TaskRequestPullRequestFromAgentResult,
   TaskSessionStartProgress,
+  TaskAttachedPlanningDoc,
 } from './types';
 import type {
   AgentState,
   AttachResult,
-  DaemonStreamCatchupPayload,
   PlanningAttachResult,
-} from './daemon/protocol';
+} from './terminal-runtime/protocol';
 import type {
   McpBridgeRequest,
   McpBridgeResponse,
@@ -263,6 +263,7 @@ declare global {
           agentModel?: string;
           agentYolo?: boolean;
           repoId?: string;
+          attachedPlanningDocs?: TaskAttachedPlanningDoc[];
         }) => Promise<Task>;
         update: (
           id: string,
@@ -287,6 +288,7 @@ declare global {
           > & {
             githubPr?: TaskGithubPr | null;
             autoStartOnUnblock?: boolean | null;
+            attachedPlanningDocs?: TaskAttachedPlanningDoc[] | null;
           },
         ) => Promise<Task>;
         assertSourceBranchEditable: (
@@ -352,9 +354,6 @@ declare global {
         getSilenceStates: () => Promise<
           { id: string; taskId?: string; state: AgentState }[]
         >;
-        onDaemonStreamCatchup: (
-          cb: (payload: DaemonStreamCatchupPayload) => void,
-        ) => () => void;
         onTaskStartProgress: (cb: (p: TaskSessionStartProgress) => void) => () => void;
       };
       shells: {
