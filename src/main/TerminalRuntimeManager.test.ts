@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StreamFrame } from '../daemon/protocol';
+import type { StreamFrame } from '../terminal-runtime/protocol';
 
 const ptyState = vi.hoisted(() => ({
   instances: [] as Array<{

@@ -1,6 +1,6 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { useEffect, useRef } from 'react';
-import type { AgentState } from '../../daemon/protocol';
+import type { AgentState } from '../../terminal-runtime/protocol';
 import type { Session, Task } from '../../types';
 import type { TaskProvider } from './TaskProvider';
 
@@ -119,9 +119,6 @@ export function useCloudSilenceReconciliation(opts: {
     run('hook:initial');
 
     const pollTimer = window.setInterval(() => run('poll'), CLOUD_SILENCE_POLL_MS);
-    const unsubCatchup = window.electronAPI.sessions.onDaemonStreamCatchup?.(() =>
-      run('daemon-stream-catchup'),
-    );
     const onVisibility = () => {
       if (document.visibilityState === 'visible') run('visibility');
     };
@@ -129,7 +126,6 @@ export function useCloudSilenceReconciliation(opts: {
 
     return () => {
       window.clearInterval(pollTimer);
-      unsubCatchup?.();
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [opts.enabled, opts.projectId, opts.setTasks]);

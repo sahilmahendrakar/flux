@@ -9,7 +9,7 @@ import type {
   StartPlanningParams,
   StartPlanningResult,
   StreamFrame,
-} from '../../daemon/protocol';
+} from '../../terminal-runtime/protocol';
 import {
   deliverTerminalStreamFrameToRenderers,
   TerminalRuntimeManager,

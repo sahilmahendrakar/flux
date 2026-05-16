@@ -13,14 +13,7 @@ describe('TerminalBackend', () => {
     await backend.teardownForAppQuit();
   });
 
-  it('createMainTerminalBackend defaults to local when env unset', () => {
-    const prev = process.env.FLUX_TERMINAL_BACKEND;
-    try {
-      delete process.env.FLUX_TERMINAL_BACKEND;
-      expect(createMainTerminalBackend()).toBeInstanceOf(LocalMainProcessTerminalBackend);
-    } finally {
-      if (prev === undefined) delete process.env.FLUX_TERMINAL_BACKEND;
-      else process.env.FLUX_TERMINAL_BACKEND = prev;
-    }
+  it('createMainTerminalBackend returns local main-process backend', () => {
+    expect(createMainTerminalBackend()).toBeInstanceOf(LocalMainProcessTerminalBackend);
   });
 });

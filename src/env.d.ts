@@ -31,9 +31,8 @@ import type {
 import type {
   AgentState,
   AttachResult,
-  DaemonStreamCatchupPayload,
   PlanningAttachResult,
-} from './daemon/protocol';
+} from './terminal-runtime/protocol';
 import type {
   McpBridgeRequest,
   McpBridgeResponse,
@@ -339,10 +338,6 @@ declare global {
         getSilenceStates: () => Promise<
           { id: string; taskId?: string; state: AgentState }[]
         >;
-        /** @deprecated Optional — legacy detached-daemon stream reconnect; not used for terminal attach. */
-        onDaemonStreamCatchup?: (
-          cb: (payload: DaemonStreamCatchupPayload) => void,
-        ) => () => void;
         onTaskStartProgress: (cb: (p: TaskSessionStartProgress) => void) => () => void;
       };
       shells: {

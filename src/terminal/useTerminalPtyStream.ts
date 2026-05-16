@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import type { AttachResult } from '../daemon/protocol';
+import type { AttachResult } from '../terminal-runtime/protocol';
 import type { TerminalHandle } from '../components/Terminal';
 import {
   applyAttachResultToTerminal,
@@ -52,8 +52,7 @@ export interface UseTerminalPtyStreamOptions {
  *
  * Re-runs when `enabled`, `id`, or `viewPolicy` change (e.g. new PTY id after
  * restart). A full renderer reload (macOS window close → reopen) naturally
- * remounts and re-subscribes to the main-process PTY stream without any
- * detached-daemon stream reconnect channel.
+ * remounts and re-subscribes to the main-process PTY stream.
  */
 export function useTerminalPtyStream({
   terminalRef,
