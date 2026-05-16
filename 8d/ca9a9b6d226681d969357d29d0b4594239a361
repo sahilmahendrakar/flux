@@ -1,0 +1,44 @@
+src/main/TerminalRuntimeManager.ts
+  s_35f9ce4d463dc7::t_10b43b5278bf15 487-509
+src/main/projectFluxRemoval.ts
+  s_35f9ce4d463dc7::t_89158b9a4374d2 8
+  s_35f9ce4d463dc7::t_c217f81325e0d3 19-22,30
+  s_35f9ce4d463dc7::t_53ea0002155673 169-172
+  s_35f9ce4d463dc7::t_5cba10ee389eb7 45-56
+  s_35f9ce4d463dc7::t_0cd7250acab6f4 190,193
+src/main.ts
+  s_35f9ce4d463dc7::t_18122073575d79 499-501
+  s_35f9ce4d463dc7::t_d002f02ed62827 2081
+  s_35f9ce4d463dc7::t_70ea8b34774e09 2760
+  s_35f9ce4d463dc7::t_e72c52f8780841 3295
+  s_35f9ce4d463dc7::t_78149115ecf2fc 3375,3386
+  s_35f9ce4d463dc7::t_4763845f00459a 3468
+  s_35f9ce4d463dc7::t_be5f7f729e0762 35
+  s_35f9ce4d463dc7::t_38775a3b4893f1 3598,3609
+  s_35f9ce4d463dc7::t_bd9c98b4465abc 3631,3633,3639,3649,3651,3659,3661,3671,3673
+  s_35f9ce4d463dc7::t_03b360c2f87c96 4016
+  s_35f9ce4d463dc7::t_9f5a80cf95adbc 3956,3965,3969,3975,3979,3983
+  s_35f9ce4d463dc7::t_aa6b236d7ba625 1641
+  s_35f9ce4d463dc7::t_a24a95bdd15c6e 1665
+  s_35f9ce4d463dc7::t_7ed57f3dc93ff8 409
+src/main/taskEphemeralTeardown.ts
+  s_35f9ce4d463dc7::t_3374b45b622cfb 45
+  s_35f9ce4d463dc7::t_fdb28ebf5d9b17 85
+  s_35f9ce4d463dc7::t_a76ac5a7de0db2 5,10-11,18,22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "8dca9a9b6d226681d969357d29d0b4594239a361",
+  "prompts": {},
+  "sessions": {
+    "s_35f9ce4d463dc7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "bb079db3-035a-4901-8cd9-3c69961ddf53",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
