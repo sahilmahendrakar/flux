@@ -50,7 +50,7 @@ describe('composeTaskSessionInitialPrompt', () => {
     expect(got.startsWith('Example\n\nSlice A')).toBe(true);
     expect(got).toContain('## Attached Planning Docs');
     expect(got).toContain('- `vision.md`');
-    expect(got).toContain(`Path: \`${path.join(planningDir, 'docs', 'vision.md')}\``);
+    expect(got).toContain(`Path: \`${path.join(docsDir, 'vision.md')}\``);
     expect(got).toContain('URL: `file://');
     expect(got).toContain('Use these docs for broader context');
   });
@@ -58,9 +58,10 @@ describe('composeTaskSessionInitialPrompt', () => {
   it('lists multiple distinct attachments', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'flux-plan-'));
     const planningDir = path.join(dir, 'planning');
-    await mkdir(planningDir, { recursive: true });
-    await writeFile(path.join(planningDir, 'a.md'), 'a', 'utf8');
-    await writeFile(path.join(planningDir, 'b.md'), 'b', 'utf8');
+    const docsDir = path.join(planningDir, 'docs');
+    await mkdir(docsDir, { recursive: true });
+    await writeFile(path.join(docsDir, 'a.md'), 'a', 'utf8');
+    await writeFile(path.join(docsDir, 'b.md'), 'b', 'utf8');
     const task = baseTask({
       attachedPlanningDocs: [{ relativePath: 'a.md' }, { relativePath: 'b.md' }],
     });
@@ -72,8 +73,9 @@ describe('composeTaskSessionInitialPrompt', () => {
   it('dedupes repeated normalized paths', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'flux-plan-'));
     const planningDir = path.join(dir, 'planning');
-    await mkdir(planningDir, { recursive: true });
-    await writeFile(path.join(planningDir, 'a.md'), 'a', 'utf8');
+    const docsDir = path.join(planningDir, 'docs');
+    await mkdir(docsDir, { recursive: true });
+    await writeFile(path.join(docsDir, 'a.md'), 'a', 'utf8');
     const task = baseTask({
       attachedPlanningDocs: [{ relativePath: 'a.md' }, { relativePath: './a.md' }],
     });
