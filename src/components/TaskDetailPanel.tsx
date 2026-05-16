@@ -51,10 +51,7 @@ import {
 import { projectLabelCatalog } from '../taskLabels';
 import AgentModelPicker from './AgentModelPicker';
 import { AGENT_CHIP_STYLES } from './AgentBadge';
-import {
-  getSessionAttachShared,
-  invalidateSessionAttachCache,
-} from '../terminal/warmAttach';
+import { getSessionAttachShared } from '../terminal/warmAttach';
 import {
   INTERACTIVE_MIRROR_TERMINAL_VIEW_POLICY,
   terminalShouldAutoFit,
@@ -731,7 +728,8 @@ export default function TaskDetailPanel({
         existingSession &&
         (existingSession.status === 'running' ||
           existingSession.status === 'stopped' ||
-          existingSession.status === 'error')
+          existingSession.status === 'error' ||
+          existingSession.status === 'interrupted')
       ) {
         setSession(existingSession);
       } else {
@@ -758,6 +756,7 @@ export default function TaskDetailPanel({
   const sessionId = session?.id;
   const sessionReadyForPty = Boolean(
     sessionId &&
+      session?.status !== 'interrupted' &&
       (session?.status === 'running' ||
         session?.status === 'stopped' ||
         session?.status === 'error') &&
@@ -789,10 +788,6 @@ export default function TaskDetailPanel({
     },
     onStreamData: (id, cb) => window.electronAPI.sessions.onData(id, cb),
     onAttachComplete: () => setSessionStreamReady(true),
-    invalidateAttachCache: () => {
-      const sid = sessionId;
-      if (sid) invalidateSessionAttachCache(sid);
-    },
   });
 
   useEffect(() => {
@@ -1152,7 +1147,9 @@ export default function TaskDetailPanel({
                           ? 'Blocked by incomplete dependencies'
                           : noAgentForSession
                             ? 'Choose an agent below before starting a session'
-                            : 'Continue the CLI session from disk (--resume)'
+                            : session?.agentConversationId
+                              ? 'Continue the CLI session using the captured resume id (--resume <id>)'
+                              : 'Continue the CLI session from disk (--resume)'
                       }
                       className={
                         startInFlight

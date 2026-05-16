@@ -8,6 +8,15 @@ import { resolveLocalOrOriginRefWithAmbiguity } from './repoGit';
 
 const execFile = promisify(execFileCallback);
 
+async function rmGitTestDir(cwd: string): Promise<void> {
+  await fs.rm(cwd, {
+    recursive: true,
+    force: true,
+    maxRetries: 15,
+    retryDelay: 50,
+  });
+}
+
 async function initGitRepo(cwd: string): Promise<void> {
   await fs.mkdir(cwd, { recursive: true });
   await execFile('git', ['init', '-b', 'main'], { cwd });
@@ -27,7 +36,7 @@ describe('resolveLocalOrOriginRefWithAmbiguity', () => {
       const r = await resolveLocalOrOriginRefWithAmbiguity(cwd, 'feature');
       expect(r).toEqual({ kind: 'ok', ref: 'feature' });
     } finally {
-      await fs.rm(cwd, { recursive: true, force: true });
+      await rmGitTestDir(cwd);
     }
   });
 
@@ -41,7 +50,7 @@ describe('resolveLocalOrOriginRefWithAmbiguity', () => {
       const r = await resolveLocalOrOriginRefWithAmbiguity(cwd, 'remote-only');
       expect(r).toEqual({ kind: 'ok', ref: 'origin/remote-only' });
     } finally {
-      await fs.rm(cwd, { recursive: true, force: true });
+      await rmGitTestDir(cwd);
     }
   });
 
@@ -73,7 +82,7 @@ describe('resolveLocalOrOriginRefWithAmbiguity', () => {
         expect(r.remoteSha).toBe(baseSha);
       }
     } finally {
-      await fs.rm(cwd, { recursive: true, force: true });
+      await rmGitTestDir(cwd);
     }
   });
 
@@ -103,7 +112,7 @@ describe('resolveLocalOrOriginRefWithAmbiguity', () => {
       });
       expect(r).toEqual({ kind: 'ok', ref: 'origin/diverge2' });
     } finally {
-      await fs.rm(cwd, { recursive: true, force: true });
+      await rmGitTestDir(cwd);
     }
   });
 
@@ -134,7 +143,7 @@ describe('resolveLocalOrOriginRefWithAmbiguity', () => {
       expect(r).toEqual({ kind: 'ok', ref: 'diverge3' });
       expect(localSha).not.toBe(baseSha);
     } finally {
-      await fs.rm(cwd, { recursive: true, force: true });
+      await rmGitTestDir(cwd);
     }
   });
 
@@ -149,7 +158,7 @@ describe('resolveLocalOrOriginRefWithAmbiguity', () => {
       const r = await resolveLocalOrOriginRefWithAmbiguity(cwd, 'aligned');
       expect(r).toEqual({ kind: 'ok', ref: 'aligned' });
     } finally {
-      await fs.rm(cwd, { recursive: true, force: true });
+      await rmGitTestDir(cwd);
     }
   });
 
@@ -160,7 +169,7 @@ describe('resolveLocalOrOriginRefWithAmbiguity', () => {
       const r = await resolveLocalOrOriginRefWithAmbiguity(cwd, 'nope');
       expect(r).toEqual({ kind: 'missing' });
     } finally {
-      await fs.rm(cwd, { recursive: true, force: true });
+      await rmGitTestDir(cwd);
     }
   });
 });
