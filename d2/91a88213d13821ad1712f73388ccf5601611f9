@@ -1,0 +1,354 @@
+src/planningDocs/cloudPlanningDocsMigration.ts
+  s_fd2d8fb2dc8131::t_ef46e2db156e1a 20
+  s_fd2d8fb2dc8131::t_a8a8c21ae5e3c4 21-24
+  s_fd2d8fb2dc8131::t_a970d6a15e2dbd 6-7
+src/planningDocs/FilesystemPlanningDocsProvider.test.ts
+  s_fd2d8fb2dc8131::t_3769043fb5381f 10-12,27-37,43-44,65-71,76,81-82,90-91
+  s_fd2d8fb2dc8131::t_d3727fb94826c8 92-94
+  s_ca6f8266c9a9d2::t_1b300c156ea0ae 75,77-80,83-89,95-103
+src/planningDocs/FilesystemPlanningDocsProvider.ts
+  s_fd2d8fb2dc8131::t_9cb875466960b4 10
+  s_ca6f8266c9a9d2::t_4670f19e95b1a9 90
+  s_fd2d8fb2dc8131::t_9203f5e63e75e5 159-162
+  s_fd2d8fb2dc8131::t_ba5698bffc138b 19
+  s_fd2d8fb2dc8131::t_193b06e156fa20 107
+  s_fd2d8fb2dc8131::t_d3727fb94826c8 119,141
+  s_ca6f8266c9a9d2::t_27fa252c6510a7 150-158,164-177
+  s_fd2d8fb2dc8131::t_caaaecec8742e1 11-18,48-85,106,111-118,120-121,132-133,136-140,163
+  s_ca6f8266c9a9d2::t_4a8a5f4647bd6d 8
+src/main/planningDocsFirestoreHydrate.test.ts
+  s_fd2d8fb2dc8131::t_dcfcbb738320fa 24-27
+  s_fd2d8fb2dc8131::t_30419e893c5816 55,77,93,118,139,148,170,240
+src/planningDocs/planningUserDocsLegacyMigration.ts
+  s_fd2d8fb2dc8131::t_df306ea8408094 111-114
+  s_fd2d8fb2dc8131::t_894b5f65cd04d4 1-110,115-211
+src/planningDocs/path.test.ts
+  s_fd2d8fb2dc8131::t_d3727fb94826c8 105
+  s_fd2d8fb2dc8131::t_4402bb2bd0b14f 92
+  s_ca6f8266c9a9d2::t_612a3e2fbac45c 8
+  s_fd2d8fb2dc8131::t_be0fb5bf74a0ca 7,11,13
+  s_fd2d8fb2dc8131::t_2bb2e855a203dd 37-39
+  s_fd2d8fb2dc8131::t_daeee4d3ececf6 127-134
+  s_fd2d8fb2dc8131::t_05492d5d147b53 135
+  s_ca6f8266c9a9d2::t_52576cda9a7589 126,136-149
+  s_fd2d8fb2dc8131::t_3fcca0fa47ce29 52-53,63,66-67,71-91,93-104
+src/planningDocs/cloudMirrorPlanningDocsProvider.ts
+  s_ca6f8266c9a9d2::t_ef683134d0db07 27-30
+  s_ca6f8266c9a9d2::t_d448d2aa540da9 2-7
+  s_fd2d8fb2dc8131::t_22b9bd33127948 10
+src/planningDocs/planningUserDocsLegacyMigration.test.ts
+  s_fd2d8fb2dc8131::t_1815e5a864fc2f 39
+  s_fd2d8fb2dc8131::t_ac08f8d2342c7a 1-38,40-77
+src/planningDocs/path.ts
+  s_ca6f8266c9a9d2::t_0a8b584f0a9e0e 3-5
+  s_fd2d8fb2dc8131::t_e943c771a468d3 79-91,101-128,130-131,133-159,161-168,176-183
+  s_fd2d8fb2dc8131::t_a6fd7964f588d8 72-73
+  s_fd2d8fb2dc8131::t_e212c82dbdb523 2,7-8
+  s_fd2d8fb2dc8131::t_d3727fb94826c8 129,132
+  s_ca6f8266c9a9d2::t_2046f94ba3cea6 212,218-219,221
+  s_fd2d8fb2dc8131::t_84eb3aee0e9720 213-217,220
+  s_fd2d8fb2dc8131::t_ac33ef42c05f67 92-100
+src/main/ProjectStore.test.ts
+  s_cd47c56e31f910::t_b3ac1ffeae5378 11
+  s_ac98e4064c8146::t_652aa901150b3d 34
+  s_cd47c56e31f910::t_519cab4356b689 494-546
+  s_fd2d8fb2dc8131::t_663a61c64473f2 12
+  s_fd2d8fb2dc8131::t_3dd633d6e89faf 562
+  s_fd2d8fb2dc8131::t_adc740ba714e6a 569-575
+CLAUDE.md
+  s_fd2d8fb2dc8131::t_3537c8a58c8d5d 11,13
+  ebc3975d9fb2ac1d 1-6
+  s_fd2d8fb2dc8131::t_68d32662d2b514 19
+  s_fd2d8fb2dc8131::t_f0186d55735960 21
+  s_fd2d8fb2dc8131::t_78c175a8148fd3 31
+  s_fd2d8fb2dc8131::t_578df93061a964 7
+  s_fd2d8fb2dc8131::t_8c6c89d6c83a3c 35
+src/components/PlanningDocsView.tsx
+  fedb122041cdf43f 9-10,17-21,62-64,71-73,76-77,105,110-111,114-115,128-129,131-133,137-140,143,145-146,150,152-154,156,244-246,257-260,332,408-412
+  s_fd2d8fb2dc8131::t_0efb47cabff16b 250
+  s_ca6f8266c9a9d2::t_ffefb5e1d1a972 11-15
+  s_ca6f8266c9a9d2::t_ba9093d693071c 1-8,29,46-61,70,74-75,80-85,92-101,112-113,116-120,122-127,130,134-136,141-142,144,147-149,151,155,190-221,224-243,261-278,280-283,285-318,320-328,331,333-344,388-406
+  s_ca6f8266c9a9d2::t_a273234e787998 107-109
+  s_ca6f8266c9a9d2::t_3971760cbdd8bf 121
+  s_ca6f8266c9a9d2::t_aacc36fa9d98a8 319
+src/main/ProjectStore.ts
+  s_fd2d8fb2dc8131::t_a4e3ba1e155e42 405
+  e0c1b8a1c6105182 4-9,11,64-67,99-111,113,129-141,240-247,287-290,501-531
+  s_ac98e4064c8146::t_85f60ae70f56c9 1137
+  cf1277bc3d9dac19 479-486,922-927,929-932
+  s_fd2d8fb2dc8131::t_e0907b233f0d53 351
+  s_fd2d8fb2dc8131::t_7f2df22817ae24 406
+  s_cd47c56e31f910::t_d5aa7395ed153f 83-94
+  s_fd2d8fb2dc8131::t_19148b47241ed6 381,383-387,392,394
+  s_cd47c56e31f910::t_1e419d54a5f2c1 1287-1341
+  e01d65850bca41d3 1-2,43,82,298,302,473-474,477-478,1344,1350,1356-1357,1403,1409
+  2eac0672a1395d6d 307,352-355,398-402,404,407,410-423,1195-1199
+  s_fd2d8fb2dc8131::t_ab875277f4ef41 321,325
+  7f6bd4470626cd32 3,44,47-55,59-63,77-81,112,114-120,160-162,223-228,230,232-239,261-277,291-292,294-297,299-301,303-305,345,349,359-361,370,382,388-390,393,395-397,424-435,437-438,471-472,475-476,933,938-940,982-986,1099-1100,1103-1105,1108-1123,1129,1131-1135,1150,1173-1174,1176-1177,1179,1182-1192,1200-1201,1205,1263-1266,1270-1272,1274,1345-1346,1348,1358-1365,1397-1398,1401,1405-1408
+  s_cd47c56e31f910::t_d7f4d3d602ac58 57
+  894250735b061565 68,121,278,754-780
+  ebc3975d9fb2ac1d 362
+  360a56057098a697 490-500
+  ae1c49d13cec2b34 71,124,281-283,835-861
+  s_96df274a66663b::t_3391c11b0b25c5 1136,1138-1141
+  s_cd47c56e31f910::t_40c2bc3067ffc6 989-993
+  9dc473843f834120 73,126,285,889-915
+  s_fd2d8fb2dc8131::t_7e314d21f81352 42
+  c47f01b677219485 356,364,366,374,391
+  s_ac98e4064c8146::t_18651bdcad7cc7 1088
+  s_ac98e4064c8146::t_cb6bdc7f5909ae 279
+  7720e8ff238b42d7 369
+  s_ac98e4064c8146::t_1f6788821a28fb 808-834
+  924617386f21e8e7 377
+  s_ac98e4064c8146::t_3c44a373dca8ef 122
+  s_ac98e4064c8146::t_e95086d58dabf8 69
+  60a7a76eb93aac8f 375
+  s_96df274a66663b::t_6eceec5a05ee6d 34-37,39-41
+  bbfa6ef6d524e782 380
+  s_ac98e4064c8146::t_7c76deed10196c 38
+  5cdef6d06ebc7759 70,123,280,781-807
+  95c76e0dfc26295d 371
+src/main/planningDocsFirestorePush.test.ts
+  s_fd2d8fb2dc8131::t_6ef4b21206b5e0 118-119
+  s_fd2d8fb2dc8131::t_ef1843a57f7482 77-78
+  s_fd2d8fb2dc8131::t_196206645450b0 127-128
+  s_fd2d8fb2dc8131::t_9190a450f1eef2 42,86
+  s_fd2d8fb2dc8131::t_88cb3ac2e780f1 57
+  s_fd2d8fb2dc8131::t_e1a489098fa53e 87
+src/main/planningDocsListEnrichment.ts
+  s_fd2d8fb2dc8131::t_2f562442b5c765 110
+  s_fd2d8fb2dc8131::t_17696da543c6c6 6
+src/renderer/planningDocs/usePlanningDocsFirestoreSync.ts
+  s_fd2d8fb2dc8131::t_bedaf20115e896 41
+src/main/planningDocsFirestorePush.ts
+  s_fd2d8fb2dc8131::t_638019c81c45d7 7
+  s_fd2d8fb2dc8131::t_e2f52fab4e63b2 91
+  s_fd2d8fb2dc8131::t_96dd3a3fab0196 8
+  s_fd2d8fb2dc8131::t_f779764785487c 85
+src/main/planningDocsListEnrichment.test.ts
+  s_fd2d8fb2dc8131::t_5477642b019167 59
+  s_fd2d8fb2dc8131::t_920ed3062736aa 58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "d291a88213d13821ad1712f73388ccf5601611f9",
+  "prompts": {
+    "2eac0672a1395d6d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a0dc214b-7b7e-49d7-99df-62253f232eee",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 31,
+      "overriden_lines": 0
+    },
+    "360a56057098a697": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2a68e73d-4372-4976-95ce-4b6fc14ae1ad",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 195,
+      "total_deletions": 4,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    },
+    "5cdef6d06ebc7759": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "cb667244-5c83-454b-917c-6657c8cc39d9",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 887,
+      "total_deletions": 115,
+      "accepted_lines": 30,
+      "overriden_lines": 0
+    },
+    "60a7a76eb93aac8f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fba1e557-5426-4e2b-b548-c2a91d6ec319",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "7720e8ff238b42d7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "caa0fdd5-51b7-4b90-a6a0-dfe1994177eb",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "7f6bd4470626cd32": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6b4fe518-4e06-4356-a7c9-74421766c50a",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 190,
+      "overriden_lines": 0
+    },
+    "894250735b061565": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c3915e14-77c3-409c-bffc-f8de5cc51e34",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 259,
+      "total_deletions": 5,
+      "accepted_lines": 30,
+      "overriden_lines": 0
+    },
+    "924617386f21e8e7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "bf5d500f-5e99-4c26-867b-12717dffaa59",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 16,
+      "total_deletions": 6,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "95c76e0dfc26295d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e597bf55-c826-49e9-a22f-0376d9b819ab",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 117,
+      "total_deletions": 42,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "9dc473843f834120": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a74c0eae-6af2-4829-b1cf-20131c5f37a7",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 30,
+      "overriden_lines": 0
+    },
+    "ae1c49d13cec2b34": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b35232b2-b021-4a94-8b6f-695e1e49bfd6",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 926,
+      "total_deletions": 321,
+      "accepted_lines": 32,
+      "overriden_lines": 0
+    },
+    "bbfa6ef6d524e782": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fe28d259-10ed-40d0-a227-ebbded340483",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 5,
+      "total_deletions": 3,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "c47f01b677219485": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3cb42505-4c75-4eef-9725-8432839e24a1",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 94,
+      "total_deletions": 4,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    },
+    "cf1277bc3d9dac19": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ff237db1-72c1-42f6-b88f-1a05b6942193",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    },
+    "e01d65850bca41d3": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7ae915b5-7acf-4242-9213-191ab578ea20",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 486,
+      "total_deletions": 87,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    },
+    "e0c1b8a1c6105182": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "bd66a403-c863-45a0-85ae-8c050b7563ad",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 1067,
+      "total_deletions": 259,
+      "accepted_lines": 81,
+      "overriden_lines": 0
+    },
+    "ebc3975d9fb2ac1d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4668f586-d8e1-4c44-9ed7-198fbd54703d",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 98,
+      "total_deletions": 26,
+      "accepted_lines": 7,
+      "overriden_lines": 0
+    },
+    "fedb122041cdf43f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "99431860-61eb-44be-b2f0-7c997b76c89b",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 50,
+      "overriden_lines": 0
+    }
+  }
+}
