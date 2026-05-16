@@ -12,12 +12,12 @@ import type {
   StartPlanningParams,
   StartPlanningResult,
   StreamFrame,
-} from '../daemon/protocol';
-import { SessionRuntime } from '../daemon/SessionRuntime';
-import { SilenceDetector } from '../daemon/SilenceDetector';
-import { PromptAutoresponder } from '../daemon/PromptAutoresponder';
-import { buildTrustPromptAutoresponderRules } from '../daemon/trustPromptAutoresponderRules';
-import type { SilenceState } from '../daemon/SilenceDetector';
+} from '../terminal-runtime/protocol';
+import { SessionRuntime } from '../terminal-runtime/SessionRuntime';
+import { SilenceDetector } from '../terminal-runtime/SilenceDetector';
+import { PromptAutoresponder } from '../terminal-runtime/PromptAutoresponder';
+import { buildTrustPromptAutoresponderRules } from '../terminal-runtime/trustPromptAutoresponderRules';
+import type { SilenceState } from '../terminal-runtime/SilenceDetector';
 
 interface SessionEntry {
   runtime: SessionRuntime;
@@ -125,7 +125,7 @@ export interface TerminalRuntimeManagerOptions {
 
 /**
  * Main-process owner of local PTYs (task sessions, shells, planning). Registry
- * semantics mirror the former detached daemon's `DaemonCore` implementation.
+ * semantics match the historical detached-daemon core, without a separate process.
  */
 export class TerminalRuntimeManager {
   private sessions = new Map<string, SessionEntry>();

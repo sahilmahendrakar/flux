@@ -176,7 +176,7 @@ import {
 } from './taskDependencies';
 import { applyUnblockAutostartForCompletedBlocker } from './unblockAutostartApply';
 import type { UnblockAutostartPolicy } from './unblockAutostart';
-import type { AgentState, AttachResult, PlanningAttachResult } from './daemon/protocol';
+import type { AgentState, AttachResult, PlanningAttachResult } from './terminal-runtime/protocol';
 
 function isPlanningAgent(value: unknown): value is Agent {
   return value === 'claude-code' || value === 'codex' || value === 'cursor';
@@ -491,8 +491,7 @@ app.whenReady().then(async () => {
 
   const worktreeService = new WorktreeService('', '');
   // Side-effecting `process.env` here means every PTY child inherits the
-  // corrected env without per-call wiring. See `docs/daemon-packaging.md` and
-  // `src/main/userShellEnv.ts`.
+  // corrected env without per-call wiring. See `src/main/userShellEnv.ts`.
   await applyShellEnvToProcess();
 
   const terminalBackend = createMainTerminalBackend();
@@ -694,8 +693,7 @@ app.whenReady().then(async () => {
   }
 
   // Catchup: for sessions already silent (or already exited) when this process
-  // connects to the daemon, no stream event will fire. Also re-run after
-  // stream reconnect so a brief disconnect doesn't permanently miss events.
+  // starts, no stream event will fire until the next PTY output tick.
   async function runSilenceCatchup(): Promise<void> {
     try {
       const silenceStates = await terminalBackend.getSessionSilenceStates();
@@ -708,8 +706,8 @@ app.whenReady().then(async () => {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('UNKNOWN_METHOD')) {
         console.warn(
-          '[main] daemon does not support getSessionSilenceStates — running sessions may not ' +
-          'auto-transition to needs-input; restart Flux to upgrade the daemon',
+          '[main] terminal backend does not support getSessionSilenceStates — running sessions may not ' +
+            'auto-transition to needs-input; upgrade Flux',
         );
       } else {
         console.warn('[main] catchup getSessionSilenceStates failed', err);

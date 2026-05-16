@@ -1,4 +1,4 @@
-import type { AttachResult } from '../daemon/protocol';
+import type { AttachResult } from '../terminal-runtime/protocol';
 import type { TerminalHandle } from '../components/Terminal';
 
 /** In-flight `onData` chunk before the attach snapshot is applied. */
