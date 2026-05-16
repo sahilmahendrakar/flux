@@ -27,6 +27,7 @@ import type {
   TaskRequestPullRequestFromAgentPayload,
   TaskRequestPullRequestFromAgentResult,
   TaskSessionStartProgress,
+  TaskAttachedPlanningDoc,
 } from './types';
 import type {
   AgentState,
@@ -249,6 +250,7 @@ declare global {
           agentModel?: string;
           agentYolo?: boolean;
           repoId?: string;
+          attachedPlanningDocs?: TaskAttachedPlanningDoc[];
         }) => Promise<Task>;
         update: (
           id: string,
@@ -273,6 +275,7 @@ declare global {
           > & {
             githubPr?: TaskGithubPr | null;
             autoStartOnUnblock?: boolean | null;
+            attachedPlanningDocs?: TaskAttachedPlanningDoc[] | null;
           },
         ) => Promise<Task>;
         assertSourceBranchEditable: (

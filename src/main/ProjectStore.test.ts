@@ -7,7 +7,7 @@ import {
   ensurePlanningAssistantMarkdownFiles,
   ProjectStore,
 } from './ProjectStore';
-import { planningAssistantMarkdown, wrapPlanningInstructionsManagedBlock } from './planningAssistantInstructions';
+import { planningAssistantMarkdown, PLANNING_ASSISTANT_TEMPLATE_VERSION, wrapPlanningInstructionsManagedBlock } from './planningAssistantInstructions';
 import { stripFluxPlanningTemplateVersionComment } from '../planningDocs/cloudPlanningDocsMigration';
 import {
   FLUX_PLANNING_INSTRUCTIONS_BEGIN,
@@ -638,7 +638,7 @@ describe('ensurePlanningAssistantMarkdownFiles (multi-repo2 planning copy)', () 
     const next = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
     expect(next).toContain('# My notes');
     expect(next).toContain(FLUX_PLANNING_INSTRUCTIONS_BEGIN);
-    expect(next).toContain('flux-planning-template 1');
+    expect(next).toContain(`flux-planning-template ${PLANNING_ASSISTANT_TEMPLATE_VERSION}`);
   });
 
   it('upgrades only the Flux template file when CLAUDE is manual and AGENTS is legacy', async () => {

@@ -139,6 +139,7 @@ import type {
   SessionStartResult,
   Task,
   TaskAgentSessionRecord,
+  TaskAttachedPlanningDoc,
   TaskGithubPr,
   TaskPullRequestIpcResult,
   TaskRequestPullRequestFromAgentResult,
@@ -2979,7 +2980,7 @@ app.whenReady().then(async () => {
             merged,
             await composeTaskSessionInitialPrompt(
               merged,
-              path.join(activeProjectDir(), 'planning'),
+              resolvePlanningDocsDir() ?? path.join(activeProjectDir(), 'planning'),
             ),
           );
       console.log('[session:start] spawn', {
@@ -3104,6 +3105,8 @@ app.whenReady().then(async () => {
     githubPr?: TaskGithubPr | null;
     /** `null` clears stored value (inherit project default for when-unblocked). */
     autoStartOnUnblock?: boolean | null;
+    /** `null` clears all attached planning docs. */
+    attachedPlanningDocs?: TaskAttachedPlanningDoc[] | null;
   };
 
   const unblockAutostartInFlight = new Set<string>();

@@ -14,11 +14,22 @@ interface CoreService {
 
 interface XtermCore {
   coreService: CoreService;
-  coreMouseService: CoreMouseService;
+  /** xterm.js ≤5 */
+  coreMouseService?: CoreMouseService;
+  /** xterm.js 6+ */
+  mouseStateService?: CoreMouseService;
 }
 
 function getCore(term: Terminal): XtermCore {
   return (term as unknown as { _core: XtermCore })._core;
+}
+
+function getMouseMeta(core: XtermCore): { protocol: string; encoding: string } {
+  const svc = core.mouseStateService ?? core.coreMouseService;
+  return {
+    protocol: svc?.activeProtocol ?? 'NONE',
+    encoding: svc?.activeEncoding ?? 'DEFAULT',
+  };
 }
 
 /**
@@ -28,11 +39,7 @@ function getCore(term: Terminal): XtermCore {
 export function readTerminalModes(terminal: Terminal): TerminalModes {
   const m = terminal.modes;
   const core = getCore(terminal);
-  // @xterm/headless 6+ may omit `coreMouseService` on the private `_core` shim
-  // used in Vitest; treat as “no mouse tracking” instead of crashing snapshots.
-  const mouse = core.coreMouseService;
-  const mouseProto = mouse?.activeProtocol ?? '';
-  const enc = mouse?.activeEncoding ?? '';
+  const { protocol: mouseProto, encoding: enc } = getMouseMeta(core);
 
   return {
     applicationCursorKeys: m.applicationCursorKeysMode,

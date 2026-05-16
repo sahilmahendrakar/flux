@@ -36,7 +36,7 @@ describe('composeTaskSessionInitialPrompt', () => {
     expect(await composeTaskSessionInitialPrompt(task, planningDir)).toBe(taskInitialPrompt(task));
   });
 
-  it('appends paths and file URLs for one readable doc', async () => {
+  it('appends attached-doc section with path and file URL per attachment', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'flux-plan-'));
     const planningDir = path.join(dir, 'planning');
     const docsDir = path.join(planningDir, 'docs');
@@ -66,8 +66,9 @@ describe('composeTaskSessionInitialPrompt', () => {
       attachedPlanningDocs: [{ relativePath: 'a.md' }, { relativePath: 'b.md' }],
     });
     const got = await composeTaskSessionInitialPrompt(task, planningDir);
-    expect(got).toContain('- `a.md`');
-    expect(got).toContain('- `b.md`');
+    expect(got).toContain(`Path: \`${path.join(docsDir, 'a.md')}\``);
+    expect(got).toContain(`Path: \`${path.join(docsDir, 'b.md')}\``);
+    expect(got).toContain('URL: `file://');
   });
 
   it('dedupes repeated normalized paths', async () => {
@@ -80,8 +81,8 @@ describe('composeTaskSessionInitialPrompt', () => {
       attachedPlanningDocs: [{ relativePath: 'a.md' }, { relativePath: './a.md' }],
     });
     const got = await composeTaskSessionInitialPrompt(task, planningDir);
-    const n = got.split('`a.md`').length - 1;
-    expect(n).toBe(1);
+    expect((got.match(/- `a\.md`/g) ?? []).length).toBe(1);
+    expect(got).toContain(`Path: \`${path.join(docsDir, 'a.md')}\``);
   });
 
   it('calls out a missing file while keeping the relative path', async () => {
@@ -92,9 +93,9 @@ describe('composeTaskSessionInitialPrompt', () => {
       attachedPlanningDocs: [{ relativePath: 'ghost.md' }],
     });
     const got = await composeTaskSessionInitialPrompt(task, planningDir);
-    expect(got).toContain('- `ghost.md`');
+    expect(got).toContain(path.join(planningDir, 'docs', 'ghost.md'));
     expect(got).toMatch(/missing|not readable|syncing/i);
-    expect(got).toContain('URL: _not available_');
+    expect(got).not.toContain('file://');
   });
 
   it('includes invalid attachment entries without throwing', async () => {

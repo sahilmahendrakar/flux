@@ -13,7 +13,7 @@ import {
 } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronDown, Pencil, Settings, Terminal, UserCircle2, X } from 'lucide-react';
+import { ChevronDown, FileText, Pencil, Settings, Terminal, UserCircle2, X } from 'lucide-react';
 import {
   Task,
   TaskStatus,
@@ -65,6 +65,9 @@ import { OpenInWorkspaceButton } from './OpenInWorkspaceButton';
 import { GithubPrIconButton } from './GithubPrIconButton';
 import TaskSourceBranchPicker from './TaskSourceBranchPicker';
 import ConfirmDialog from './ConfirmDialog';
+import type { PlanningDocFileEntry } from '../planningDocs/types';
+import { compactPlanningDocPathLabel } from '../taskPlanningDocAttachments';
+import { sanitizeTaskAttachedPlanningDocsInput } from '../taskAttachedPlanningDocs';
 import {
   buildTaskSourceBranchPersistPatch,
   effectiveTaskSourceBranchShort,
@@ -145,6 +148,10 @@ export interface TaskDetailPanelProps {
   /** From `project:getRepos` when multi-repo2 is enabled. */
   projectRepos?: RepoConfig[];
   multiRepo2Enabled?: boolean;
+  /** Listed planning markdown files for this workspace (same source as the Docs sidebar). */
+  planningDocFiles?: PlanningDocFileEntry[];
+  /** Opens the Docs tab and selects `relativePath` (unsaved-doc confirm is handled by the host). */
+  onOpenPlanningDoc?: (relativePath: string) => void;
 }
 
 const TASK_DETAIL_WIDTH_KEY = 'flux.taskDetailPanelWidth';
@@ -244,6 +251,8 @@ export default function TaskDetailPanel({
   layout = 'board',
   projectRepos,
   multiRepo2Enabled = false,
+  planningDocFiles = [],
+  onOpenPlanningDoc,
 }: TaskDetailPanelProps) {
   const sessionWorkspace = layout === 'sessionWorkspace';
   const asideRef = useRef<HTMLElement>(null);
@@ -299,6 +308,22 @@ export default function TaskDetailPanel({
     () => projectLabelCatalog(projectTasks),
     [projectTasks],
   );
+
+  const planningDocPathSet = useMemo(
+    () => new Set(planningDocFiles.map((f) => f.relativePath)),
+    [planningDocFiles],
+  );
+
+  const attachedPlanningPaths = useMemo(() => {
+    const docs = task?.attachedPlanningDocs;
+    if (!docs?.length) return [];
+    return docs.map((d) => d.relativePath);
+  }, [task?.attachedPlanningDocs]);
+
+  const attachablePlanningDocs = useMemo(() => {
+    const attached = new Set(attachedPlanningPaths);
+    return planningDocFiles.filter((f) => !attached.has(f.relativePath));
+  }, [planningDocFiles, attachedPlanningPaths]);
 
   const selectedAssigneeMember = useMemo(() => {
     if (!task?.assigneeId || projectMembers === undefined) return null;
@@ -1577,6 +1602,115 @@ export default function TaskDetailPanel({
                 </div>
               )}
             </section>
+
+            {onOpenPlanningDoc ? (
+              <section
+                className="border-t border-white/[0.04] px-5 py-5"
+                aria-label="Attached planning documents"
+              >
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3">
+                  <h2 className="mb-1 text-sm font-medium text-zinc-300">Attached docs</h2>
+                  <p className="mb-2 text-[11px] leading-snug text-zinc-500">
+                    Link planning markdown for quick access. Opens in the Docs workspace.
+                  </p>
+                  {attachedPlanningPaths.length === 0 ? (
+                    <p className="mb-2 text-xs text-zinc-600">No documents attached.</p>
+                  ) : (
+                    <ul className="mb-2 flex flex-wrap gap-1.5" role="list">
+                      {attachedPlanningPaths.map((relPath) => {
+                        const exists = planningDocPathSet.has(relPath);
+                        const label = compactPlanningDocPathLabel(relPath);
+                        return (
+                          <li key={relPath} className="flex max-w-full items-stretch">
+                            {exists ? (
+                              <button
+                                type="button"
+                                onClick={() => onOpenPlanningDoc(relPath)}
+                                title={relPath}
+                                aria-label={`Open planning document ${relPath}`}
+                                className="inline-flex max-w-[min(100%,14rem)] items-center gap-1 rounded-l-md border border-white/[0.08] bg-white/[0.05] py-1 pl-2 pr-1 text-left text-[11px] font-medium text-sky-200/95 ring-1 ring-inset ring-white/[0.04] transition hover:bg-white/[0.08] hover:text-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/40"
+                              >
+                                <FileText
+                                  className="h-3 w-3 shrink-0 opacity-80"
+                                  strokeWidth={2}
+                                  aria-hidden
+                                />
+                                <span className="min-w-0 truncate">{label}</span>
+                              </button>
+                            ) : (
+                              <span
+                                className="inline-flex max-w-[min(100%,14rem)] cursor-not-allowed items-center gap-1 rounded-l-md border border-amber-500/25 bg-amber-500/[0.08] py-1 pl-2 pr-1 text-left text-[11px] font-medium text-amber-100/90 line-through opacity-90 ring-1 ring-inset ring-amber-500/15"
+                                title={`${relPath} — not found in planning docs list`}
+                                role="status"
+                                aria-label={`Missing planning document ${relPath}`}
+                              >
+                                <FileText
+                                  className="h-3 w-3 shrink-0 opacity-70"
+                                  strokeWidth={2}
+                                  aria-hidden
+                                />
+                                <span className="min-w-0 truncate">{label}</span>
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const docs = task.attachedPlanningDocs ?? [];
+                                const next = docs.filter((d) => d.relativePath !== relPath);
+                                onUpdate(task.id, {
+                                  attachedPlanningDocs: next.length > 0 ? next : [],
+                                });
+                              }}
+                              className="shrink-0 rounded-r-md border border-l-0 border-white/[0.08] bg-white/[0.04] px-1.5 text-zinc-500 transition hover:bg-white/[0.08] hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25"
+                              title={`Remove ${relPath}`}
+                              aria-label={`Remove attached document ${relPath}`}
+                            >
+                              <X className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  {planningDocFiles.length === 0 ? (
+                    <p className="text-[11px] text-zinc-600">No planning docs loaded for this project yet.</p>
+                  ) : attachablePlanningDocs.length === 0 ? (
+                    attachedPlanningPaths.length === 0 ? (
+                      <p className="text-[11px] text-zinc-600">All planning documents are already attached.</p>
+                    ) : null
+                  ) : (
+                    <label className="block">
+                      <span className="sr-only">Attach planning document</span>
+                      <select
+                        defaultValue=""
+                        key={attachedPlanningPaths.join('\0')}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (!v) return;
+                          const docs = task.attachedPlanningDocs ?? [];
+                          const next = sanitizeTaskAttachedPlanningDocsInput([
+                            ...docs,
+                            { relativePath: v },
+                          ]);
+                          onUpdate(task.id, { attachedPlanningDocs: next });
+                          e.target.selectedIndex = 0;
+                        }}
+                        className={propertySelectClass}
+                        style={{ colorScheme: 'dark' } as CSSProperties}
+                        aria-label="Attach a planning document from the project list"
+                      >
+                        <option value="">Attach document…</option>
+                        {attachablePlanningDocs.map((f) => (
+                          <option key={f.relativePath} value={f.relativePath}>
+                            {f.relativePath}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+              </section>
+            ) : null}
 
             <div className="space-y-4 px-5 py-5">
               {(blockingTasks.length > 0 || staleMissingIds.length > 0) && (
