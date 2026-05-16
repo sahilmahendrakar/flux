@@ -1,0 +1,33 @@
+src/App.tsx
+  s_7cbbf45771c4c1::t_a509202baf8923 1480-1493
+  s_7cbbf45771c4c1::t_2fe890ff53acd9 3393-3394
+  s_7cbbf45771c4c1::t_cb8d7418ea3675 331
+  s_7cbbf45771c4c1::t_72a3f9670fd95a 30
+  s_7cbbf45771c4c1::t_c70230f09f8f97 275-295
+src/components/Board.tsx
+  s_7cbbf45771c4c1::t_5f99b4f6fc8a76 226
+  s_7cbbf45771c4c1::t_71d3b9f5e049af 308
+  s_7cbbf45771c4c1::t_4a01cf643c16b8 200-225
+  s_7cbbf45771c4c1::t_106370811d5f0f 264
+  s_7cbbf45771c4c1::t_7bab11376356e4 3
+  s_7cbbf45771c4c1::t_fdbbf0be8bc1cc 79-80
+  s_7cbbf45771c4c1::t_77db71c027e524 199
+  s_7cbbf45771c4c1::t_f2d37342d9e085 29-30
+  s_7cbbf45771c4c1::t_6cb2659f703ebb 110-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "b0201fcb890a3d9b543043b07aa2e6fee0a73b4a",
+  "prompts": {},
+  "sessions": {
+    "s_7cbbf45771c4c1": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "66e1c63b-7ae2-430f-b4b7-075a40dd5a83",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
