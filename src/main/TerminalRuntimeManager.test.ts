@@ -91,7 +91,7 @@ describe('TerminalRuntimeManager', () => {
     expect(mgr.listSessions()).toEqual([]);
   });
 
-  it('killAll stops sessions, shells, and planning', async () => {
+  it('shutdownAllPtys stops sessions, shells, and planning', async () => {
     const { TerminalRuntimeManager } = await import('./TerminalRuntimeManager');
     const mgr = new TerminalRuntimeManager({ deliverStreamFrame: vi.fn() });
 
@@ -128,7 +128,7 @@ describe('TerminalRuntimeManager', () => {
     expect(mgr.listShells().length).toBe(1);
     expect(mgr.listPlanning().length).toBe(1);
 
-    mgr.killAll();
+    mgr.shutdownAllPtys();
 
     expect(mgr.listSessions()).toEqual([]);
     expect(mgr.listShells()).toEqual([]);

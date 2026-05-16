@@ -494,18 +494,27 @@ export class TerminalRuntimeManager {
   }
 
   /**
-   * Tear down every local PTY and clear registries (e.g. full app quit).
-   * Unlike the detached daemon, in-process PTYs must stop when Electron main exits.
+   * Kill and dispose every registered PTY (shells, planning, and any in-process
+   * task sessions). Used on full app quit so no child processes remain.
    */
-  killAll(): void {
-    for (const id of [...this.sessions.keys()]) {
-      this.stopSession(id);
+  shutdownAllPtys(): void {
+    for (const entry of [...this.sessions.values()]) {
+      entry.detector.dispose();
+      entry.autoresponder?.dispose();
+      entry.runtime.kill();
+      entry.runtime.dispose();
     }
-    for (const id of [...this.shells.keys()]) {
-      this.closeShell(id);
+    this.sessions.clear();
+    for (const entry of [...this.shells.values()]) {
+      entry.runtime.kill();
+      entry.runtime.dispose();
     }
-    for (const id of [...this.planning.keys()]) {
-      this.stopPlanning(id);
+    this.shells.clear();
+    for (const entry of [...this.planning.values()]) {
+      entry.autoresponder?.dispose();
+      entry.runtime.kill();
+      entry.runtime.dispose();
     }
+    this.planning.clear();
   }
 }
