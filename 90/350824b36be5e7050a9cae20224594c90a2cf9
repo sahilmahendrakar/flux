@@ -1,0 +1,137 @@
+src/planningDocs/path.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 9,137-139
+vite.main.config.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 31-39
+src/terminal-runtime/renderedScreenText.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-32
+src/terminal-runtime/trustPromptAutoresponderRules.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-33
+src/main/composeTaskSessionInitialPrompt.ts
+  s_402b8f7c47f776::t_1f6e1b7291760f 3,13,22-23,69,72-73,94,114-116,118-124,126,128,136
+src/main/taskAgentSessionRecords.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-55
+src/main/taskEphemeralTeardown.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 4,9,13,18,20-21,36,41,53,78
+src/components/TaskDetailPanel.tsx
+  s_402b8f7c47f776::t_b80bdb1d0b3106 54,731-732,759,1150-1152
+src/terminal-runtime/terminal-host/types.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-34
+src/preload.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 35,403
+src/renderer/tasks/useCloudSilenceReconciliation.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 3,10-11,89
+src/terminal/terminalGeometryPolicy.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 49
+src/terminal/warmAttach.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1,39,106
+docs/agent-prompt-detection.md
+  s_402b8f7c47f776::t_b80bdb1d0b3106 21,32,114,132,219,227-229
+src/terminal-runtime/SilenceDetector.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-93
+src/terminal-runtime/terminal-host/HeadlessEmulator.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-299
+src/main/agentConversationIdParse.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-56
+src/terminal/warmAttach.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 2
+src/terminal-runtime/trustPromptAutoresponderRules.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-70
+src/terminal-runtime/SilenceDetector.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-85
+src/terminal-runtime/terminal-host/TerminalSession.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-240
+src/main/terminalBackend/createMainTerminalBackend.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-13
+src/planningDocs/cloudPlanningDocsMigration.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 22-23,27-29,35-39,76-109,132-137
+src/main/terminalBackend/LocalMainProcessTerminalBackend.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1,3-12,14-23,28,36-37,39-41,43,49-55,57-70,74-75,78-79,82-84,87-88,91-93,96-97,100-101,104-111,114-118,121-123,125-127,129,133-143,146-147,150-151,154-155,158-159,162-163,167-168,172,176,191,194-195,198-199,202-203,207,211,215,219,222-223,226-227,230-231,234-235,239,243,246-247
+src/main/agentSpawn.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 58,63,74-78,89-92
+src/planningDocs/cloudPlanningDocsMigration.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 5,12-15,56-67
+src/terminal/useTerminalPtyStream.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-2,52-55,117
+src/terminal-runtime/terminal-host/HeadlessEmulator.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-116
+src/terminal-runtime/sessionExitTransition.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-90
+src/terminal-runtime/attachWire.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 25,33
+src/types.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 411,481-511
+src/main/userShellEnv.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 7-9,11-12,16,289,296-297
+src/main/taskAgentSessionRecords.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1,3,5-7,9-12,14,16-17,19,23-38,41-44,47-52,54-59,62-78,80-81,85-93,96-100,102-108,110-124,126-146,148-150,152-155,157-165,167-169,171-173,176-185,188-198,201-238,240,243-246
+src/main/TerminalRuntimeManager.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 4,6,15-20,27,49-136,138-139,141,145-155,157-164,175,183,192,194,212,215-221,230,251,262,270-274,276-282,285-291,304-312,354,361,430,432,450,459,480,531-540,542-545,547-551,553
+src/terminal-runtime/terminalEnv.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 2,6,8
+src/terminal-runtime/terminalEnv.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-69
+src/terminal-runtime/terminalSnapshot.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-118
+src/terminal-runtime/terminal-host/TerminalSession.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-94
+src/terminal-runtime/PromptAutoresponder.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-88
+src/main/terminalBackend/terminalBackend.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-19
+src/planningDocs/planningInstructionMarkers.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-6
+src/main/repoGit.branchResolve.test.ts
+  s_402b8f7c47f776::t_42f540b4897fd0 11-19
+  s_402b8f7c47f776::t_bb87d73ec7ead8 39,53,85,115,146,161,172
+src/terminal-runtime/SessionRuntime.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 43,45-46,78
+src/terminal-runtime/renderedScreenText.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 2-3,5-7,10-20
+src/main.ts
+  ai_agent 35-36,49-53,141,185,423-433,502-503,506-507,509,511,514-529,535,564,575-589,591-606,609-611,730,733,743-744,1046,1673,1696,1703-1713,1831,2004,2084,2117,2182,2237,2271,2380,2401-2402,2428,2793,2799-2800,2887,2970-2976,2978,3002,3040-3053,3301,3340,3372,3458-3459,3465,3470,3474,3479-3496,3500,3505,3513,3518,3563,3693,3726,3728,3734,3744,3746,3754,3756,3766,3768,4046,4051,4060,4064,4070,4074,4078,4107-4165
+src/main/terminalBackend/TerminalBackend.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-100
+src/terminal-runtime/protocol.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 2-4,7,9,19,31,46,83,121,130,164
+src/planningDocs/path.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 3,105
+src/main/planningAssistantInstructions.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-17,19-144,147-148,151-187,190-311
+  s_402b8f7c47f776::t_403b67af5b22d5 18
+  s_402b8f7c47f776::t_d937089f4e89b1 145-146,149-150
+  s_402b8f7c47f776::t_8c864e0c73abc7 188-189
+src/main/projectFluxRemoval.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 5,15-16,21,25,30,40,44,150,157,168,171
+src/main/ProjectStore.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 11-15,591-640,642-653
+  s_402b8f7c47f776::t_2d8378a76e4daf 641
+  s_402b8f7c47f776::t_5c4df0e92e2d2c 10
+src/main/agentConversationIdParse.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-75
+forge.config.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 116-117,129-130,132-133,202
+src/main/TerminalRuntimeManager.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-330
+src/main/agentSpawn.test.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 1-46
+src/hooks/useTrustAutorespondNotice.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 10
+src/env.d.ts
+  s_402b8f7c47f776::t_b80bdb1d0b3106 36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "90350824b36be5e7050a9cae20224594c90a2cf9",
+  "prompts": {},
+  "sessions": {
+    "s_402b8f7c47f776": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "65ee956a-f19a-4661-8867-7b1ed0f4005d",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
