@@ -266,6 +266,15 @@ export class TerminalRuntimeManager {
     this.sessions.get(id)?.runtime.write(data);
   }
 
+  /**
+   * Ensures this write is applied before follow-up writes (e.g. bracketed paste
+   * then a lone `\r` for {@link tasks:requestPullRequestFromAgent}).
+   */
+  async writeSessionAwait(id: string, data: string): Promise<void> {
+    this.writeSession(id, data);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+
   resizeSession(id: string, cols: number, rows: number): void {
     const entry = this.sessions.get(id);
     if (!entry) return;
@@ -484,10 +493,19 @@ export class TerminalRuntimeManager {
     this.planning.get(id)?.runtime.resize(cols, rows);
   }
 
-  /** Kill every local PTY (e.g. app before-quit). */
+  /**
+   * Tear down every local PTY and clear registries (e.g. full app quit).
+   * Unlike the detached daemon, in-process PTYs must stop when Electron main exits.
+   */
   killAll(): void {
-    for (const { runtime } of this.sessions.values()) runtime.kill();
-    for (const { runtime } of this.shells.values()) runtime.kill();
-    for (const { runtime } of this.planning.values()) runtime.kill();
+    for (const id of [...this.sessions.keys()]) {
+      this.stopSession(id);
+    }
+    for (const id of [...this.shells.keys()]) {
+      this.closeShell(id);
+    }
+    for (const id of [...this.planning.keys()]) {
+      this.stopPlanning(id);
+    }
   }
 }
