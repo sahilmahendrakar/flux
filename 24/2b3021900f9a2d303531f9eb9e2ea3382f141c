@@ -1,0 +1,35 @@
+src/taskRequestPullRequestFromAgentContext.ts
+  s_a10772397f2f47::t_30e85d8a4384d0 1-92
+src/App.tsx
+  s_a10772397f2f47::t_30e85d8a4384d0 2399-2403
+src/types.ts
+  s_a10772397f2f47::t_30e85d8a4384d0 316-324
+src/main.ts
+  ai_agent 142-144,2202-2204,2206,2213,2217,2227-2231,2292,2295,2322
+src/preload.ts
+  s_a10772397f2f47::t_30e85d8a4384d0 27,347
+src/taskAgentPullRequestPrompt.test.ts
+  s_a10772397f2f47::t_30e85d8a4384d0 54-56
+src/env.d.ts
+  s_a10772397f2f47::t_30e85d8a4384d0 27,295-297
+src/taskRequestPullRequestFromAgentContext.test.ts
+  s_a10772397f2f47::t_30e85d8a4384d0 1-108
+src/taskAgentPullRequestPrompt.ts
+  s_a10772397f2f47::t_30e85d8a4384d0 36-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "242b3021900f9a2d303531f9eb9e2ea3382f141c",
+  "prompts": {},
+  "sessions": {
+    "s_a10772397f2f47": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8c10df68-641a-4c92-8376-a089444baab3",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
