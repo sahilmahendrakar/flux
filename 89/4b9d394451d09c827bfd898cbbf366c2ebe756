@@ -1,0 +1,74 @@
+firestore.rules
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 90-148,194-195,198-199
+src/main/projectFluxRemoval.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 5,15-16,21,25,30,40,44,150,157,168,171
+src/taskAgentPullRequestPrompt.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 36-38
+src/main/TerminalRuntimeManager.test.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-256
+src/mcpBridge.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 6,49-50,66-67
+src/taskAttachedPlanningDocs.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-56
+src/App.tsx
+  s_1bc3144b9d2b06::t_77f72106c308ac 1856
+  s_1bc3144b9d2b06::t_9972001b3a8d48 196-203
+  s_1bc3144b9d2b06::t_8f3a4001af048c 1974-1976
+  s_1bc3144b9d2b06::t_3aefc3158de80b 136
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 2421-2425
+  s_1bc3144b9d2b06::t_158902ad154028 1871-1878
+src/taskAttachedPlanningDocs.test.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-57
+src/taskRequestPullRequestFromAgentContext.test.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-108
+src/taskRequestPullRequestFromAgentContext.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-92
+src/types.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 267-271,321-329,404-408
+src/main/terminalBackend/TerminalBackend.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-85
+src/main/taskEphemeralTeardown.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 4,9,13,18,20-21,36,41,53,78
+src/taskAgentPullRequestPrompt.test.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 54-56
+src/main/terminalBackend/createMainTerminalBackend.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-24
+src/env.d.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 27,295-297
+src/main/TerminalRuntimeManager.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-493
+src/preload.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 25,28,293,318,350
+src/main/TaskStore.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 5,7,23,239-244,274-275,290,326-335
+src/main/terminalBackend/LocalMainProcessTerminalBackend.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-232
+src/renderer/tasks/TaskProvider.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-7,33-34,51
+src/main/terminalBackend/terminalBackend.test.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-26
+src/main/TaskStore.test.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 7-60
+src/main/terminalBackend/DetachedRpcTerminalBackend.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 1-140
+src/main.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 35-36,136,142-145,417-419,488-490,493-494,496,498,506,535,546-551,553-568,571-573,696,1009,1636,1659,1785,1840,1959,2039,2072,2137,2192,2202-2204,2206,2213,2217,2226-2231,2292,2295,2322,2335,2356-2357,2383,2748,2754-2755,2842,2944,3034-3035,3229,3268,3300,3386-3387,3393,3401,3415,3420,3428,3433,3478,3608,3641,3643,3649,3659,3661,3669,3671,3681,3683,3961,3966,3975,3979,3985,3989,3993,4026-4029
+src/renderer/tasks/LocalTaskProvider.ts
+  s_1bc3144b9d2b06::t_b936f2bf6251fd 67-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "894b9d394451d09c827bfd898cbbf366c2ebe756",
+  "prompts": {},
+  "sessions": {
+    "s_1bc3144b9d2b06": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "96054e8c-3666-4c1a-b67b-bf128851364f",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
