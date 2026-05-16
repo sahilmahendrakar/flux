@@ -22,7 +22,6 @@ import type {
   SessionStartResult,
   Shell,
   Task,
-  TaskAttachedPlanningDoc,
   TaskGithubPr,
   TaskPullRequestIpcResult,
   TaskRequestPullRequestFromAgentPayload,
@@ -281,7 +280,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAll: () => ipcRenderer.invoke('tasks:getAll') as Promise<Task[]>,
     create: (input: {
       title: string;
-      agent: Agent;
+      agent: Agent | null;
       blockedByTaskIds?: string[];
       labels?: string[];
       sourceBranch?: string;
@@ -289,7 +288,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       agentModel?: string;
       agentYolo?: boolean;
       repoId?: string;
-      attachedPlanningDocs?: TaskAttachedPlanningDoc[];
     }) => ipcRenderer.invoke('tasks:create', input) as Promise<Task>,
     update: (
       id: string,
@@ -314,7 +312,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       > & {
         githubPr?: TaskGithubPr | null;
         autoStartOnUnblock?: boolean | null;
-        attachedPlanningDocs?: TaskAttachedPlanningDoc[] | null;
       },
     ) => ipcRenderer.invoke('tasks:update', id, patch) as Promise<Task>,
     assertSourceBranchEditable: (

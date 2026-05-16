@@ -241,7 +241,7 @@ declare global {
         getAll: () => Promise<Task[]>;
         create: (input: {
           title: string;
-          agent: Agent;
+          agent: Agent | null;
           blockedByTaskIds?: string[];
           labels?: string[];
           sourceBranch?: string;

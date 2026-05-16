@@ -12,15 +12,7 @@ import {
   type DocumentData,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
-import {
-  COLUMNS,
-  type Agent,
-  type Task,
-  type TaskAttachedPlanningDoc,
-  type TaskGithubPr,
-  type TaskStatus,
-} from '../../types';
-import { parsePersistedTaskAttachedPlanningDocs, sanitizeTaskAttachedPlanningDocsInput } from '../../taskAttachedPlanningDocs';
+import { COLUMNS, type Agent, type Task, type TaskGithubPr, type TaskStatus } from '../../types';
 import { parseGithubPrField } from '../../githubPrMetadata';
 import { validateBlockedByTaskIds } from '../../taskDependencies';
 import { normalizeTaskLabels } from '../../taskLabels';
@@ -127,7 +119,7 @@ export class FirestoreTaskProvider implements TaskProvider {
     const data = {
       title: input.title,
       status: input.status ?? ('backlog' as TaskStatus),
-      agent: input.agent,
+      agent: input.agent === null ? null : input.agent,
       repoId: repoResolved.repoId,
       createdAt: serverTimestamp(),
       createdBy: this.uid,
@@ -140,16 +132,12 @@ export class FirestoreTaskProvider implements TaskProvider {
       ...(input.assigneeId !== undefined && input.assigneeId !== ''
         ? { assigneeId: input.assigneeId }
         : {}),
-      ...(input.agentModel !== undefined && String(input.agentModel).trim() !== ''
+      ...(input.agent != null &&
+      input.agentModel !== undefined &&
+      String(input.agentModel).trim() !== ''
         ? { agentModel: input.agentModel.trim() }
         : {}),
-      ...(input.agentYolo === true ? { agentYolo: true } : {}),
-      ...(input.attachedPlanningDocs !== undefined
-        ? (() => {
-            const s = sanitizeTaskAttachedPlanningDocsInput(input.attachedPlanningDocs);
-            return s.length > 0 ? { attachedPlanningDocs: s } : {};
-          })()
-        : {}),
+      ...(input.agent != null && input.agentYolo === true ? { agentYolo: true } : {}),
     };
     const ref = await addDoc(col, data);
     let normalizedDeps: string[] | undefined;
@@ -201,16 +189,13 @@ export class FirestoreTaskProvider implements TaskProvider {
       ...(input.assigneeId !== undefined && input.assigneeId !== ''
         ? { assigneeId: input.assigneeId }
         : {}),
-      ...(input.agentModel !== undefined && String(input.agentModel).trim() !== ''
+      ...(input.agent != null &&
+      input.agentModel !== undefined &&
+      String(input.agentModel).trim() !== ''
         ? { agentModel: input.agentModel.trim() }
         : {}),
-      ...(input.agentYolo === true ? { agentYolo: true } : {}),
+      ...(input.agent != null && input.agentYolo === true ? { agentYolo: true } : {}),
       repoId: repoResolved.repoId,
-      ...(() => {
-        if (input.attachedPlanningDocs === undefined) return {};
-        const s = sanitizeTaskAttachedPlanningDocsInput(input.attachedPlanningDocs);
-        return s.length > 0 ? { attachedPlanningDocs: s } : {};
-      })(),
     };
   }
 
@@ -269,9 +254,22 @@ export class FirestoreTaskProvider implements TaskProvider {
     };
     if (patch.title !== undefined) updates.title = patch.title;
     if (patch.status !== undefined) updates.status = patch.status;
-    if (patch.agent !== undefined) updates.agent = patch.agent;
-    if (patch.agentModel !== undefined) updates.agentModel = patch.agentModel;
-    if (patch.agentYolo !== undefined) updates.agentYolo = patch.agentYolo;
+    if (patch.agent !== undefined) {
+      if (patch.agent === null) {
+        updates.agent = null;
+        updates.agentModel = deleteField();
+        updates.agentYolo = deleteField();
+      } else {
+        updates.agent = patch.agent;
+      }
+    }
+    const nextAgent = patch.agent !== undefined ? patch.agent : previous.agent;
+    if (patch.agentModel !== undefined && nextAgent !== null) {
+      updates.agentModel = patch.agentModel;
+    }
+    if (patch.agentYolo !== undefined && nextAgent !== null) {
+      updates.agentYolo = patch.agentYolo;
+    }
     if (patch.description !== undefined) updates.description = patch.description;
     if (patch.orderKey !== undefined) updates.orderKey = patch.orderKey;
     if (patch.workspaceCleanedAt !== undefined) {
@@ -348,18 +346,6 @@ export class FirestoreTaskProvider implements TaskProvider {
         updates.fluxWorkBranch = b;
       }
     }
-    if (patch.attachedPlanningDocs !== undefined) {
-      if (patch.attachedPlanningDocs === null) {
-        updates.attachedPlanningDocs = deleteField();
-      } else {
-        const s = sanitizeTaskAttachedPlanningDocsInput(patch.attachedPlanningDocs);
-        if (s.length > 0) {
-          updates.attachedPlanningDocs = s;
-        } else {
-          updates.attachedPlanningDocs = deleteField();
-        }
-      }
-    }
     await updateDoc(ref, updates);
     const after = await getDoc(ref);
     return toTask(
@@ -386,20 +372,25 @@ function toTask(
     (KNOWN_STATUSES as string[]).includes(data.status)
       ? (data.status as TaskStatus)
       : 'backlog';
-  const agent =
-    typeof data.agent === 'string' && (AGENTS as string[]).includes(data.agent)
-      ? (data.agent as Agent)
-      : 'claude-code';
+  const agent: Agent | null =
+    data.agent === null
+      ? null
+      : typeof data.agent === 'string' && (AGENTS as string[]).includes(data.agent)
+        ? (data.agent as Agent)
+        : 'claude-code';
   return {
     id: d.id,
     title: typeof data.title === 'string' ? data.title : '',
     status,
     agent,
     agentModel:
-      typeof data.agentModel === 'string' && data.agentModel.trim() !== ''
+      agent != null &&
+      typeof data.agentModel === 'string' &&
+      data.agentModel.trim() !== ''
         ? data.agentModel.trim()
         : undefined,
-    agentYolo: typeof data.agentYolo === 'boolean' ? data.agentYolo : undefined,
+    agentYolo:
+      agent != null && typeof data.agentYolo === 'boolean' ? data.agentYolo : undefined,
     description: typeof data.description === 'string' ? data.description : undefined,
     createdAt: tsToIso(data.createdAt) ?? new Date().toISOString(),
     projectId,
@@ -418,18 +409,7 @@ function toTask(
     ...parseCreateSourceBranchIfMissingField(data.createSourceBranchIfMissing),
     ...parseRepoIdField(data.repoId, primaryRepoId),
     ...parseFluxWorkBranchField(data.fluxWorkBranch),
-    ...parseAttachedPlanningDocsField(data.attachedPlanningDocs),
   };
-}
-
-function parseAttachedPlanningDocsField(
-  val: unknown,
-): { attachedPlanningDocs: TaskAttachedPlanningDoc[] } | Record<string, never> {
-  const parsed = parsePersistedTaskAttachedPlanningDocs(val);
-  if (!parsed) {
-    return {};
-  }
-  return { attachedPlanningDocs: parsed };
 }
 
 function parseFluxWorkBranchField(

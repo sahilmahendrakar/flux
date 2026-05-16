@@ -14,7 +14,7 @@ import type { AppStateStore } from './AppStateStore';
 import { primaryRootPathFromCloudBinding } from '../cloudLocalBindingMigration';
 import type { LocalBindingStore } from './LocalBindingStore';
 import type { McpRendererBridge, McpBridgeResult } from './McpRendererBridge';
-import type { ActiveProjectKey, RepoBranchDiscoveryResponse, RepoConfig, RepoPathStatus, Task, TaskAttachedPlanningDoc, TaskGithubPr } from '../types';
+import type { ActiveProjectKey, Agent, RepoBranchDiscoveryResponse, RepoConfig, RepoPathStatus, Task, TaskGithubPr } from '../types';
 import {
   classifyGitBranchPresence,
   planTaskSourceBranchFieldsForCreate,
@@ -91,10 +91,7 @@ export class McpServer {
             | 'createSourceBranchIfMissing'
             | 'repoId'
           >
-        > & {
-          githubPr?: TaskGithubPr | null;
-          attachedPlanningDocs?: TaskAttachedPlanningDoc[] | null;
-        },
+        > & { githubPr?: TaskGithubPr | null },
       ) => Promise<Task>;
       startTask: (id: string) => Promise<Task>;
       startSessionForExistingTask: (task: Task) => Promise<void>;
@@ -107,7 +104,7 @@ export class McpServer {
 
   private createSdkServer(): BaseMcpServer {
     const server = new BaseMcpServer(
-      { name: 'flux', version: '0.1.0' },
+      { name: 'flux', version: '0.1.1' },
       { capabilities: { tools: {} } },
     );
     this.registerTools(server);
@@ -295,9 +292,11 @@ export class McpServer {
         title: z.string().describe('Task title'),
         description: z.string().optional().describe('Task description'),
         agent: z
-          .enum(['claude-code', 'codex', 'cursor'])
+          .enum(['claude-code', 'codex', 'cursor', 'none'])
           .optional()
-          .describe('Agent to use. Defaults to claude-code'),
+          .describe(
+            'Agent to use. Use none for an unassigned task. When omitted, the project default task agent applies.',
+          ),
         blockedByTaskIds: z
           .array(z.string())
           .optional()
@@ -343,12 +342,6 @@ export class McpServer {
           .describe(
             'Only when multi-repo2 is enabled: stable repo id from flux__get_project_info.repos[].id. Must match a configured repository; omit to use primaryRepoId.',
           ),
-        attachedPlanningDocs: z
-          .array(z.object({ relativePath: z.string() }))
-          .optional()
-          .describe(
-            'Planning markdown paths relative to the project planning/ root (forward slashes, .md only). Invalid or forbidden paths are dropped.',
-          ),
       },
       async (input) => {
         try {
@@ -356,21 +349,27 @@ export class McpServer {
           if (active.kind === 'none') {
             return jsonToolPayload({ error: 'No project open' });
           }
-          const agent =
-            input.agent ??
-            (active.kind === 'local'
-              ? active.project.defaultTaskAgent
-              : this.bindingStore.getPrefs(active.activeKey.id).defaultTaskAgent);
+          const agent: Agent | null =
+            input.agent === 'none'
+              ? null
+              : input.agent != null
+                ? input.agent
+                : active.kind === 'local'
+                  ? active.project.defaultTaskAgent
+                  : this.bindingStore.getPrefs(active.activeKey.id).defaultTaskAgent;
           const spawnDefaultsSrc =
             active.kind === 'local'
               ? active.project
               : this.bindingStore.getPrefs(active.activeKey.id);
-          const modelYolo = mergedTaskCreateAgentFields(
-            spawnDefaultsSrc,
-            agent,
-            input.agentModel,
-            input.agentYolo,
-          );
+          const modelYolo =
+            agent != null
+              ? mergedTaskCreateAgentFields(
+                  spawnDefaultsSrc,
+                  agent,
+                  input.agentModel,
+                  input.agentYolo,
+                )
+              : {};
           if (active.kind === 'local') {
             const repos = await this.projectStore.getReposAt(active.projectDir);
             const requestedRepoId = input.repoId;
@@ -403,9 +402,6 @@ export class McpServer {
                 ? { blockedByTaskIds: input.blockedByTaskIds }
                 : {}),
               ...(input.labels !== undefined ? { labels: input.labels } : {}),
-              ...(input.attachedPlanningDocs !== undefined
-                ? { attachedPlanningDocs: input.attachedPlanningDocs as TaskAttachedPlanningDoc[] }
-                : {}),
             });
             if (input.description != null && input.description !== '') {
               task = await this.taskStore.update(task.id, {
@@ -444,9 +440,6 @@ export class McpServer {
               ...(input.repoId !== undefined
                 ? { repoId: input.repoId }
                 : {}),
-              ...(input.attachedPlanningDocs !== undefined
-                ? { attachedPlanningDocs: input.attachedPlanningDocs as TaskAttachedPlanningDoc[] }
-                : {}),
             },
           };
           const result = await this.bridge.request<Task>(
@@ -472,7 +465,10 @@ export class McpServer {
         status: z
           .enum(['backlog', 'in-progress', 'needs-input', 'review', 'done'])
           .optional(),
-        agent: z.enum(['claude-code', 'codex', 'cursor']).optional(),
+        agent: z
+          .enum(['claude-code', 'codex', 'cursor', 'none'])
+          .optional()
+          .describe('Set to none to clear the task coding agent'),
         blockedByTaskIds: z
           .array(z.string())
           .optional()
@@ -518,13 +514,6 @@ export class McpServer {
           .describe(
             'Only when multi-repo2 is enabled: change task.repoId using an id from flux__get_project_info.repos[]. Rejected when a session, worktree, or PR blocks repo moves (same as the UI).',
           ),
-        attachedPlanningDocs: z
-          .array(z.object({ relativePath: z.string() }))
-          .nullable()
-          .optional()
-          .describe(
-            'Replace attached planning markdown paths; null or [] clears. Invalid paths are dropped.',
-          ),
       },
       async (input) => {
         try {
@@ -553,14 +542,13 @@ export class McpServer {
                 | 'createSourceBranchIfMissing'
                 | 'repoId'
               >
-            > & {
-              githubPr?: TaskGithubPr | null;
-              attachedPlanningDocs?: TaskAttachedPlanningDoc[] | null;
-            } = {};
+            > & { githubPr?: TaskGithubPr | null } = {};
             if (input.title !== undefined) patch.title = input.title;
             if (input.description !== undefined) patch.description = input.description;
             if (input.status !== undefined) patch.status = input.status;
-            if (input.agent !== undefined) patch.agent = input.agent;
+            if (input.agent !== undefined) {
+              patch.agent = input.agent === 'none' ? null : input.agent;
+            }
             if (input.blockedByTaskIds !== undefined)
               patch.blockedByTaskIds = input.blockedByTaskIds;
             if (input.labels !== undefined) patch.labels = input.labels;
@@ -578,9 +566,6 @@ export class McpServer {
             }
             if (input.repoId !== undefined) {
               patch.repoId = input.repoId;
-            }
-            if (input.attachedPlanningDocs !== undefined) {
-              patch.attachedPlanningDocs = input.attachedPlanningDocs;
             }
             const updated = await this.taskActions.updateTask(input.id, patch);
             this.notifyTasksChanged();
@@ -616,15 +601,13 @@ export class McpServer {
               | 'createSourceBranchIfMissing'
               | 'repoId'
             >
-          > & {
-            assigneeId?: string | null;
-            githubPr?: TaskGithubPr | null;
-            attachedPlanningDocs?: TaskAttachedPlanningDoc[] | null;
-          } = {};
+          > & { assigneeId?: string | null; githubPr?: TaskGithubPr | null } = {};
           if (input.title !== undefined) patch.title = input.title;
           if (input.description !== undefined) patch.description = input.description;
           if (input.status !== undefined) patch.status = input.status;
-          if (input.agent !== undefined) patch.agent = input.agent;
+          if (input.agent !== undefined) {
+            patch.agent = input.agent === 'none' ? null : input.agent;
+          }
           if (input.blockedByTaskIds !== undefined) {
             patch.blockedByTaskIds = input.blockedByTaskIds;
           }
@@ -643,9 +626,6 @@ export class McpServer {
           }
           if (input.repoId !== undefined) {
             patch.repoId = input.repoId;
-          }
-          if (input.attachedPlanningDocs !== undefined) {
-            patch.attachedPlanningDocs = input.attachedPlanningDocs;
           }
           if (assigneeId !== undefined) patch.assigneeId = assigneeId;
           const payload: McpBridgeTasksUpdatePayload = { taskId: input.id, patch };
@@ -685,6 +665,12 @@ export class McpServer {
                 error: 'Task not found or not part of the current project',
               });
             }
+            if (existing.agent == null) {
+              return jsonToolPayload({
+                error:
+                  'This task has no coding agent assigned. Use flux__update_task to set agent before starting.',
+              });
+            }
             const updated = await this.taskActions.startTask(input.id);
             this.notifyTasksChanged();
             return jsonToolPayload(updated);
@@ -706,6 +692,12 @@ export class McpServer {
             return jsonToolPayload({
               error:
                 'Task is blocked by incomplete dependencies. Finish blocking tasks first.',
+            });
+          }
+          if (existing.agent == null) {
+            return jsonToolPayload({
+              error:
+                'This task has no coding agent assigned. Use flux__update_task to set agent before starting.',
             });
           }
           const updateResult = await this.bridge.request<McpBridgeTasksUpdateResult>(

@@ -304,7 +304,8 @@ export function PlanningPanel({
     [onLocalProjectRefresh, project],
   );
 
-  const handleAgentPick = (next: Agent) => {
+  const handleAgentPick = (next: Agent | null) => {
+    if (next == null) return;
     setSelectedAgent(next);
     void (async () => {
       await persistPlanningAgent(next);

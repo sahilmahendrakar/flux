@@ -18,6 +18,8 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const githubUpdatesOwner = 'sahilmahendrakar';
+const githubUpdatesRepo = 'flux-web';
 
 /** Zips produced by `@electron-forge/maker-zip` for Darwin (electron-updater needs these + `latest-mac.yml`). */
 function isDarwinMakerZipArtifact(artifactPath: string): boolean {
@@ -206,7 +208,7 @@ const config: ForgeConfig = {
   ],
   publishers: [
     new PublisherGithub({
-      repository: { owner: 'sahilmahendrakar', name: 'flux-web' },
+      repository: { owner: githubUpdatesOwner, name: githubUpdatesRepo },
     }),
   ],
 };

@@ -2,15 +2,14 @@ import { app } from 'electron';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { Agent, Task, TaskAttachedPlanningDoc, TaskGithubPr } from '../types';
+import type { Agent, Task, TaskGithubPr } from '../types';
 import { DEFAULT_CURSOR_AGENT_MODEL } from '../types';
-import { sanitizeTaskAttachedPlanningDocsInput } from '../taskAttachedPlanningDocs';
 import { validateBlockedByTaskIds, taskIdsToClearAutoStartOnUnblockWhenAutomationEnables } from '../taskDependencies';
 import { normalizeTaskLabels } from '../taskLabels';
 
 type TaskInput = {
   title: string;
-  agent: Agent;
+  agent: Agent | null;
   projectId: string;
   blockedByTaskIds?: string[];
   labels?: string[];
@@ -20,7 +19,6 @@ type TaskInput = {
   agentYolo?: boolean;
   /** Multi-repo2: identity of the {@link RepoConfig} this task belongs to. Optional — falls back to primary. */
   repoId?: string;
-  attachedPlanningDocs?: TaskAttachedPlanningDoc[];
 };
 
 function errnoCode(err: unknown): string | undefined {
@@ -230,17 +228,11 @@ export class TaskStore {
     } else if (input.agent === 'claude-code' && (input.agentModel ?? '').trim()) {
       task.agentModel = (input.agentModel ?? '').trim();
     }
-    if (input.agentYolo === true) {
+    if (input.agent != null && input.agentYolo === true) {
       task.agentYolo = true;
     }
     if (input.repoId != null && input.repoId.length > 0) {
       task.repoId = input.repoId;
-    }
-    if (input.attachedPlanningDocs !== undefined) {
-      const s = sanitizeTaskAttachedPlanningDocsInput(input.attachedPlanningDocs);
-      if (s.length > 0) {
-        task.attachedPlanningDocs = s;
-      }
     }
     this.tasks.push(task);
     await this.save();
@@ -271,8 +263,6 @@ export class TaskStore {
       autoStartOnUnblock?: boolean | null;
       assigneeId?: string | null;
       githubPr?: TaskGithubPr | null;
-      /** `null` clears stored attachments. */
-      attachedPlanningDocs?: TaskAttachedPlanningDoc[] | null;
     },
   ): Promise<Task> {
     if (!this.filePath) {
@@ -287,7 +277,6 @@ export class TaskStore {
       assigneeId: patchAssigneeId,
       githubPr: patchGithubPr,
       autoStartOnUnblock: patchAsou,
-      attachedPlanningDocs: patchAttachedDocs,
       ...patchRest
     } = patch;
     const updated: Task = {
@@ -323,18 +312,6 @@ export class TaskStore {
         updated.githubPr = patchGithubPr;
       }
     }
-    if (patchAttachedDocs !== undefined) {
-      if (patchAttachedDocs === null) {
-        delete updated.attachedPlanningDocs;
-      } else {
-        const s = sanitizeTaskAttachedPlanningDocsInput(patchAttachedDocs);
-        if (s.length > 0) {
-          updated.attachedPlanningDocs = s;
-        } else {
-          delete updated.attachedPlanningDocs;
-        }
-      }
-    }
     if (patch.sourceBranch !== undefined) {
       const b = patch.sourceBranch.trim();
       if (b.length === 0) {
@@ -358,6 +335,11 @@ export class TaskStore {
         updated.repoId = nextRepo;
       }
     }
+    if (updated.agent == null) {
+      delete updated.agentModel;
+      delete updated.agentYolo;
+    }
+
     this.tasks[index] = updated;
     await this.save();
     return updated;

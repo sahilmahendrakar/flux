@@ -264,11 +264,6 @@ export type Project = LocalProject | CloudProject;
 
 export type TaskGithubPrState = 'open' | 'closed' | 'merged';
 
-/** One planning markdown doc attached to a task (paths are relative to the project `planning/` root). */
-export interface TaskAttachedPlanningDoc {
-  relativePath: string;
-}
-
 /** GitHub pull request linked to a task (persisted locally and in Firestore). */
 export interface TaskGithubPr {
   url: string;
@@ -331,7 +326,8 @@ export interface Task {
   id: string;
   title: string;
   status: TaskStatus;
-  agent: Agent;
+  /** `null` = no coding agent assigned yet (no session until a real agent is chosen). */
+  agent: Agent | null;
   /**
    * Model for the session: Cursor Agent (`agent --model`, default `auto` when
    * unset), or Claude Code (`claude --model` — omitted when unset/empty so the
@@ -400,17 +396,13 @@ export interface Task {
   fluxWorkBranch?: string;
   /** Linked GitHub PR metadata (optional). */
   githubPr?: TaskGithubPr;
-  /**
-   * Normalized planning markdown paths (under the project `planning/` directory).
-   * Omitted when none; persisted locally and in Firestore for cloud tasks.
-   */
-  attachedPlanningDocs?: TaskAttachedPlanningDoc[];
 }
 
 export type SessionStatus = 'idle' | 'running' | 'stopped' | 'error' | 'interrupted';
 
 export type SessionStartErrorCode =
   | 'AGENT_NOT_FOUND'
+  | 'NO_TASK_AGENT'
   | 'WORKTREE_FAILED'
   /** Source ref missing and {@link Task.createSourceBranchIfMissing} is false (or branch exists only remotely but could not be materialized). */
   | 'WORKTREE_SOURCE_BRANCH_MISSING'
@@ -579,6 +571,12 @@ export const AGENTS: { id: Agent; label: string }[] = [
   { id: 'claude-code', label: 'Claude Code' },
   { id: 'codex', label: 'Codex' },
   { id: 'cursor', label: 'Cursor Agent' },
+];
+
+/** Task agent picker: real CLIs plus explicit “not assigned yet”. */
+export const TASK_AGENT_SELECT_OPTIONS: { id: Agent | null; label: string }[] = [
+  ...AGENTS,
+  { id: null, label: 'None' },
 ];
 
 /** Cursor `--model` value when `task.agentModel` is absent or blank. */
