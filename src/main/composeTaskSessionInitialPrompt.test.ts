@@ -36,7 +36,7 @@ describe('composeTaskSessionInitialPrompt', () => {
     expect(await composeTaskSessionInitialPrompt(task, planningDir)).toBe(taskInitialPrompt(task));
   });
 
-  it('appends paths and file URLs for one readable doc', async () => {
+  it('appends one absolute path line per readable doc (no file URLs)', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'flux-plan-'));
     const planningDir = path.join(dir, 'planning');
     await mkdir(planningDir, { recursive: true });
@@ -48,9 +48,9 @@ describe('composeTaskSessionInitialPrompt', () => {
     const got = await composeTaskSessionInitialPrompt(task, planningDir);
     expect(got.startsWith('Example\n\nSlice A')).toBe(true);
     expect(got).toContain('## Attached Planning Docs');
-    expect(got).toContain('- `vision.md`');
-    expect(got).toContain(`Path: \`${path.join(planningDir, 'vision.md')}\``);
-    expect(got).toContain('URL: `file://');
+    expect(got).toContain(path.join(planningDir, 'vision.md'));
+    expect(got).not.toContain('file://');
+    expect(got).not.toMatch(/\bURL:/);
     expect(got).toContain('Use these docs for broader context');
   });
 
@@ -64,8 +64,8 @@ describe('composeTaskSessionInitialPrompt', () => {
       attachedPlanningDocs: [{ relativePath: 'a.md' }, { relativePath: 'b.md' }],
     });
     const got = await composeTaskSessionInitialPrompt(task, planningDir);
-    expect(got).toContain('- `a.md`');
-    expect(got).toContain('- `b.md`');
+    expect(got).toContain(path.join(planningDir, 'a.md'));
+    expect(got).toContain(path.join(planningDir, 'b.md'));
   });
 
   it('dedupes repeated normalized paths', async () => {
@@ -77,8 +77,8 @@ describe('composeTaskSessionInitialPrompt', () => {
       attachedPlanningDocs: [{ relativePath: 'a.md' }, { relativePath: './a.md' }],
     });
     const got = await composeTaskSessionInitialPrompt(task, planningDir);
-    const n = got.split('`a.md`').length - 1;
-    expect(n).toBe(1);
+    const absA = path.join(planningDir, 'a.md');
+    expect(got.split(absA).length - 1).toBe(1);
   });
 
   it('calls out a missing file while keeping the relative path', async () => {
@@ -89,9 +89,9 @@ describe('composeTaskSessionInitialPrompt', () => {
       attachedPlanningDocs: [{ relativePath: 'ghost.md' }],
     });
     const got = await composeTaskSessionInitialPrompt(task, planningDir);
-    expect(got).toContain('- `ghost.md`');
+    expect(got).toContain(path.join(planningDir, 'docs', 'ghost.md'));
     expect(got).toMatch(/missing|not readable|syncing/i);
-    expect(got).toContain('URL: _not available_');
+    expect(got).not.toContain('file://');
   });
 
   it('includes invalid attachment entries without throwing', async () => {

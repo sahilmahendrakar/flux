@@ -2918,7 +2918,10 @@ app.whenReady().then(async () => {
         ? agentSpawnResumeSpec(merged)
         : agentSpawnSpec(
             merged,
-            await composeTaskSessionInitialPrompt(merged, path.join(activeProjectDir(), 'planning')),
+            await composeTaskSessionInitialPrompt(
+              merged,
+              resolvePlanningDocsDir() ?? path.join(activeProjectDir(), 'planning'),
+            ),
           );
       console.log('[session:start] spawn', {
         taskId: task.id,

@@ -1,16 +1,16 @@
 import fs from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
-import { pathToFileURL } from 'node:url';
 import {
   isPlanningMarkdownRelativePathForbiddenForUserWrite,
   normalizePlanningDocRelativePath,
+  resolvePlanningUserMarkdownAbsPathForRead,
   safeResolvePlanningMarkdownAbsPath,
 } from '../planningDocs/path';
 import type { Task } from '../types';
 import { taskInitialPrompt } from './agentSpawn';
 
 export type AttachedPlanningDocPromptLine =
-  | { kind: 'ok'; relativePath: string; absPath: string; fileUrl: string }
+  | { kind: 'ok'; relativePath: string; absPath: string }
   | { kind: 'missing'; relativePath: string; absPath?: string; note: string }
   | { kind: 'invalid'; detail: string };
 
@@ -19,8 +19,9 @@ export const ATTACHED_PLANNING_DOCS_SCOPE_INSTRUCTION =
   'Use these docs for broader context, but implement only the scope described in this task description.';
 
 /**
- * Build prompt lines for each attachment: valid paths are resolved under
- * `planningDir` and checked for a readable regular file.
+ * Build prompt lines for each attachment: paths resolve the same way as Docs reads
+ * (`planning/docs/` first, then legacy markdown outside `docs/`), then checked for a
+ * readable regular file (formatted as one absolute path per line).
  */
 export async function collectAttachedPlanningDocPromptLines(
   attached: unknown,
@@ -66,11 +67,16 @@ export async function collectAttachedPlanningDocPromptLines(
     if (seen.has(norm)) continue;
     seen.add(norm);
 
-    const absPath = safeResolvePlanningMarkdownAbsPath(planningDir, norm);
+    const absPath = await resolvePlanningUserMarkdownAbsPathForRead(planningDir, norm, (p) =>
+      fs.access(p, fsConstants.R_OK),
+    );
     if (!absPath) {
       lines.push({
-        kind: 'invalid',
-        detail: `Could not resolve path safely under planning: \`${norm}\``,
+        kind: 'missing',
+        relativePath: norm,
+        absPath: safeResolvePlanningMarkdownAbsPath(planningDir, norm),
+        note:
+          'File missing or not readable locally (for cloud projects the planning mirror may still be syncing).',
       });
       continue;
     }
@@ -91,7 +97,6 @@ export async function collectAttachedPlanningDocPromptLines(
         kind: 'ok',
         relativePath: norm,
         absPath,
-        fileUrl: pathToFileURL(absPath).href,
       });
     } catch {
       lines.push({
@@ -111,29 +116,22 @@ export function formatAttachedPlanningDocsSection(lines: AttachedPlanningDocProm
   const parts: string[] = ['## Attached Planning Docs', ''];
   for (const line of lines) {
     if (line.kind === 'ok') {
-      parts.push(`- \`${line.relativePath}\``);
-      parts.push(`  - Path: \`${line.absPath}\``);
-      parts.push(`  - URL: \`${line.fileUrl}\``);
+      parts.push(line.absPath);
     } else if (line.kind === 'missing') {
-      parts.push(`- \`${line.relativePath}\``);
-      if (line.absPath) {
-        parts.push(`  - Path: \`${line.absPath}\` — _${line.note}_`);
-      } else {
-        parts.push(`  - Path: _${line.note}_`);
-      }
-      parts.push('  - URL: _not available_');
+      const loc = line.absPath ?? line.relativePath;
+      parts.push(`${loc} — ${line.note}`);
     } else {
-      parts.push(`- _${line.detail}_`);
+      parts.push(line.detail);
     }
-    parts.push('');
   }
+  parts.push('');
   parts.push(ATTACHED_PLANNING_DOCS_SCOPE_INSTRUCTION);
   return parts.join('\n');
 }
 
 /**
  * First agent prompt for a new task session: task title/description plus optional
- * attached planning doc paths (absolute + `file://`). Omits the attachment block
+ * attached planning doc absolute paths (one line per file). Omits the attachment block
  * when there are no attachments or the list is empty.
  */
 export async function composeTaskSessionInitialPrompt(

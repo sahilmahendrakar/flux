@@ -3,7 +3,7 @@ import {
   MAX_PLANNING_RELATIVE_PATH_UTF8_BYTES,
   normalizePlanningDocRelativePath,
   isPlanningMarkdownRelativePathForbiddenForUserWrite,
-  safeResolvePlanningMarkdownAbsPath,
+  resolvePlanningUserMarkdownAbsPathForRead,
 } from './planningDocs/path';
 import type { TaskAttachedPlanningDoc } from './types';
 
@@ -161,22 +161,32 @@ export async function assertAttachedPlanningMarkdownFilesExist(
     };
   }
   for (const doc of docs) {
-    const abs = safeResolvePlanningMarkdownAbsPath(planningDir, doc.relativePath);
+    const norm = normalizePlanningDocRelativePath(doc.relativePath);
+    if (!norm) {
+      return {
+        ok: false,
+        message: `Invalid planning doc path: "${doc.relativePath}".`,
+      };
+    }
+    const abs = await resolvePlanningUserMarkdownAbsPathForRead(planningDir, norm, (p) => fs.access(p));
     if (!abs) {
-      return { ok: false, message: `Invalid planning doc path: "${doc.relativePath}".` };
+      return {
+        ok: false,
+        message: `Planning doc not found: "${doc.relativePath}". Paths are relative to the project planning docs tree (under planning/docs/); create the file or fix the spelling.`,
+      };
     }
     try {
       const st = await fs.stat(abs);
       if (!st.isFile()) {
         return {
           ok: false,
-          message: `Planning doc "${doc.relativePath}" is not a file (expected a markdown file under planning/).`,
+          message: `Planning doc "${doc.relativePath}" is not a file (expected a markdown file under planning/docs/ or legacy planning markdown).`,
         };
       }
     } catch {
       return {
         ok: false,
-        message: `Planning doc not found: "${doc.relativePath}". Paths are relative to the project planning/ directory; create the file or fix the spelling.`,
+        message: `Planning doc not found: "${doc.relativePath}". Paths are relative to the project planning docs tree (under planning/docs/); create the file or fix the spelling.`,
       };
     }
   }
