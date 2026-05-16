@@ -1,0 +1,31 @@
+src/main/composeTaskSessionInitialPrompt.test.ts
+  s_f445c305411392::t_940555a4259a6c 92
+src/components/TaskDetailPanel.tsx
+  ai_agent 1577-1684
+src/main/composeTaskSessionInitialPrompt.ts
+  s_f445c305411392::t_7cb533b7f33f92 6
+  s_f445c305411392::t_f2f2abdd8777e5 22-24
+  s_f445c305411392::t_d32adf90196d2e 77
+  s_f445c305411392::t_e85dd03686abe3 70-72,75-76,78-79
+src/taskAttachedPlanningDocs.ts
+  s_f445c305411392::t_414791422a5d69 164-171,173-176,183,189
+  s_f445c305411392::t_bd6c34cdffce23 6
+src/main.ts
+  s_f445c305411392::t_133354f19ae242 2921-2924
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "2bf456be13370352814988c28b639be87d2a7853",
+  "prompts": {},
+  "sessions": {
+    "s_f445c305411392": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "eacee25b-88a1-4dc0-b1c4-e358e0d08c88",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
