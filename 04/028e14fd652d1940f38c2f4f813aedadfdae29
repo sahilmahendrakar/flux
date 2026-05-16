@@ -1,0 +1,57 @@
+src/main/terminalBackend/LocalMainProcessTerminalBackend.ts
+  s_a10772397f2f47::t_14af07a78ae9e7 14,48,51-56,108-109
+  s_a10772397f2f47::t_ca35b4c0800933 1-13,15-47,49-50,57-107,110-232
+src/main/TerminalRuntimeManager.ts
+  s_a10772397f2f47::t_3fcd0741a0565a 121
+  s_a10772397f2f47::t_2f195915407c96 127-128
+  s_a10772397f2f47::t_0be5930d13ce71 67-68
+src/main/terminalBackend/DetachedRpcTerminalBackend.ts
+  s_a10772397f2f47::t_f799765cda657b 1-140
+src/main.ts
+  s_a10772397f2f47::t_08c8d546243b97 412-414
+  s_a10772397f2f47::t_932afa3c3aafce 4002-4005
+  s_a10772397f2f47::t_8f6c5be180a2c7 483-485,488-489,491,493,501
+  s_a10772397f2f47::t_5272c8461d5e88 35-36
+  s_a10772397f2f47::t_2c98097878a74a 530,541-546,548-563,566-568
+  s_a10772397f2f47::t_e69d2a4f033e79 691,1004,1631,1654,1780,1955,2035,2068,2133,2188,2224,2329,2350-2351,2377,2742,2748-2749,2828,2930,3210,3249,3281,3362-3363,3369,3377,3391,3396,3404,3409,3454,3584,3617,3619,3625,3635,3637,3645,3647,3657,3659,3937,3942,3951,3955,3961,3965,3969
+src/main/terminalBackend/TerminalBackend.ts
+  s_a10772397f2f47::t_b47086e04bc168 1-38,41-85
+  s_a10772397f2f47::t_45e29943eb1638 39-40
+src/main/taskEphemeralTeardown.ts
+  s_a10772397f2f47::t_a378ad9f6537ae 4
+  s_a10772397f2f47::t_c8cf4e6bf30172 18,20-21
+  s_a10772397f2f47::t_937b5b4a5225fb 78
+  s_a10772397f2f47::t_69028777ce9cfc 53
+  s_a10772397f2f47::t_b0a969b4813754 36
+  s_a10772397f2f47::t_9d5332cb202c19 41
+src/main/projectFluxRemoval.ts
+  s_a10772397f2f47::t_1776beeea8b0f9 44
+  s_a10772397f2f47::t_72505b71f3bf2d 157
+  s_a10772397f2f47::t_66b3423ae01324 168,171
+  s_a10772397f2f47::t_0194a0a6d75f9f 5
+  s_a10772397f2f47::t_4e2fc0f5a134d8 15-16,21,25,30,40
+  s_a10772397f2f47::t_8a848b81471651 150
+src/main/terminalBackend/createMainTerminalBackend.ts
+  s_a10772397f2f47::t_dabf2b43dc5f82 17
+  s_a10772397f2f47::t_33897caf614651 1-9,12-16,18-24
+  s_a10772397f2f47::t_539c41dc9868a0 10-11
+src/main/terminalBackend/terminalBackend.test.ts
+  s_a10772397f2f47::t_f6d71d4ee6b9f5 1-15,17-26
+  s_a10772397f2f47::t_4e3635af85103b 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "04028e14fd652d1940f38c2f4f813aedadfdae29",
+  "prompts": {},
+  "sessions": {
+    "s_a10772397f2f47": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8c10df68-641a-4c92-8376-a089444baab3",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
