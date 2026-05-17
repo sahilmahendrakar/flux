@@ -39,11 +39,9 @@ import {
   DEFAULT_AUTO_START_SESSION_ON_IN_PROGRESS,
   DEFAULT_AUTO_START_WHEN_UNBLOCKED,
 } from '../cloudBindingPrefs';
-import { migrateLegacyPlanningMarkdownIntoUserDocsDir } from '../planningDocs/planningUserDocsLegacyMigration';
-import {
-  PLANNING_ASSISTANT_MARKDOWN_VERSION_MARKER,
-  planningAssistantMarkdown,
-} from './planningCliGuidance';
+import { ensurePlanningAssistantMarkdownFiles } from './planningAssistantInstructions';
+
+export { ensurePlanningAssistantMarkdownFiles };
 
 const DEFAULT_AGENT: Agent = 'claude-code';
 const DEFAULT_BASE_BRANCH = 'main';
@@ -296,62 +294,6 @@ async function atomicWriteFile(filePath: string, payload: string): Promise<void>
     }
   }
   await fs.rename(tmpPath, filePath);
-}
-
-function isLegacyMcpPlanningAssistantMarkdown(body: string): boolean {
-  return (
-    body.includes('# Planning workspace') &&
-    body.includes('You have access to the following Flux tools for task management') &&
-    body.includes('flux__get_project_info')
-  );
-}
-
-function isFluxGeneratedPlanningAssistantMarkdown(body: string): boolean {
-  return body.includes('# Planning workspace —') && body.includes('## Flux CLI');
-}
-
-function needsPlanningAssistantMarkdownUpgrade(body: string): boolean {
-  return !body.includes(PLANNING_ASSISTANT_MARKDOWN_VERSION_MARKER);
-}
-
-function shouldReplacePlanningAssistantMarkdown(body: string): boolean {
-  if (isLegacyMcpPlanningAssistantMarkdown(body)) return true;
-  if (isFluxGeneratedPlanningAssistantMarkdown(body) && needsPlanningAssistantMarkdownUpgrade(body)) {
-    return true;
-  }
-  return false;
-}
-
-/**
- * Creates `CLAUDE.md` and/or `AGENTS.md` when missing. Existing generated MCP-era
- * assistant instructions are migrated to CLI instructions; other user edits are left alone.
- */
-export async function ensurePlanningAssistantMarkdownFiles(
-  planningDir: string,
-  projectName: string,
-  rootPath: string,
-  options?: { multiRepoGuide?: boolean },
-): Promise<void> {
-  await fs.mkdir(path.join(planningDir, 'docs'), { recursive: true });
-  await migrateLegacyPlanningMarkdownIntoUserDocsDir(planningDir);
-  const resolvedRoot = path.resolve(rootPath);
-  const multiRepoGuide = options?.multiRepoGuide ?? true;
-  const md = planningAssistantMarkdown(projectName, resolvedRoot, multiRepoGuide);
-  for (const fileName of ['CLAUDE.md', 'AGENTS.md'] as const) {
-    const filePath = path.join(planningDir, fileName);
-    try {
-      const existing = await fs.readFile(filePath, 'utf8');
-      if (shouldReplacePlanningAssistantMarkdown(existing)) {
-        await fs.writeFile(filePath, md, 'utf8');
-      }
-    } catch (err: unknown) {
-      if (errnoCode(err) === 'ENOENT') {
-        await fs.writeFile(filePath, md, 'utf8');
-      } else {
-        throw err;
-      }
-    }
-  }
 }
 
 export class ProjectStore {

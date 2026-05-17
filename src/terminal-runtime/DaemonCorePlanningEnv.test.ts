@@ -27,7 +27,7 @@ const originalEnv = {
   SHELL: process.env.SHELL,
 };
 
-describe('DaemonCore planning PTY env', () => {
+describe('TerminalRuntimeManager planning PTY env', () => {
   beforeEach(() => {
     ptyState.calls = [];
     process.env.HOME = '/Users/dev';
@@ -54,10 +54,10 @@ describe('DaemonCore planning PTY env', () => {
   });
 
   it('overlays Flux CLI bridge vars without dropping agent auth env', async () => {
-    const { DaemonCore } = await import('./DaemonCore');
-    const daemon = new DaemonCore(() => undefined, { idleMs: 60_000 });
+    const { TerminalRuntimeManager } = await import('../main/TerminalRuntimeManager');
+    const terminalRuntime = new TerminalRuntimeManager({ deliverStreamFrame: () => undefined });
 
-    const result = daemon.startPlanning({
+    const result = terminalRuntime.startPlanning({
       projectId: 'project-1',
       agent: 'claude-code',
       planningDir: '/tmp/planning',

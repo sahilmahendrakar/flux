@@ -31,9 +31,8 @@ import type {
 import type {
   AgentState,
   AttachResult,
-  DaemonStreamCatchupPayload,
   PlanningAttachResult,
-} from './daemon/protocol';
+} from './terminal-runtime/protocol';
 import {
   AUTOMATION_BRIDGE_READY_CHANNEL,
   AUTOMATION_BRIDGE_REQUEST_CHANNEL,
@@ -110,6 +109,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     patchAgentSpawnDefaults: (patch: AgentSpawnDefaultsPatch) =>
       ipcRenderer.invoke('project:patchAgentSpawnDefaults', patch) as Promise<
         { ok: true } | { error: string }
+      >,
+    getMcpConfig: () =>
+      ipcRenderer.invoke('project:getMcpConfig') as Promise<
+        { ok: true; path: string; text: string } | { error: string }
+      >,
+    setMcpConfig: (text: string) =>
+      ipcRenderer.invoke('project:setMcpConfig', text) as Promise<
+        { ok: true; path: string; text: string } | { error: string }
+      >,
+    addMcpConfig: (text: string) =>
+      ipcRenderer.invoke('project:addMcpConfig', text) as Promise<
+        { ok: true; path: string; text: string } | { error: string }
       >,
     getRepos: () =>
       ipcRenderer.invoke('project:getRepos') as Promise<RepoConfig[]>,
@@ -401,7 +412,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     get: (taskId: string) =>
       ipcRenderer.invoke('session:get', taskId) as Promise<Session | null>,
     getAll: () => ipcRenderer.invoke('session:getAll') as Promise<Session[]>,
-    /** Warm-reattach: daemon attach payload (`replay` and optional `snapshot`). */
+    /** Warm-reattach: attach payload (`replay` and optional `snapshot`). */
     attach: (sessionId: string) =>
       ipcRenderer.invoke('session:attach', sessionId) as Promise<AttachResult | null>,
     write: (sessionId: string, data: string) =>
@@ -447,12 +458,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('session:getSilenceStates') as Promise<
         { id: string; taskId?: string; state: AgentState }[]
       >,
-    onDaemonStreamCatchup: (cb: (payload: DaemonStreamCatchupPayload) => void) => {
-      const channel = 'daemon:streamCatchup';
-      const handler = (_e: unknown, payload: DaemonStreamCatchupPayload) => cb(payload);
-      ipcRenderer.on(channel, handler);
-      return () => ipcRenderer.removeListener(channel, handler);
-    },
     onTaskStartProgress: (cb: (p: TaskSessionStartProgress) => void) => {
       const ch = 'session:taskStartProgress' as const;
       const handler = (

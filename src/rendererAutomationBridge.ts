@@ -3,6 +3,7 @@ import type {
   Agent,
   RepoPathStatus,
   Task,
+  TaskAttachedPlanningDoc,
   TaskGithubPr,
   TaskStatus,
 } from './types';
@@ -45,6 +46,7 @@ export interface AutomationBridgeTaskCreateInput {
   agentYolo?: boolean;
   /** Multi-repo2; local tasks validate against project repos; omitted uses primary. */
   repoId?: string;
+  attachedPlanningDocs?: TaskAttachedPlanningDoc[];
 }
 
 export interface AutomationBridgeTaskPatch {
@@ -60,6 +62,7 @@ export interface AutomationBridgeTaskPatch {
   sourceBranch?: string;
   createSourceBranchIfMissing?: boolean;
   repoId?: string;
+  attachedPlanningDocs?: TaskAttachedPlanningDoc[] | null;
 }
 
 export interface AutomationBridgeTasksCreatePayload {

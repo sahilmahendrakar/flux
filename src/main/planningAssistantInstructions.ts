@@ -1,9 +1,125 @@
-/** Bump when generated `planning/CLAUDE.md` / `AGENTS.md` should be refreshed on disk. */
-export const PLANNING_ASSISTANT_MARKDOWN_VERSION = 2;
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { migrateLegacyPlanningMarkdownIntoUserDocsDir } from '../planningDocs/planningUserDocsLegacyMigration';
+import {
+  planningMarkdownEquivalentForSeededInstructions,
+  readFluxPlanningTemplateVersionFromManagedBody,
+} from '../planningDocs/cloudPlanningDocsMigration';
+import {
+  FLUX_PLANNING_INSTRUCTIONS_BEGIN,
+  FLUX_PLANNING_INSTRUCTIONS_END,
+  PLANNING_INSTRUCTIONS_STATE_BASENAME,
+} from '../planningDocs/planningInstructionMarkers';
 
-export const PLANNING_ASSISTANT_MARKDOWN_VERSION_MARKER = `<!-- flux-assistant-version:${PLANNING_ASSISTANT_MARKDOWN_VERSION} -->`;
+export { PLANNING_INSTRUCTIONS_STATE_BASENAME } from '../planningDocs/planningInstructionMarkers';
 
-/** Shared body for `planning/CLAUDE.md` and `planning/AGENTS.md`. */
+/** Bumps when `planningAssistantMarkdown` prose meaningfully changes (used with embedded version tag). */
+export const PLANNING_ASSISTANT_TEMPLATE_VERSION = 3;
+
+export type PlanningInstructionFileName = 'CLAUDE.md' | 'AGENTS.md';
+
+const FLUX_INSTRUCTIONS_SCHEMA_VERSION = 1 as const;
+
+export interface FluxPlanningInstructionsStateFile {
+  schemaVersion: typeof FLUX_INSTRUCTIONS_SCHEMA_VERSION;
+  templateVersion: number;
+  files: Partial<
+    Record<
+      PlanningInstructionFileName,
+      {
+        lastAppliedManagedContentHash: string;
+      }
+    >
+  >;
+}
+
+function errnoCode(err: unknown): string | undefined {
+  return err && typeof err === 'object' && 'code' in err
+    ? (err as NodeJS.ErrnoException).code
+    : undefined;
+}
+
+function sha256Hex(s: string): string {
+  return createHash('sha256').update(s, 'utf8').digest('hex');
+}
+
+export function fluxPlanningTemplateVersionLine(): string {
+  return `<!-- flux-planning-template ${PLANNING_ASSISTANT_TEMPLATE_VERSION} -->`;
+}
+
+export function wrapPlanningInstructionsManagedBlock(managedInner: string): string {
+  return `${FLUX_PLANNING_INSTRUCTIONS_BEGIN}\n${managedInner}\n${FLUX_PLANNING_INSTRUCTIONS_END}\n`;
+}
+
+export type ParsedPlanningInstructionBlocks =
+  | {
+      kind: 'managed-markers';
+      userPrefix: string;
+      managedInner: string;
+      userSuffix: string;
+    }
+  | { kind: 'no-markers'; fullBody: string };
+
+export function parsePlanningInstructionFileForUpdate(raw: string): ParsedPlanningInstructionBlocks {
+  const text = raw.replace(/\r\n/g, '\n');
+  const beginIdx = text.indexOf(FLUX_PLANNING_INSTRUCTIONS_BEGIN);
+  const endIdx = text.indexOf(FLUX_PLANNING_INSTRUCTIONS_END);
+  if (beginIdx === -1 || endIdx === -1 || endIdx <= beginIdx) {
+    return { kind: 'no-markers', fullBody: text };
+  }
+  const afterBegin = beginIdx + FLUX_PLANNING_INSTRUCTIONS_BEGIN.length;
+  const inner = text.slice(afterBegin, endIdx);
+  return {
+    kind: 'managed-markers',
+    userPrefix: text.slice(0, beginIdx),
+    managedInner: inner.replace(/^\n+/, '').replace(/\n+$/, ''),
+    userSuffix: text.slice(endIdx + FLUX_PLANNING_INSTRUCTIONS_END.length),
+  };
+}
+
+function assembleInstructionFileWithMarkers(
+  userPrefix: string,
+  managedInner: string,
+  userSuffix: string,
+): string {
+  const p = userPrefix.replace(/\s+$/u, '');
+  const s = userSuffix.replace(/^\s+/u, '');
+  const mid = wrapPlanningInstructionsManagedBlock(managedInner);
+  if (p && s) return `${p}\n\n${mid}\n${s}\n`;
+  if (p) return `${p}\n\n${mid}`;
+  if (s) return `${mid}\n${s}\n`;
+  return mid;
+}
+
+async function readUtf8IfExists(filePath: string): Promise<string | null> {
+  try {
+    return await fs.readFile(filePath, 'utf8');
+  } catch (e: unknown) {
+    if (errnoCode(e) === 'ENOENT') return null;
+    throw e;
+  }
+}
+
+async function writeFluxInstructionsState(
+  planningDir: string,
+  state: FluxPlanningInstructionsStateFile,
+): Promise<void> {
+  const p = path.join(planningDir, PLANNING_INSTRUCTIONS_STATE_BASENAME);
+  const tmp = `${p}.tmp`;
+  const payload = `${JSON.stringify(state, null, 2)}\n`;
+  await fs.writeFile(tmp, payload, 'utf8');
+  if (process.platform === 'win32') {
+    try {
+      await fs.unlink(p);
+    } catch (e: unknown) {
+      if (errnoCode(e) !== 'ENOENT') throw e;
+    }
+  }
+  await fs.rename(tmp, p);
+}
+
+/** Shared body for `planning/CLAUDE.md` and `planning/AGENTS.md` (same text, two filenames). */
 export function planningAssistantMarkdown(
   projectName: string,
   rootPath: string,
@@ -20,9 +136,9 @@ When user intent spans more than one repository and is ambiguous, **ask once** w
   2. Read team planning documents under \`docs/\` relative to this directory (for example \`docs/vision.md\`, \`docs/architecture.md\`, sprint notes, ADRs). Older projects may still have markdown at the planning root outside \`docs/\` until migrated — prefer \`docs/\` for new material.
   3. Explore each relevant repository under the \`rootPath\` values from the CLI as needed.
   4. Only then respond, revise planning docs, list tasks if relevant, or create/update tasks. For **new** tasks, pass \`--repo-id\` (matching \`repos[].id\`) when work belongs to a non-primary repository; omit \`--repo-id\` to target the primary repo.`
-    : `  1. Run \`flux project info --json\` once (unless you already have the current \`rootPath\` and project name from a call in this turn). Use the returned \`rootPath\` as the application codebase location.
+    : `  1. Run \`flux project info --json\` once (unless you already have the current \`rootPath\` and project name from a command in this turn). Use the returned \`rootPath\` as the application codebase location.
   2. Read team planning documents under \`docs/\` relative to this directory (for example \`docs/vision.md\`, \`docs/architecture.md\`). Older projects may still have markdown at the planning root outside \`docs/\` until migrated — prefer \`docs/\` for new material.
-  3. Explore the repository under that \`rootPath\` as needed for the user\u2019s question.
+  3. Explore the repository under that \`rootPath\` as needed for the user’s question.
   4. Only then respond, revise planning docs, list tasks if relevant, or create/update tasks so titles and descriptions match reality.`;
 
   const createTaskLine = multiRepoGuide
@@ -39,9 +155,7 @@ When user intent spans more than one repository and is ambiguous, **ask once** w
     ? `- \`flux repo branches --json\` — local + origin branch lists, default branch, optional \`--classify-branch <name>\`; add \`--repo-id\` to scope a non-primary repository`
     : `- \`flux repo branches --json\` — local + origin branch lists, default branch, optional \`--classify-branch <name>\` before batch-creating tasks`;
 
-  return `${PLANNING_ASSISTANT_MARKDOWN_VERSION_MARKER}
-
-# Planning workspace — ${projectName}
+  const body = `# Planning workspace — ${projectName}
 
 ${workspaceIntro}
 
@@ -74,6 +188,8 @@ ${listBranchesLine}
 
 Board relationship: new tasks land in **Backlog**. \`flux tasks start\` is the usual way to mark work actively in flight. Use \`flux tasks update\` for other status changes (e.g. **Needs input**, **Review**, **Done**) or edits to title/description/agent.
 
+**Planning doc attachments:** When you turn a broad plan into concrete board tasks, add \`attachedPlanningDocs: [{ "relativePath": "docs/your-plan.md" }]\` (or another existing path under the planning docs tree, e.g. \`notes/plan.md\`) so implementers see the full write-up in Flux. Each task \`description\` should still spell out only that task's slice of work (acceptance, files, edge cases)—do not replace descriptions with a pointer to the plan alone.
+
 ## Multi-task features (required)
 
 When you split one user-facing feature or initiative into **two or more** board tasks, treat them as a single feature batch. **Do this on every \`flux tasks create\` in the batch — not in a follow-up \`flux tasks update\`:**
@@ -105,4 +221,104 @@ Maintain team planning markdown under \`docs/\` (relative to this directory) as 
 - Create tasks for concrete, actionable work items
 - Keep \`docs/vision.md\` and \`docs/architecture.md\` up to date as the project evolves
 `;
+
+  return `${fluxPlanningTemplateVersionLine()}\n\n${body}`;
+}
+
+function computeNextInstructionFile(
+  relativePath: PlanningInstructionFileName,
+  previous: string | null,
+  managedInner: string,
+): { nextBody: string; wroteManaged: boolean } {
+  if (previous === null || previous.trim() === '') {
+    return { nextBody: wrapPlanningInstructionsManagedBlock(managedInner), wroteManaged: true };
+  }
+
+  const parsed = parsePlanningInstructionFileForUpdate(previous);
+  if (parsed.kind === 'managed-markers') {
+    const v = readFluxPlanningTemplateVersionFromManagedBody(parsed.managedInner);
+    if (v < PLANNING_ASSISTANT_TEMPLATE_VERSION) {
+      return {
+        nextBody: assembleInstructionFileWithMarkers(
+          parsed.userPrefix,
+          managedInner,
+          parsed.userSuffix,
+        ),
+        wroteManaged: true,
+      };
+    }
+    if (parsed.managedInner === managedInner) {
+      return { nextBody: previous, wroteManaged: true };
+    }
+    if (planningMarkdownEquivalentForSeededInstructions(relativePath, parsed.managedInner, managedInner)) {
+      return {
+        nextBody: assembleInstructionFileWithMarkers(
+          parsed.userPrefix,
+          managedInner,
+          parsed.userSuffix,
+        ),
+        wroteManaged: true,
+      };
+    }
+    return { nextBody: previous, wroteManaged: false };
+  }
+
+  const full = parsed.fullBody;
+  if (planningMarkdownEquivalentForSeededInstructions(relativePath, full, managedInner)) {
+    return { nextBody: wrapPlanningInstructionsManagedBlock(managedInner), wroteManaged: true };
+  }
+
+  return { nextBody: full, wroteManaged: false };
+}
+
+/**
+ * Idempotently creates or upgrades `planning/CLAUDE.md` and `planning/AGENTS.md`.
+ * Flux-managed regions are delimited by HTML comments; user text outside those markers is preserved.
+ */
+export async function ensurePlanningAssistantMarkdownFiles(
+  planningDir: string,
+  projectName: string,
+  rootPath: string,
+  options?: { multiRepoGuide?: boolean },
+): Promise<void> {
+  await fs.mkdir(path.join(planningDir, 'docs'), { recursive: true });
+  await migrateLegacyPlanningMarkdownIntoUserDocsDir(planningDir);
+  const resolvedRoot = path.resolve(rootPath);
+  const multiRepoGuide = options?.multiRepoGuide ?? true;
+  const managedInner = planningAssistantMarkdown(projectName, resolvedRoot, multiRepoGuide);
+  const managedHash = sha256Hex(managedInner);
+
+  const paths = {
+    'CLAUDE.md': path.join(planningDir, 'CLAUDE.md'),
+    'AGENTS.md': path.join(planningDir, 'AGENTS.md'),
+  } as const;
+
+  const previousContent: Record<PlanningInstructionFileName, string | null> = {
+    'CLAUDE.md': await readUtf8IfExists(paths['CLAUDE.md']),
+    'AGENTS.md': await readUtf8IfExists(paths['AGENTS.md']),
+  };
+
+  const claude = computeNextInstructionFile('CLAUDE.md', previousContent['CLAUDE.md'], managedInner);
+  const agents = computeNextInstructionFile('AGENTS.md', previousContent['AGENTS.md'], managedInner);
+
+  if (claude.nextBody !== previousContent['CLAUDE.md']) {
+    await fs.writeFile(paths['CLAUDE.md'], claude.nextBody, 'utf8');
+  }
+  if (agents.nextBody !== previousContent['AGENTS.md']) {
+    await fs.writeFile(paths['AGENTS.md'], agents.nextBody, 'utf8');
+  }
+
+  const files: FluxPlanningInstructionsStateFile['files'] = {};
+  if (claude.wroteManaged) {
+    files['CLAUDE.md'] = { lastAppliedManagedContentHash: managedHash };
+  }
+  if (agents.wroteManaged) {
+    files['AGENTS.md'] = { lastAppliedManagedContentHash: managedHash };
+  }
+
+  await writeFluxInstructionsState(planningDir, {
+    schemaVersion: FLUX_INSTRUCTIONS_SCHEMA_VERSION,
+    templateVersion: PLANNING_ASSISTANT_TEMPLATE_VERSION,
+    files,
+  });
 }

@@ -57,6 +57,11 @@ import { FirestoreTaskProvider } from './renderer/tasks/FirestoreTaskProvider';
 import { useGithubPrBoardRefresh } from './renderer/tasks/useGithubPrBoardRefresh';
 import { applyGithubPrRefreshFromRenderer } from './renderer/tasks/applyGithubPrRefreshFromRenderer';
 import {
+  applyProviderSnapshotWithPending,
+  mergeServerTaskWithPendingPatchOntoLocal,
+  mergeTaskRowPreserveMissing,
+} from './renderer/tasks/mergePendingTaskSnapshot';
+import {
   formatGithubPrDiscoveryFailure,
   isBenignPrDiscoveryWhileAgentWorking,
   shouldStopPrAgentFollowupDiscovery,
@@ -68,6 +73,7 @@ import {
 } from './renderer/tasks/useCloudSilenceReconciliation';
 import { keyForInsert, sortColumn } from './renderer/tasks/orderKey';
 import { normalizeTaskLabels } from './taskLabels';
+import { sanitizeTaskAttachedPlanningDocsInput } from './taskAttachedPlanningDocs';
 import { selectSessionForTaskWorkspace } from './sessionWorkspacePick';
 import { invalidateSessionAttachCache } from './terminal/warmAttach';
 import { isTaskBlocked, taskIdsToClearAutoStartOnUnblockWhenAutomationEnables } from './taskDependencies';
@@ -120,92 +126,6 @@ function isWorkspaceSessionTabId(tabId: string): boolean {
   if (STATIC_TAB_IDS.has(tabId)) return false;
   if (tabId.startsWith(PLAN_TAB_PREFIX)) return false;
   return true;
-}
-
-/** Apply debounced cloud patches onto a server task for optimistic UI (`null` clears optional fields). */
-function mergeServerTaskWithPendingPatch(task: Task, patch: TaskPatch | undefined): Task {
-  if (!patch) return task;
-  const {
-    assigneeId,
-    workspaceCleanedAt,
-    githubPr,
-    sourceBranch,
-    createSourceBranchIfMissing,
-    autoStartOnUnblock,
-    repoId,
-    ...rest
-  } = patch;
-  let next: Task = { ...task, ...rest };
-  if (assigneeId !== undefined) {
-    if (assigneeId === null || assigneeId === '') {
-      next = { ...next };
-      delete next.assigneeId;
-    } else {
-      next = { ...next, assigneeId };
-    }
-  }
-  if (workspaceCleanedAt !== undefined) {
-    if (workspaceCleanedAt === null) {
-      next = { ...next };
-      delete next.workspaceCleanedAt;
-    } else {
-      next = { ...next, workspaceCleanedAt };
-    }
-  }
-  if (githubPr !== undefined) {
-    if (githubPr === null) {
-      next = { ...next };
-      delete next.githubPr;
-    } else {
-      next = { ...next, githubPr };
-    }
-  }
-  if (sourceBranch !== undefined) {
-    if (typeof sourceBranch === 'string' && sourceBranch.trim() === '') {
-      next = { ...next };
-      delete next.sourceBranch;
-    } else {
-      next = { ...next, sourceBranch };
-    }
-  }
-  if (createSourceBranchIfMissing !== undefined) {
-    if (createSourceBranchIfMissing) {
-      next = { ...next, createSourceBranchIfMissing: true };
-    } else {
-      next = { ...next };
-      delete next.createSourceBranchIfMissing;
-    }
-  }
-  if (autoStartOnUnblock !== undefined) {
-    if (autoStartOnUnblock === null) {
-      next = { ...next };
-      delete next.autoStartOnUnblock;
-    } else {
-      next = { ...next, autoStartOnUnblock };
-    }
-  }
-  if (repoId !== undefined) {
-    if (typeof repoId === 'string' && repoId.trim() === '') {
-      next = { ...next };
-      delete next.repoId;
-    } else {
-      next = { ...next, repoId };
-    }
-  }
-  return next;
-}
-
-/** Server rows can omit optional fields; keep local values unless the server set them. */
-function mergeTaskRowPreserveMissing(local: Task, server: Task): Task {
-  return { ...local, ...server };
-}
-
-function mergeServerTaskWithPendingPatchOntoLocal(
-  local: Task,
-  server: Task,
-  patch: TaskPatch | undefined,
-): Task {
-  return mergeServerTaskWithPendingPatch(mergeTaskRowPreserveMissing(local, server), patch);
 }
 
 const TASK_PR_ERROR_HINTS: Partial<Record<TaskPrErrorCode, string>> = {
@@ -616,15 +536,6 @@ export default function App() {
       return p?.kind === 'cloud' ? p.sharedRepos : [];
     });
   }, [project?.kind, project?.id, uid]);
-
-  useEffect(() => {
-    if (!provider) {
-      setTasks([]);
-      return;
-    }
-    const unsub = provider.subscribe((all) => setTasks(all));
-    return () => unsub();
-  }, [provider]);
 
   const planningDocsFirestoreStream = usePlanningDocsFirestoreSync({
     enabled: project?.kind === 'cloud' && !!uid && isFirebaseConfigured(),
@@ -1473,6 +1384,17 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!provider) {
+      setTasks([]);
+      return;
+    }
+    const unsub = provider.subscribe((all) => {
+      setTasks((prev) => applyProviderSnapshotWithPending(all, prev, pendingRef.current));
+    });
+    return () => unsub();
+  }, [provider]);
+
   const stripLocalSessionStateForTask = useCallback((taskId: string) => {
     const ids = sessionsRef.current
       .filter((s) => s.taskId === taskId)
@@ -1844,6 +1766,7 @@ export default function App() {
         autoStartOnUnblock: patchAsou,
         githubPr: patchGh,
         workspaceCleanedAt: patchWsc,
+        attachedPlanningDocs: patchAttachedPlanningDocs,
         ...patchRest
       } = patch;
       setTasks((prev) =>
@@ -1902,6 +1825,20 @@ export default function App() {
               next = { ...next, repoId: rid };
             }
           }
+          if (patchAttachedPlanningDocs !== undefined) {
+            if (patchAttachedPlanningDocs === null) {
+              next = { ...next };
+              delete next.attachedPlanningDocs;
+            } else {
+              const s = sanitizeTaskAttachedPlanningDocsInput(patchAttachedPlanningDocs);
+              if (s.length > 0) {
+                next = { ...next, attachedPlanningDocs: s };
+              } else {
+                next = { ...next };
+                delete next.attachedPlanningDocs;
+              }
+            }
+          }
           next = {
             ...next,
             ...assigneePatchForCloudAutoStartOnUnblock({
@@ -1952,6 +1889,12 @@ export default function App() {
       }
       if (patchGh !== undefined) {
         persistable.githubPr = patchGh;
+      }
+      if (patchAttachedPlanningDocs !== undefined) {
+        persistable.attachedPlanningDocs =
+          patchAttachedPlanningDocs === null
+            ? null
+            : sanitizeTaskAttachedPlanningDocsInput(patchAttachedPlanningDocs);
       }
       if (Object.keys(persistable).length === 0) return;
 
@@ -3224,6 +3167,8 @@ export default function App() {
                             prAgentAwaiting: Boolean(prAgentAwaitingByTaskId[item.session.taskId]),
                             projectRepos: projectRepos ?? undefined,
                             multiRepo2Enabled: true,
+                            planningDocFiles,
+                            onOpenPlanningDoc: handleSelectPlanningDoc,
                           }
                         : undefined
                     }
@@ -3357,6 +3302,8 @@ export default function App() {
                         }
                         projectRepos={projectRepos ?? undefined}
                         multiRepo2Enabled
+                        planningDocFiles={planningDocFiles}
+                        onOpenPlanningDoc={handleSelectPlanningDoc}
                       />
                     </div>
                     <div

@@ -83,9 +83,10 @@ Sign-in is optional. Without the env vars set, Flux runs fully local (open local
 
 When you start a planning session, Flux injects automation bridge env vars, writes `.flux/cli-bridge.json` under the project directory, and prepends the packaged `flux` shim to the PTY `PATH` (dev builds use `.vite/build`). Planning agents run board commands in the shell, for example `flux project info --json` and `flux tasks list --json`.
 
+
 Seeded `planning/CLAUDE.md` and `planning/AGENTS.md` document the CLI surface for all planning agents. Always pass `--json` on board commands. When the user names a git branch for work, pass `--source-branch` on each related `flux tasks create`. `flux tasks delete` requires `--confirm` after explicit user intent.
 
-Planning automation uses the loopback HTTP bridge and packaged `flux` CLI only (no local MCP server on port 47432). Legacy `mcp.json` / `planning/.cursor/mcp.json` files, if present from older sessions, are not modified or required.
+Planning automation uses the loopback HTTP bridge and packaged `flux` CLI only (no built-in Flux MCP server on port 47432). Project MCP config remains available for external provider servers, such as Datadog or Atlassian: Project Config → MCP servers → Add MCP accepts either a full `{ "mcpServers": { ... } }` config or a single `"name": { ... }` server entry. Flux no longer injects a reserved `flux` MCP server into `mcp.json`; planning agents use the CLI for Flux board operations.
 
 ---
 

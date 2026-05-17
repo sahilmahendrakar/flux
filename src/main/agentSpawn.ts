@@ -12,10 +12,17 @@ export function taskInitialPrompt(task: Task): string {
 }
 
 export type AgentSpawnTaskInput = Pick<Task, 'agent' | 'agentModel' | 'agentYolo'>;
+export type AgentSpawnResumeOptions =
+  | string
+  | {
+      agentConversationId?: string;
+      mcpConfigPath?: string;
+    };
 
 export function agentSpawnSpec(
   task: AgentSpawnTaskInput,
   initialPrompt: string,
+  options: { mcpConfigPath?: string } = {},
 ): { command: string; args: string[] } {
   if (task.agent == null) {
     throw new Error('agentSpawnSpec requires a task agent');
@@ -30,6 +37,13 @@ export function agentSpawnSpec(
       if (task.agentYolo === true) {
         args.push('--dangerously-skip-permissions');
       }
+      if (options.mcpConfigPath) {
+        args.push('--mcp-config', options.mcpConfigPath);
+      }
+      // Claude's --mcp-config is variadic, so separate it from the prompt.
+      if (options.mcpConfigPath) {
+        args.push('--');
+      }
       args.push(initialPrompt);
       return { command: 'claude', args };
     }
@@ -37,7 +51,7 @@ export function agentSpawnSpec(
       return { command: 'codex', args: [] };
     case 'cursor': {
       const model = resolvedCursorAgentModel(task);
-      const args: string[] = ['--model', model];
+      const args: string[] = ['--model', model, '--approve-mcps'];
       if (task.agentYolo === true) {
         args.push('--yolo');
       }
@@ -53,10 +67,16 @@ export function agentSpawnSpec(
  */
 export function agentSpawnResumeSpec(
   task: AgentSpawnTaskInput,
+  options: AgentSpawnResumeOptions = {},
 ): { command: string; args: string[] } {
   if (task.agent == null) {
     throw new Error('agentSpawnResumeSpec requires a task agent');
   }
+  const resumeId =
+    typeof options === 'string'
+      ? options.trim()
+      : options.agentConversationId?.trim();
+  const mcpConfigPath = typeof options === 'string' ? undefined : options.mcpConfigPath;
   switch (task.agent) {
     case 'claude-code': {
       const args: string[] = [];
@@ -67,18 +87,29 @@ export function agentSpawnResumeSpec(
       if (task.agentYolo === true) {
         args.push('--dangerously-skip-permissions');
       }
-      args.push('--resume');
+      if (mcpConfigPath) {
+        args.push('--mcp-config', mcpConfigPath);
+      }
+      if (resumeId) {
+        args.push('--resume', resumeId);
+      } else {
+        args.push('--resume');
+      }
       return { command: 'claude', args };
     }
     case 'codex':
       return { command: 'codex', args: ['--resume'] };
     case 'cursor': {
       const model = resolvedCursorAgentModel(task);
-      const args: string[] = ['--model', model];
+      const args: string[] = ['--model', model, '--approve-mcps'];
       if (task.agentYolo === true) {
         args.push('--yolo');
       }
-      args.push('--resume');
+      if (resumeId) {
+        args.push('--resume', resumeId);
+      } else {
+        args.push('--resume');
+      }
       return { command: 'agent', args };
     }
   }

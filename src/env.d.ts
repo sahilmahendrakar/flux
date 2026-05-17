@@ -27,13 +27,13 @@ import type {
   TaskRequestPullRequestFromAgentPayload,
   TaskRequestPullRequestFromAgentResult,
   TaskSessionStartProgress,
+  TaskAttachedPlanningDoc,
 } from './types';
 import type {
   AgentState,
   AttachResult,
-  DaemonStreamCatchupPayload,
   PlanningAttachResult,
-} from './daemon/protocol';
+} from './terminal-runtime/protocol';
 import type {
   AutomationBridgeRequest,
   AutomationBridgeResponse,
@@ -111,6 +111,19 @@ declare global {
         patchAgentSpawnDefaults: (
           patch: AgentSpawnDefaultsPatch,
         ) => Promise<{ ok: true } | { error: string }>;
+        getMcpConfig: () => Promise<
+          { ok: true; path: string; text: string } | { error: string }
+        >;
+        setMcpConfig: (
+          text: string,
+        ) => Promise<
+          { ok: true; path: string; text: string } | { error: string }
+        >;
+        addMcpConfig: (
+          text: string,
+        ) => Promise<
+          { ok: true; path: string; text: string } | { error: string }
+        >;
         getRepos: () => Promise<RepoConfig[]>;
         updateRepo: (payload: {
           rootPath: string;
@@ -250,6 +263,7 @@ declare global {
           agentModel?: string;
           agentYolo?: boolean;
           repoId?: string;
+          attachedPlanningDocs?: TaskAttachedPlanningDoc[];
         }) => Promise<Task>;
         update: (
           id: string,
@@ -274,6 +288,7 @@ declare global {
           > & {
             githubPr?: TaskGithubPr | null;
             autoStartOnUnblock?: boolean | null;
+            attachedPlanningDocs?: TaskAttachedPlanningDoc[] | null;
           },
         ) => Promise<Task>;
         assertSourceBranchEditable: (
@@ -339,9 +354,6 @@ declare global {
         getSilenceStates: () => Promise<
           { id: string; taskId?: string; state: AgentState }[]
         >;
-        onDaemonStreamCatchup: (
-          cb: (payload: DaemonStreamCatchupPayload) => void,
-        ) => () => void;
         onTaskStartProgress: (cb: (p: TaskSessionStartProgress) => void) => () => void;
       };
       shells: {
