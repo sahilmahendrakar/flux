@@ -7,15 +7,16 @@ import {
   readFluxPlanningTemplateVersionFromManagedBody,
 } from '../planningDocs/cloudPlanningDocsMigration';
 import {
-  FLUX_PLANNING_INSTRUCTIONS_BEGIN,
-  FLUX_PLANNING_INSTRUCTIONS_END,
+  FLUXX_PLANNING_INSTRUCTIONS_BEGIN,
+  FLUXX_PLANNING_INSTRUCTIONS_END,
+  findPlanningInstructionMarkerBounds,
   PLANNING_INSTRUCTIONS_STATE_BASENAME,
 } from '../planningDocs/planningInstructionMarkers';
 
 export { PLANNING_INSTRUCTIONS_STATE_BASENAME } from '../planningDocs/planningInstructionMarkers';
 
 /** Bumps when `planningAssistantMarkdown` prose meaningfully changes (used with embedded version tag). */
-export const PLANNING_ASSISTANT_TEMPLATE_VERSION = 3;
+export const PLANNING_ASSISTANT_TEMPLATE_VERSION = 5;
 
 export type PlanningInstructionFileName = 'CLAUDE.md' | 'AGENTS.md';
 
@@ -44,12 +45,15 @@ function sha256Hex(s: string): string {
   return createHash('sha256').update(s, 'utf8').digest('hex');
 }
 
-export function fluxPlanningTemplateVersionLine(): string {
-  return `<!-- flux-planning-template ${PLANNING_ASSISTANT_TEMPLATE_VERSION} -->`;
+export function fluxxPlanningTemplateVersionLine(): string {
+  return `<!-- fluxx-planning-template ${PLANNING_ASSISTANT_TEMPLATE_VERSION} -->`;
 }
 
+/** @deprecated Use {@link fluxxPlanningTemplateVersionLine}. */
+export const fluxPlanningTemplateVersionLine = fluxxPlanningTemplateVersionLine;
+
 export function wrapPlanningInstructionsManagedBlock(managedInner: string): string {
-  return `${FLUX_PLANNING_INSTRUCTIONS_BEGIN}\n${managedInner}\n${FLUX_PLANNING_INSTRUCTIONS_END}\n`;
+  return `${FLUXX_PLANNING_INSTRUCTIONS_BEGIN}\n${managedInner}\n${FLUXX_PLANNING_INSTRUCTIONS_END}\n`;
 }
 
 export type ParsedPlanningInstructionBlocks =
@@ -63,18 +67,17 @@ export type ParsedPlanningInstructionBlocks =
 
 export function parsePlanningInstructionFileForUpdate(raw: string): ParsedPlanningInstructionBlocks {
   const text = raw.replace(/\r\n/g, '\n');
-  const beginIdx = text.indexOf(FLUX_PLANNING_INSTRUCTIONS_BEGIN);
-  const endIdx = text.indexOf(FLUX_PLANNING_INSTRUCTIONS_END);
-  if (beginIdx === -1 || endIdx === -1 || endIdx <= beginIdx) {
+  const bounds = findPlanningInstructionMarkerBounds(text);
+  if (!bounds) {
     return { kind: 'no-markers', fullBody: text };
   }
-  const afterBegin = beginIdx + FLUX_PLANNING_INSTRUCTIONS_BEGIN.length;
-  const inner = text.slice(afterBegin, endIdx);
+  const afterBegin = bounds.beginIdx + bounds.beginMarkerLen;
+  const inner = text.slice(afterBegin, bounds.endIdx);
   return {
     kind: 'managed-markers',
-    userPrefix: text.slice(0, beginIdx),
+    userPrefix: text.slice(0, bounds.beginIdx),
     managedInner: inner.replace(/^\n+/, '').replace(/\n+$/, ''),
-    userSuffix: text.slice(endIdx + FLUX_PLANNING_INSTRUCTIONS_END.length),
+    userSuffix: text.slice(bounds.endIdx + bounds.endMarkerLen),
   };
 }
 
@@ -95,9 +98,12 @@ function assembleInstructionFileWithMarkers(
 function isGeneratedPlanningAssistantMarkdownWithoutMarkers(body: string): boolean {
   return (
     body.includes('# Planning workspace —') &&
-    (body.includes('## Flux CLI') ||
-      (body.includes('You have access to the following Flux tools for task management') &&
-        body.includes('flux__get_project_info')))
+    (body.includes('## Fluxx CLI') ||
+      body.includes('## Flux CLI') ||
+      (body.includes('You have access to the following Flux') &&
+        body.includes('flux__get_project_info')) ||
+      body.includes('fluxx project info --json') ||
+      body.includes('flux project info --json'))
   );
 }
 
@@ -135,77 +141,77 @@ export function planningAssistantMarkdown(
   multiRepoGuide: boolean,
 ): string {
   const workspaceIntro = multiRepoGuide
-    ? `This directory is the Flux **planning** workspace for \`${projectName}\`. The team may use **several** application repositories; each has a stable \`id\` in Flux. Run \`flux project info --json\` before repo-specific work: it returns \`repos[]\` (with \`id\`, \`label\`, \`isPrimary\`, \`configuredDefaultBranch\`, optional \`defaultBranchShort\`, clone \`rootPath\` when known, plus \`pathStatus\` locally or \`binding\` in the cloud), \`primaryRepoId\`, and a backwards-compatible top-level \`rootPath\` pointing at the **primary** repository clone. Planning sessions still use **this** directory as the process working directory — open code under each repo's \`rootPath\` from the CLI output, not only the path embedded below.
+    ? `This directory is the Fluxx **planning** workspace for \`${projectName}\`. The team may use **several** application repositories; each has a stable \`id\` in Fluxx. Run \`fluxx project info --json\` before repo-specific work: it returns \`repos[]\` (with \`id\`, \`label\`, \`isPrimary\`, \`configuredDefaultBranch\`, optional \`defaultBranchShort\`, clone \`rootPath\` when known, plus \`pathStatus\` locally or \`binding\` in the cloud), \`primaryRepoId\`, and a backwards-compatible top-level \`rootPath\` pointing at the **primary** repository clone. Planning sessions still use **this** directory as the process working directory — open code under each repo's \`rootPath\` from the CLI output, not only the path embedded below.
 
 When user intent spans more than one repository and is ambiguous, **ask once** which repo (or \`repoId\`) they mean before creating tasks.`
-    : `This directory is the Flux **planning** workspace for \`${projectName}\`. Application code lives in the git repository at \`${rootPath}\` (embedded here when these files were created). The **canonical** path for reading code is the \`rootPath\` field returned by \`flux project info --json\` — prefer that after you run the command. Planning sessions use this directory as the process working directory.`;
+    : `This directory is the Fluxx **planning** workspace for \`${projectName}\`. Application code lives in the git repository at \`${rootPath}\` (embedded here when these files were created). The **canonical** path for reading code is the \`rootPath\` field returned by \`fluxx project info --json\` — prefer that after you run the command. Planning sessions use this directory as the process working directory.`;
 
   const contextSteps = multiRepoGuide
-    ? `  1. Run \`flux project info --json\` once (unless you already have current \`repos\`, \`primaryRepoId\`, and primary \`rootPath\` from this turn). Use each repo's \`rootPath\` when reading that repository's code; use \`primaryRepoId\` / \`isPrimary\` to spot the default repo.
+    ? `  1. Run \`fluxx project info --json\` once (unless you already have current \`repos\`, \`primaryRepoId\`, and primary \`rootPath\` from this turn). Use each repo's \`rootPath\` when reading that repository's code; use \`primaryRepoId\` / \`isPrimary\` to spot the default repo.
   2. Read team planning documents under \`docs/\` relative to this directory (for example \`docs/vision.md\`, \`docs/architecture.md\`, sprint notes, ADRs). Older projects may still have markdown at the planning root outside \`docs/\` until migrated — prefer \`docs/\` for new material.
   3. Explore each relevant repository under the \`rootPath\` values from the CLI as needed.
   4. Only then respond, revise planning docs, list tasks if relevant, or create/update tasks. For **new** tasks, pass \`--repo-id\` (matching \`repos[].id\`) when work belongs to a non-primary repository; omit \`--repo-id\` to target the primary repo.`
-    : `  1. Run \`flux project info --json\` once (unless you already have the current \`rootPath\` and project name from a command in this turn). Use the returned \`rootPath\` as the application codebase location.
+    : `  1. Run \`fluxx project info --json\` once (unless you already have the current \`rootPath\` and project name from a command in this turn). Use the returned \`rootPath\` as the application codebase location.
   2. Read team planning documents under \`docs/\` relative to this directory (for example \`docs/vision.md\`, \`docs/architecture.md\`). Older projects may still have markdown at the planning root outside \`docs/\` until migrated — prefer \`docs/\` for new material.
   3. Explore the repository under that \`rootPath\` as needed for the user’s question.
   4. Only then respond, revise planning docs, list tasks if relevant, or create/update tasks so titles and descriptions match reality.`;
 
   const createTaskLine = multiRepoGuide
-    ? `- \`flux tasks create --json --title "..." --description "..." --agent <claude-code|cursor|codex|none>\` — optional repeated \`--label <label>\`, repeated \`--depends-on-task-id <taskId>\`, \`--assignee-email\` (cloud; use \`flux members list --json\`), \`--repo-id <repos[].id>\` (omit for primary), \`--source-branch <git-branch>\` (alias: \`--feature-branch\`), \`--create-source-branch-if-missing=true\` when a missing branch should be created on first session start`
-    : `- \`flux tasks create --json --title "..." --description "..." --agent <claude-code|cursor|codex|none>\` — optional repeated \`--label <label>\`, repeated \`--depends-on-task-id <taskId>\`, \`--assignee-email\` (cloud; use \`flux members list --json\`), \`--source-branch <git-branch>\` (alias: \`--feature-branch\`), \`--create-source-branch-if-missing=true\``;
+    ? `- \`fluxx tasks create --json --title "..." --description "..." --agent <claude-code|cursor|codex|none>\` — optional repeated \`--label <label>\`, repeated \`--depends-on-task-id <taskId>\`, \`--assignee-email\` (cloud; use \`fluxx members list --json\`), \`--repo-id <repos[].id>\` (omit for primary), \`--source-branch <git-branch>\` (alias: \`--feature-branch\`), \`--create-source-branch-if-missing=true\` when a missing branch should be created on first session start`
+    : `- \`fluxx tasks create --json --title "..." --description "..." --agent <claude-code|cursor|codex|none>\` — optional repeated \`--label <label>\`, repeated \`--depends-on-task-id <taskId>\`, \`--assignee-email\` (cloud; use \`fluxx members list --json\`), \`--source-branch <git-branch>\` (alias: \`--feature-branch\`), \`--create-source-branch-if-missing=true\``;
 
   const updateTaskLine = multiRepoGuide
-    ? `- \`flux tasks update --json --id <taskId>\` — optional \`--title\`, \`--description\`, \`--status\`, \`--agent\`, repeated \`--label <label>\` (replace labels), \`--clear-labels\`, repeated \`--depends-on-task-id <taskId>\` (replace dependencies), \`--clear-dependencies\`, \`--assignee-email\`, \`--unassign-assignee=true\`, \`--repo-id <repos[].id>\` (only while no session/worktree/PR — same as UI), \`--source-branch <git-branch>\` (alias: \`--feature-branch\`), \`--create-source-branch-if-missing\`. Branch edits fail safely if a session or worktree already exists`
-    : `- \`flux tasks update --json --id <taskId>\` — optional \`--title\`, \`--description\`, \`--status\`, \`--agent\`, repeated \`--label <label>\` (replace labels), \`--clear-labels\`, repeated \`--depends-on-task-id <taskId>\` (replace dependencies), \`--clear-dependencies\`, \`--assignee-email\`, \`--unassign-assignee=true\`, \`--source-branch <git-branch>\` (alias: \`--feature-branch\`), \`--create-source-branch-if-missing\`. Branch edits fail safely if a session or worktree already exists`;
+    ? `- \`fluxx tasks update --json --id <taskId>\` — optional \`--title\`, \`--description\`, \`--status\`, \`--agent\`, repeated \`--label <label>\` (replace labels), \`--clear-labels\`, repeated \`--depends-on-task-id <taskId>\` (replace dependencies), \`--clear-dependencies\`, \`--assignee-email\`, \`--unassign-assignee=true\`, \`--repo-id <repos[].id>\` (only while no session/worktree/PR — same as UI), \`--source-branch <git-branch>\` (alias: \`--feature-branch\`), \`--create-source-branch-if-missing\`. Branch edits fail safely if a session or worktree already exists`
+    : `- \`fluxx tasks update --json --id <taskId>\` — optional \`--title\`, \`--description\`, \`--status\`, \`--agent\`, repeated \`--label <label>\` (replace labels), \`--clear-labels\`, repeated \`--depends-on-task-id <taskId>\` (replace dependencies), \`--clear-dependencies\`, \`--assignee-email\`, \`--unassign-assignee=true\`, \`--source-branch <git-branch>\` (alias: \`--feature-branch\`), \`--create-source-branch-if-missing\`. Branch edits fail safely if a session or worktree already exists`;
 
-  const projectInfoLine = `- \`flux project info --json\` — project \`name\`, \`rootPath\` (primary clone), ${multiRepoGuide ? '`repos` / `primaryRepoId` when multi-repo is active, ' : ''}\`taskCounts\`, and \`defaultBranchShort\` when git discovery succeeds (see \`branchDiscoveryError\` if not)`;
+  const projectInfoLine = `- \`fluxx project info --json\` — project \`name\`, \`rootPath\` (primary clone), ${multiRepoGuide ? '`repos` / `primaryRepoId` when multi-repo is active, ' : ''}\`taskCounts\`, and \`defaultBranchShort\` when git discovery succeeds (see \`branchDiscoveryError\` if not)`;
 
   const listBranchesLine = multiRepoGuide
-    ? `- \`flux repo branches --json\` — local + origin branch lists, default branch, optional \`--classify-branch <name>\`; add \`--repo-id\` to scope a non-primary repository`
-    : `- \`flux repo branches --json\` — local + origin branch lists, default branch, optional \`--classify-branch <name>\` before batch-creating tasks`;
+    ? `- \`fluxx repos branches --json\` — local + origin branch lists, default branch, optional \`--classify-branch <name>\`; add \`--repo-id\` to scope a non-primary repository`
+    : `- \`fluxx repos branches --json\` — local + origin branch lists, default branch, optional \`--classify-branch <name>\` before batch-creating tasks`;
 
   const body = `# Planning workspace — ${projectName}
 
 ${workspaceIntro}
 
-## Flux CLI
+## Fluxx CLI
 
-Planning sessions inject bridge env and prepend the packaged \`flux\` shim to \`PATH\` when Flux starts a session. Use the command as \`flux ...\`; do **not** create a \`FLUX_BIN\` variable, paste the absolute shim path, or run \`which flux\` except when troubleshooting a missing command. **Always pass \`--json\`** on board commands so you can parse stdout. Run \`flux tasks create --help\` or \`flux tasks update --help\` for the full flag list. If \`flux\` is missing, ask the user to start planning from the Flux app (not a bare shell).
+Planning sessions inject bridge env and prepend the packaged \`fluxx\` shim to \`PATH\` when Fluxx starts a session. Use the command as \`fluxx ...\`; do **not** create a \`FLUXX_BIN\` variable, paste the absolute shim path, or run \`which fluxx\` except when troubleshooting a missing command. **Always pass \`--json\`** on board commands so you can parse stdout. Run \`fluxx tasks create --help\` or \`fluxx tasks update --help\` for the full flag list. If \`fluxx\` is missing, ask the user to start planning from the Fluxx app (not a bare shell).
 
 ## Your role
 
-You are a planning assistant. Help the developer think through features, maintain documentation under \`docs/\` in this workspace, and manage tasks on the Flux board via the CLI.
+You are a planning assistant. Help the developer think through features, maintain documentation under \`docs/\` in this workspace, and manage tasks on the Fluxx board via the CLI.
 
 ## Turn-taking
 
 - Do **not** start a substantive planning pass, repository exploration, or CLI use until the user has asked a question or given a concrete task.
-- **After they do**, gather context **before** you give substantive answers, update planning docs, or run Flux CLI commands, unless the request is purely meta and needs no repository or board context. Follow this order:
+- **After they do**, gather context **before** you give substantive answers, update planning docs, or run Fluxx CLI commands, unless the request is purely meta and needs no repository or board context. Follow this order:
 ${contextSteps}
 
 ## Available commands
 
 Board and project operations (run in the planning shell):
 
-- \`flux tasks list --json\` — list tasks (includes \`sourceBranch\` / \`createSourceBranchIfMissing\` when set). Optional repeated \`--exclude-status <column>\` (\`backlog\`, \`in-progress\`, \`needs-input\`, \`done\`) — e.g. \`--exclude-status done\` for active work only
+- \`fluxx tasks list --json\` — list tasks (includes \`sourceBranch\` / \`createSourceBranchIfMissing\` when set). Optional repeated \`--exclude-status <column>\` (\`backlog\`, \`in-progress\`, \`needs-input\`, \`done\`) — e.g. \`--exclude-status done\` for active work only
 ${createTaskLine}
-- \`flux tasks start --json --id <taskId>\` — move a task to **In progress** (\`in-progress\`)
+- \`fluxx tasks start --json --id <taskId>\` — move a task to **In progress** (\`in-progress\`)
 ${updateTaskLine}
-- \`flux tasks delete --json --id <taskId> --confirm\` — permanently remove a task; **only** after the user clearly asked to delete. If intent is ambiguous, ask once before deleting
+- \`fluxx tasks delete --json --id <taskId> --confirm\` — permanently remove a task; **only** after the user clearly asked to delete. If intent is ambiguous, ask once before deleting
 ${projectInfoLine}
 ${listBranchesLine}
-- \`flux members list --json\` — cloud projects: team roster (\`email\`, \`displayName\`, \`role\`); local projects return an empty list with a note
+- \`fluxx members list --json\` — cloud projects: team roster (\`email\`, \`displayName\`, \`role\`); local projects return an empty list with a note
 
-Board relationship: new tasks land in **Backlog**. \`flux tasks start\` is the usual way to mark work actively in flight. Use \`flux tasks update\` for other status changes (e.g. **Needs input**, **Review**, **Done**) or edits to title/description/agent.
+Board relationship: new tasks land in **Backlog**. \`fluxx tasks start\` is the usual way to mark work actively in flight. Use \`fluxx tasks update\` for other status changes (e.g. **Needs input**, **Review**, **Done**) or edits to title/description/agent.
 
-**Planning doc attachments:** When you turn a broad plan into concrete board tasks, add \`attachedPlanningDocs: [{ "relativePath": "docs/your-plan.md" }]\` (or another existing path under the planning docs tree, e.g. \`notes/plan.md\`) so implementers see the full write-up in Flux. Each task \`description\` should still spell out only that task's slice of work (acceptance, files, edge cases)—do not replace descriptions with a pointer to the plan alone.
+**Planning doc attachments:** When you turn a broad plan into concrete board tasks, add \`attachedPlanningDocs: [{ "relativePath": "docs/your-plan.md" }]\` (or another existing path under the planning docs tree, e.g. \`notes/plan.md\`) so implementers see the full write-up in Fluxx. Each task \`description\` should still spell out only that task's slice of work (acceptance, files, edge cases)—do not replace descriptions with a pointer to the plan alone.
 
 ## Multi-task features (required)
 
-When you split one user-facing feature or initiative into **two or more** board tasks, treat them as a single feature batch. **Do this on every \`flux tasks create\` in the batch — not in a follow-up \`flux tasks update\`:**
+When you split one user-facing feature or initiative into **two or more** board tasks, treat them as a single feature batch. **Do this on every \`fluxx tasks create\` in the batch — not in a follow-up \`fluxx tasks update\`:**
 
 1. **Feature branch** — Choose one git branch (e.g. \`feature/list-view\`). Pass \`--source-branch <branch> --create-source-branch-if-missing=true\` on **each** task in the batch. If the user named a branch, use it; otherwise derive a short \`feature/<slug>\` from the feature name.
 2. **Labels** — Pass at least two repeated \`--label\` flags on **each** create: one area (e.g. \`frontend\`, \`backend\`, \`planning\`) and one kind (e.g. \`enhancement\`, \`bugfix\`). Add a feature slug label when helpful (e.g. \`list-view\`).
-3. **Dependencies** — The CLI supports \`--depends-on-task-id\` on **create and update** (aliases: \`--blocked-by-task-id\`). Create foundation tasks first; for later tasks in the batch, pass \`--depends-on-task-id <id>\` for each prerequisite using ids from \`flux tasks list --json\` or from earlier creates in the same turn. Typical order: toggle/shell → core component → sorting → polish. Do **not** tell the user dependencies are UI-only.
+3. **Dependencies** — The CLI supports \`--depends-on-task-id\` on **create and update** (aliases: \`--blocked-by-task-id\`). Create foundation tasks first; for later tasks in the batch, pass \`--depends-on-task-id <id>\` for each prerequisite using ids from \`fluxx tasks list --json\` or from earlier creates in the same turn. Typical order: toggle/shell → core component → sorting → polish. Do **not** tell the user dependencies are UI-only.
 
 **Single-task requests:** Still add sensible \`--label\` flags. Use \`--source-branch\` when the user names a branch or the work clearly belongs on a named feature branch.
 
@@ -213,7 +219,7 @@ When you split one user-facing feature or initiative into **two or more** board 
 
 **Task labels and dependencies:** Use repeated flags, not JSON: \`--label frontend --label enhancement\`, \`--depends-on-task-id <taskId>\` (repeat per blocker), \`--clear-labels\`, \`--clear-dependencies\` on update. Reference only tasks in the current project.
 
-**Team (cloud) projects:** CLI commands route through the running Flux app. It must be **open and signed in**; if you see auth or “open Flux” errors, ask the user to bring Flux to the foreground and try again.
+**Team (cloud) projects:** CLI commands route through the running Fluxx app. It must be **open and signed in**; if you see auth or “open Fluxx” errors, ask the user to bring Fluxx to the foreground and try again.
 
 ## Files in this workspace
 
@@ -231,7 +237,7 @@ Maintain team planning markdown under \`docs/\` (relative to this directory) as 
 - Keep \`docs/vision.md\` and \`docs/architecture.md\` up to date as the project evolves
 `;
 
-  return `${fluxPlanningTemplateVersionLine()}\n\n${body}`;
+  return `${fluxxPlanningTemplateVersionLine()}\n\n${body}`;
 }
 
 function computeNextInstructionFile(
@@ -285,7 +291,7 @@ function computeNextInstructionFile(
 
 /**
  * Idempotently creates or upgrades `planning/CLAUDE.md` and `planning/AGENTS.md`.
- * Flux-managed regions are delimited by HTML comments; user text outside those markers is preserved.
+ * Fluxx-managed regions are delimited by HTML comments; user text outside those markers is preserved.
  */
 export async function ensurePlanningAssistantMarkdownFiles(
   planningDir: string,

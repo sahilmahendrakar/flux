@@ -129,9 +129,9 @@ function isWorkspaceSessionTabId(tabId: string): boolean {
 }
 
 const TASK_PR_ERROR_HINTS: Partial<Record<TaskPrErrorCode, string>> = {
-  NO_PROJECT: 'Open a project workspace in Flux, then try again.',
+  NO_PROJECT: 'Open a project workspace in Fluxx, then try again.',
   NO_WORKTREE:
-    "Start this task's agent session so Flux has a live worktree, then try opening the PR again.",
+    "Start this task's agent session so Fluxx has a live worktree, then try opening the PR again.",
   NO_AGENT_SESSION:
     'Open the task and start its agent session from the board or task panel, then click the PR icon again.',
   AGENT_SESSION_NOT_RUNNING:
@@ -671,7 +671,7 @@ export default function App() {
   const tasksWorktreeIdsKey = useMemo(
     () =>
       tasks
-        .map((t) => `${t.id}\t${t.repoId ?? ''}\t${t.fluxWorkBranch ?? ''}`)
+        .map((t) => `${t.id}\t${t.repoId ?? ''}\t${t.fluxxWorkBranch ?? ''}`)
         .sort()
         .join('\0'),
     [tasks],
@@ -707,7 +707,7 @@ export default function App() {
           tasksRef.current.map((t) => ({
             taskId: t.id,
             repoId: t.repoId,
-            fluxWorkBranch: t.fluxWorkBranch,
+            fluxxWorkBranch: t.fluxxWorkBranch,
           })),
         )
         .then((map) => {
@@ -827,7 +827,7 @@ export default function App() {
     cloudProjectsState.projects,
   ]);
 
-  // Multi-repo2 cloud: keep ~/.flux/projects/<cloudId>/ workspace `repos[]` aligned with shared repo ids + bindings.
+  // Multi-repo2 cloud: keep ~/.fluxx/projects/<cloudId>/ workspace `repos[]` aligned with shared repo ids + bindings.
   useEffect(() => {
     if (!project || project.kind !== 'cloud') return;
     if (project.sharedRepos.length === 0) return;
@@ -1080,12 +1080,12 @@ export default function App() {
 
   useEffect(() => {
     if (project?.kind !== 'cloud') return;
-    return window.electronAPI.tasks.onPersistFluxWorkBranch(({ taskId, fluxWorkBranch }) => {
+    return window.electronAPI.tasks.onPersistFluxxWorkBranch(({ taskId, fluxxWorkBranch }) => {
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, fluxWorkBranch } : t)),
+        prev.map((t) => (t.id === taskId ? { ...t, fluxxWorkBranch } : t)),
       );
-      void providerRef.current?.update(taskId, { fluxWorkBranch }).catch((err) => {
-        console.error('[task:fluxWorkBranch] Firestore write failed', { taskId, err });
+      void providerRef.current?.update(taskId, { fluxxWorkBranch }).catch((err) => {
+        console.error('[task:fluxxWorkBranch] Firestore write failed', { taskId, err });
       });
     });
   }, [project?.kind]);
@@ -1884,8 +1884,8 @@ export default function App() {
       if (patch.repoId !== undefined) {
         persistable.repoId = patch.repoId;
       }
-      if (patch.fluxWorkBranch !== undefined) {
-        persistable.fluxWorkBranch = patch.fluxWorkBranch;
+      if (patch.fluxxWorkBranch !== undefined) {
+        persistable.fluxxWorkBranch = patch.fluxxWorkBranch;
       }
       if (patchGh !== undefined) {
         persistable.githubPr = patchGh;
@@ -3443,7 +3443,7 @@ export default function App() {
       {taskDeleteConfirmTask ? (
         <ConfirmDialog
           title="Delete task and workspace?"
-          description={`This removes "${taskDeleteConfirmTask.title}" from the board and tears down its Flux workspace.`}
+          description={`This removes "${taskDeleteConfirmTask.title}" from the board and tears down its Fluxx workspace.`}
           bullets={[
             'Remove the task from the board',
             'End agent sessions tied to this task (running agents stop)',

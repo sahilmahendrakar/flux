@@ -10,7 +10,7 @@ import {
 import { planningAssistantMarkdown, PLANNING_ASSISTANT_TEMPLATE_VERSION, wrapPlanningInstructionsManagedBlock } from './planningAssistantInstructions';
 import { stripFluxPlanningTemplateVersionComment } from '../planningDocs/cloudPlanningDocsMigration';
 import {
-  FLUX_PLANNING_INSTRUCTIONS_BEGIN,
+  FLUXX_PLANNING_INSTRUCTIONS_BEGIN,
   PLANNING_INSTRUCTIONS_STATE_BASENAME,
 } from '../planningDocs/planningInstructionMarkers';
 import { deriveStablePrimaryRepoIdForProject } from '../repoIdentity';
@@ -329,7 +329,7 @@ describe('ProjectStore repo-id operations', () => {
     ]);
   });
 
-  it('migrates legacy basename Flux dir to ~/.flux/projects/<id>/ on create', async () => {
+  it('migrates legacy basename Flux dir to ~/.fluxx/projects/<id>/ on create', async () => {
     const rootA = path.join(tmp, 'w', 'repo-name');
     await fs.mkdir(rootA, { recursive: true });
     await touchGitRepo(rootA);
@@ -424,7 +424,7 @@ describe('ProjectStore repo-id operations', () => {
     const cloud = new ProjectStore(tmp);
     await cloud.ensureCloudLayoutForRoot('cloud-retire', rootA);
 
-    await expect(fs.readFile(path.join(legacyCloud, '.flux-superseded-by'), 'utf8')).resolves.toBe(
+    await expect(fs.readFile(path.join(legacyCloud, '.fluxx-superseded-by'), 'utf8')).resolves.toBe(
       `${canonicalCloud}\n`,
     );
   });
@@ -446,7 +446,7 @@ describe('ProjectStore repo-id operations', () => {
       /migration conflict/,
     );
     const conflict = JSON.parse(
-      await fs.readFile(path.join(legacyCloud, '.flux-migration-conflict.json'), 'utf8'),
+      await fs.readFile(path.join(legacyCloud, '.fluxx-migration-conflict.json'), 'utf8'),
     ) as { legacyDir: string; canonicalDir: string; reason: string };
     expect(conflict.legacyDir).toBe(legacyCloud);
     expect(conflict.canonicalDir).toBe(canonicalCloud);
@@ -532,7 +532,7 @@ describe('ProjectStore.listMaterializationDirsForProjectId', () => {
     expect(cloudDirs.map((p) => path.resolve(p))).toEqual([path.resolve(legacyCloud)]);
   });
 
-  it('refuses unsafe legacy flat ~/.flux/projects root deletion when nested projects exist', async () => {
+  it('refuses unsafe legacy flat ~/.fluxx/projects root deletion when nested projects exist', async () => {
     const projectsRoot = path.join(tmp, 'projects');
     const nested = path.join(projectsRoot, 'nested');
     await writeLegacyConfig(nested, path.join(tmp, 'r2'), { id: 'nested-proj' });
@@ -543,7 +543,7 @@ describe('ProjectStore.listMaterializationDirsForProjectId', () => {
     );
   });
 
-  it('allows legacy flat ~/.flux/projects root deletion when no nested project dirs exist', async () => {
+  it('allows legacy flat ~/.fluxx/projects root deletion when no nested project dirs exist', async () => {
     const projectsRoot = path.join(tmp, 'projects');
     await writeLegacyConfig(projectsRoot, path.join(tmp, 'r1'), { id: 'flat-only' });
     await expect(assertSafeToDeleteLegacyFlatProjectsRoot(tmp, projectsRoot)).resolves.toBeUndefined();
@@ -567,12 +567,12 @@ describe('ensurePlanningAssistantMarkdownFiles (multi-repo2 planning copy)', () 
     });
     expect((await fs.stat(path.join(dir, 'docs'))).isDirectory()).toBe(true);
     const claude = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
-    expect(claude).toContain('<!-- flux-planning-template 3 -->');
+    expect(claude).toContain('<!-- fluxx-planning-template 5 -->');
     expect(claude).toContain('## Multi-task features (required)');
-    expect(claude).toContain('flux project info --json');
+    expect(claude).toContain('fluxx project info --json');
     expect(claude).toContain('repos[]');
     expect(claude).toContain('--repo-id');
-    expect(claude).toContain('do **not** create a `FLUX_BIN` variable');
+    expect(claude).toContain('do **not** create a `FLUXX_BIN` variable');
     expect(claude).not.toContain('flux__');
   });
 
@@ -588,7 +588,7 @@ describe('ensurePlanningAssistantMarkdownFiles (multi-repo2 planning copy)', () 
       multiRepoGuide: false,
     });
     const claude = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
-    expect(claude).toContain('flux project info --json');
+    expect(claude).toContain('fluxx project info --json');
     expect(claude).not.toContain('repos[]');
     expect(claude).not.toContain('--repo-id');
     expect(claude).not.toContain('flux__');
@@ -608,7 +608,7 @@ Planning sessions inject bridge env.
     });
 
     const claude = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
-    expect(claude).toContain('<!-- flux-planning-template 3 -->');
+    expect(claude).toContain('<!-- fluxx-planning-template 5 -->');
     expect(claude).toContain('## Multi-task features (required)');
     expect(claude).toContain('--depends-on-task-id');
   });
@@ -629,8 +629,8 @@ You have access to the following Flux tools for task management:
 
     const claude = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
     const agents = await fs.readFile(path.join(dir, 'AGENTS.md'), 'utf8');
-    expect(claude).toContain('flux project info --json');
-    expect(agents).toContain('flux tasks create --json');
+    expect(claude).toContain('fluxx project info --json');
+    expect(agents).toContain('fluxx tasks create --json');
     expect(claude).not.toContain('flux__');
     expect(agents).not.toContain('flux__');
   });
@@ -649,8 +649,8 @@ You have access to the following Flux tools for task management:
   it('wraps new seeds with Flux markers and persists instruction state', async () => {
     await ensurePlanningAssistantMarkdownFiles(dir, 'N', '/tmp/root', { multiRepoGuide: true });
     const claude = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
-    expect(claude).toContain(FLUX_PLANNING_INSTRUCTIONS_BEGIN);
-    expect(claude).toContain('<!-- flux-planning-template');
+    expect(claude).toContain(FLUXX_PLANNING_INSTRUCTIONS_BEGIN);
+    expect(claude).toContain('<!-- fluxx-planning-template');
     const st = JSON.parse(
       await fs.readFile(path.join(dir, PLANNING_INSTRUCTIONS_STATE_BASENAME), 'utf8'),
     ) as { schemaVersion: number; files: Record<string, unknown> };
@@ -675,8 +675,8 @@ You have access to the following Flux tools for task management:
     await fs.writeFile(path.join(dir, 'AGENTS.md'), legacy, 'utf8');
     await ensurePlanningAssistantMarkdownFiles(dir, 'Legacy', '/other/root', { multiRepoGuide: true });
     const upgraded = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
-    expect(upgraded).toContain(FLUX_PLANNING_INSTRUCTIONS_BEGIN);
-    expect(upgraded).toContain('flux project info --json');
+    expect(upgraded).toContain(FLUXX_PLANNING_INSTRUCTIONS_BEGIN);
+    expect(upgraded).toContain('fluxx project info --json');
   });
 
   it('preserves manual instruction files that are not Flux templates', async () => {
@@ -694,8 +694,8 @@ You have access to the following Flux tools for task management:
     await ensurePlanningAssistantMarkdownFiles(dir, 'Up', '/tmp/u', { multiRepoGuide: true });
     const next = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
     expect(next).toContain('# My notes');
-    expect(next).toContain(FLUX_PLANNING_INSTRUCTIONS_BEGIN);
-    expect(next).toContain(`flux-planning-template ${PLANNING_ASSISTANT_TEMPLATE_VERSION}`);
+    expect(next).toContain(FLUXX_PLANNING_INSTRUCTIONS_BEGIN);
+    expect(next).toContain(`fluxx-planning-template ${PLANNING_ASSISTANT_TEMPLATE_VERSION}`);
   });
 
   it('upgrades only the Flux template file when CLAUDE is manual and AGENTS is legacy', async () => {
@@ -707,6 +707,6 @@ You have access to the following Flux tools for task management:
     await ensurePlanningAssistantMarkdownFiles(dir, 'Split', '/tmp/s', { multiRepoGuide: true });
     expect(await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8')).toBe('manual-only');
     const agents = await fs.readFile(path.join(dir, 'AGENTS.md'), 'utf8');
-    expect(agents).toContain(FLUX_PLANNING_INSTRUCTIONS_BEGIN);
+    expect(agents).toContain(FLUXX_PLANNING_INSTRUCTIONS_BEGIN);
   });
 });

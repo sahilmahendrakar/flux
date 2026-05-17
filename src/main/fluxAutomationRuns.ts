@@ -367,7 +367,7 @@ export async function automationRunStartTask(
       return {
         ok: false,
         error:
-          'This task has no coding agent assigned. Use `flux tasks update --agent` before starting.',
+          'This task has no coding agent assigned. Use `fluxx tasks update --agent` before starting.',
       };
     }
     const updated = await h.taskActions.startTask(input.id);
@@ -391,7 +391,7 @@ export async function automationRunStartTask(
     return {
       ok: false,
       error:
-        'This task has no coding agent assigned. Use `flux tasks update --agent` before starting.',
+        'This task has no coding agent assigned. Use `fluxx tasks update --agent` before starting.',
     };
   }
   const updateResult = await h.bridge.request<AutomationBridgeTasksUpdateResult>('tasks.update', active.activeKey, {

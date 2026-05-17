@@ -16,7 +16,7 @@
  *   we do not nag; nothing is uploaded automatically.
  *
  * - **New teammates:** Cloud activation materialises `planning/` under
- *   `~/.flux/projects/<cloudProjectId>/` and may seed `CLAUDE.md` / `AGENTS.md` with
+ *   `~/.fluxx/projects/<cloudProjectId>/` and may seed `CLAUDE.md` / `AGENTS.md` with
  *   machine-specific paths. Shared planning markdown is written under `planning/docs/`.
  *   Those instruction bodies often differ only by embedded workspace paths — see
  *   {@link planningMarkdownEquivalentForSeededInstructions}. Marker-wrapped local bodies
@@ -24,18 +24,15 @@
  *   avoids noisy conflict copies while still replacing with shared content when Firestore
  *   has the team version.
  *
- *   Flux-managed instruction upgrades persist `planning/.flux-instructions.json` (local metadata only;
- *   not a planning doc and not cloud-synced).
+ *   Fluxx-managed instruction upgrades persist `planning/.fluxx-instructions.json` (local metadata only;
+ *   legacy `.flux-instructions.json` still read; not a planning doc and not cloud-synced).
  *
- * Persisted completion flags: `planning/.flux-cloud-docs-migration.json`
+ * Persisted completion flags: `planning/.fluxx-cloud-docs-migration.json` (legacy `.flux-cloud-docs-migration.json` still read)
  * (`planningDocsMigrationDisk.ts`). Renderer orchestration: `useCloudPlanningDocsMigration.tsx`.
  * Firestore IO: `renderer/planningDocs/firestorePlanningDocs.ts`.
  */
 
-import {
-  FLUX_PLANNING_INSTRUCTIONS_BEGIN,
-  FLUX_PLANNING_INSTRUCTIONS_END,
-} from './planningInstructionMarkers';
+import { findPlanningInstructionMarkerBounds } from './planningInstructionMarkers';
 
 /** Local-only tree for divergent copies preserved during Firestore-first hydration. */
 export const PLANNING_CLOUD_UNSYNCED_PREFIX = '_flux_unsynced';
@@ -73,36 +70,36 @@ export function normalizePlanningInstructionHeading(markdown: string): string {
   return markdown.replace(/^#\s+Planning workspace — .*$/m, '# Planning workspace — __FLUX_NAME__');
 }
 
-const FLUX_PLANNING_TEMPLATE_VERSION_COMMENT = /^<!--\s*flux-planning-template\s+(\d+)\s*-->\s*\n?/im;
+const FLUXX_PLANNING_TEMPLATE_VERSION_COMMENT =
+  /^<!--\s*(?:flux|fluxx)-planning-template\s+(\d+)\s*-->\s*\n?/im;
 
-/** Strips the optional Flux template version tag emitted at the top of managed instruction bodies. */
+/** Strips the optional Fluxx template version tag emitted at the top of managed instruction bodies. */
 export function stripFluxPlanningTemplateVersionComment(markdown: string): string {
-  return markdown.replace(/\r\n/g, '\n').replace(FLUX_PLANNING_TEMPLATE_VERSION_COMMENT, '');
+  return markdown.replace(/\r\n/g, '\n').replace(FLUXX_PLANNING_TEMPLATE_VERSION_COMMENT, '');
 }
 
 /** Reads the numeric template version from the first line of a managed instruction body, or `0` if absent. */
 export function readFluxPlanningTemplateVersionFromManagedBody(managedBody: string): number {
   const unified = managedBody.replace(/\r\n/g, '\n');
-  const m = unified.match(FLUX_PLANNING_TEMPLATE_VERSION_COMMENT);
+  const m = unified.match(FLUXX_PLANNING_TEMPLATE_VERSION_COMMENT);
   if (!m) return 0;
   const n = Number.parseInt(m[1] ?? '', 10);
   return Number.isFinite(n) ? n : 0;
 }
 
 /**
- * When instruction files use Flux marker blocks, compare only the managed inner region.
+ * When instruction files use Fluxx marker blocks, compare only the managed inner region.
  * Otherwise use the full document (legacy unwrapped seeds).
  */
 export function extractPlanningInstructionManagedBodyForEquivalence(markdown: string): string {
   const unified = markdown.replace(/\r\n/g, '\n');
-  const beginIdx = unified.indexOf(FLUX_PLANNING_INSTRUCTIONS_BEGIN);
-  const endIdx = unified.indexOf(FLUX_PLANNING_INSTRUCTIONS_END);
-  if (beginIdx === -1 || endIdx === -1 || endIdx <= beginIdx) {
+  const bounds = findPlanningInstructionMarkerBounds(unified);
+  if (!bounds) {
     return unified;
   }
-  const afterBegin = beginIdx + FLUX_PLANNING_INSTRUCTIONS_BEGIN.length;
+  const afterBegin = bounds.beginIdx + bounds.beginMarkerLen;
   return unified
-    .slice(afterBegin, endIdx)
+    .slice(afterBegin, bounds.endIdx)
     .replace(/^\n+/, '')
     .replace(/\n+$/, '');
 }

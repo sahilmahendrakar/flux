@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUNDLE="$DIR/fluxx-cli.js"
+if [ ! -f "$BUNDLE" ]; then
+  BUNDLE="$DIR/flux-cli.js"
+fi
+if [ -n "${FLUXX_ELECTRON_EXE:-}" ] && [ -x "${FLUXX_ELECTRON_EXE}" ]; then
+  export ELECTRON_RUN_AS_NODE=1
+  exec "${FLUXX_ELECTRON_EXE}" "$BUNDLE" "$@"
+fi
+if [ -n "${FLUX_ELECTRON_EXE:-}" ] && [ -x "${FLUX_ELECTRON_EXE}" ]; then
+  export ELECTRON_RUN_AS_NODE=1
+  exec "${FLUX_ELECTRON_EXE}" "$BUNDLE" "$@"
+fi
+exec node "$BUNDLE" "$@"

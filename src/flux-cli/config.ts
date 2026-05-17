@@ -1,11 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ActiveProjectKey } from '../types';
-import { FLUX_CLI_BRIDGE_CONFIG_REL } from '../fluxCliBridgeConfig';
 import {
-  FLUX_AUTOMATION_EXPECTED_ACTIVE_KEY_ENV,
-  FLUX_AUTOMATION_TOKEN_ENV,
-  FLUX_AUTOMATION_URL_ENV,
+  FLUXX_CLI_BRIDGE_CONFIG_REL,
+  LEGACY_FLUX_CLI_BRIDGE_CONFIG_REL,
+} from '../fluxCliBridgeConfig';
+import {
+  readFluxxAutomationExpectedActiveKeyFromEnv,
+  readFluxxAutomationTokenFromEnv,
+  readFluxxAutomationUrlFromEnv,
 } from '../main/fluxAutomationEnv';
 
 export interface FluxCliBridgeConfig {
@@ -42,9 +45,9 @@ function parseConfigFile(raw: string): FluxCliBridgeConfig | null {
 }
 
 function configFromEnv(): FluxCliBridgeConfig | null {
-  const url = process.env[FLUX_AUTOMATION_URL_ENV]?.trim();
-  const token = process.env[FLUX_AUTOMATION_TOKEN_ENV]?.trim();
-  const keyRaw = process.env[FLUX_AUTOMATION_EXPECTED_ACTIVE_KEY_ENV]?.trim();
+  const url = readFluxxAutomationUrlFromEnv();
+  const token = readFluxxAutomationTokenFromEnv();
+  const keyRaw = readFluxxAutomationExpectedActiveKeyFromEnv();
   if (!url || !token || !keyRaw) {
     return null;
   }
@@ -59,13 +62,19 @@ function configFromEnv(): FluxCliBridgeConfig | null {
   }
 }
 
+function configFromDiskAtPath(configPath: string): FluxCliBridgeConfig | null {
+  if (!fs.existsSync(configPath)) {
+    return null;
+  }
+  const raw = fs.readFileSync(configPath, 'utf8');
+  return parseConfigFile(raw);
+}
+
 function configFromDisk(startDir: string): FluxCliBridgeConfig | null {
   let dir = path.resolve(startDir);
   for (let i = 0; i < 32; i += 1) {
-    const candidate = path.join(dir, FLUX_CLI_BRIDGE_CONFIG_REL);
-    if (fs.existsSync(candidate)) {
-      const raw = fs.readFileSync(candidate, 'utf8');
-      const parsed = parseConfigFile(raw);
+    for (const rel of [FLUXX_CLI_BRIDGE_CONFIG_REL, LEGACY_FLUX_CLI_BRIDGE_CONFIG_REL]) {
+      const parsed = configFromDiskAtPath(path.join(dir, rel));
       if (parsed) return parsed;
     }
     const parent = path.dirname(dir);
@@ -75,7 +84,7 @@ function configFromDisk(startDir: string): FluxCliBridgeConfig | null {
   return null;
 }
 
-/** Resolve bridge settings from planning-session env or project `.flux/cli-bridge.json`. */
+/** Resolve bridge settings from planning-session env or project `.fluxx/cli-bridge.json`. */
 export function loadFluxCliBridgeConfig(cwd = process.cwd()): FluxCliBridgeConfig | null {
   return configFromEnv() ?? configFromDisk(cwd);
 }

@@ -21,7 +21,7 @@ export type AutomationBridgeOp =
   | 'repo.branchDiscovery'
   | 'members.list';
 
-/** One project member row for `members.list` / `flux members list` (cloud). */
+/** One project member row for `members.list` / `fluxx members list` (cloud). */
 export interface AutomationBridgeMember {
   uid: string;
   email: string;
@@ -105,7 +105,7 @@ export type AutomationBridgeResponse =
   | { id: string; ok: true; data: unknown }
   | { id: string; ok: false; code: AutomationBridgeErrorCode; message: string };
 
-/** One repository row for `flux project info` when multi-repo2 is enabled. */
+/** One repository row for `fluxx project info` when multi-repo2 is enabled. */
 export interface AutomationBridgeProjectInfoRepoSummary {
   id: string;
   /** Human-readable name (cloud: Firestore label; local: Flux repo name / folder). */

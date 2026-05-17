@@ -1,10 +1,10 @@
-# Flux repository — agent notes
+# Fluxx repository — agent notes
 
-## CLI `flux tasks list`
+## CLI `fluxx tasks list`
 
-`flux tasks list --json` supports optional repeated **`--exclude-status`**: board column ids (`backlog`, `in-progress`, `needs-input`, `done`). Tasks in those statuses are omitted from the result. Omit the flag to return the full board. Example: `flux tasks list --json --exclude-status done` for active work only. Filtering happens in the Flux desktop app after tasks are loaded, for both local and cloud projects.
+`fluxx tasks list --json` supports optional repeated **`--exclude-status`**: board column ids (`backlog`, `in-progress`, `needs-input`, `done`). Tasks in those statuses are omitted from the result. Omit the flag to return the full board. Example: `fluxx tasks list --json --exclude-status done` for active work only. Filtering happens in the Fluxx desktop app after tasks are loaded, for both local and cloud projects.
 
-Planning workspaces created by Flux also ship `planning/AGENTS.md` (and `planning/CLAUDE.md`) with the same command list; user planning markdown for the Docs UI and cloud sync lives under `planning/docs/**`. Keep assistant files aligned when editing guidance.
+Planning workspaces created by Fluxx also ship `planning/AGENTS.md` (and `planning/CLAUDE.md`) with the same command list; user planning markdown for the Docs UI and cloud sync lives under `planning/docs/**`. Keep assistant files aligned when editing guidance.
 
 ## Cloud planning-docs sync (maintainer model)
 
@@ -16,9 +16,9 @@ Planning workspaces created by Flux also ship `planning/AGENTS.md` (and `plannin
 
 **Main IPC (see `src/main.ts`):** `planningDocs:list`, `planningDocs:read`, `planningDocs:applyFirestoreSnapshot`, push helpers (`planningDocs:listPushCandidates`, `planningDocs:recordPushSuccess`, `planningDocs:persistConflict`, `planningDocs:resolveConflict`), migration handles, and `planningDocs:revealSyncFolder`. The main process broadcasts `planningDocs:changed` after snapshot apply, conflict resolution, and migration hydration (`PlanningDocsWatcher` debounces filesystem events on the same channel).
 
-**Disk sync metadata:** `planning/.flux-docs-sync/state.json` tracks per-path `remoteRevision`, `lastSyncedContentHash`, optional `pausedPushPaths` after a push conflict, and timestamps. A one-time `planning/.flux-planning-user-docs-root-migration-v1.json` records when legacy top-level markdown was moved under `planning/docs/`. Conflict JSON artifacts live under `planning/.flux-docs-sync/conflicts/`. First-run backups / seed flow use `_flux_unsynced/` and persisted migration state (`src/planningDocs/cloudPlanningDocsMigration.ts`, `src/main/planningDocsMigrationDisk.ts`).
+**Disk sync metadata:** `planning/.fluxx-docs-sync/state.json` tracks per-path `remoteRevision`, `lastSyncedContentHash`, optional `pausedPushPaths` after a push conflict, and timestamps (legacy `.flux-docs-sync/` is still read when present). A one-time `planning/.fluxx-planning-user-docs-root-migration-v1.json` records when legacy top-level markdown was moved under `planning/docs/`. Conflict JSON artifacts live under `planning/.fluxx-docs-sync/conflicts/`. First-run backups / seed flow use `_flux_unsynced/` and persisted migration state (`src/planningDocs/cloudPlanningDocsMigration.ts`, `src/main/planningDocsMigrationDisk.ts`).
 
-**Loop prevention / overwrite safety:** `applyFirestorePlanningDocsSnapshot` (`src/main/planningDocsFirestoreHydrate.ts`) only applies remote body when the file is missing, matches the last synced hash, or has no prior sync row—so a user’s unpushed local edits are not clobbered by a snapshot. Push candidates are discovered only under `planning/docs/**`; `.flux-docs-sync/`, `_flux_unsynced/`, and paths paused for conflict are excluded (`src/main/planningDocsFirestorePush.ts`).
+**Loop prevention / overwrite safety:** `applyFirestorePlanningDocsSnapshot` (`src/main/planningDocsFirestoreHydrate.ts`) only applies remote body when the file is missing, matches the last synced hash, or has no prior sync row—so a user’s unpushed local edits are not clobbered by a snapshot. Push candidates are discovered only under `planning/docs/**`; `.fluxx-docs-sync/` (and legacy `.flux-docs-sync/`), `_flux_unsynced/`, and paths paused for conflict are excluded (`src/main/planningDocsFirestorePush.ts`).
 
 **Revision / conflicts:** Remote revisions are derived from `updatedAt` (`src/planningDocs/firestoreRevision.ts`). Renderer pushes use `runTransaction` with a base revision (`src/renderer/planningDocs/firestorePlanningDocs.ts`). Mismatches surface as recoverable conflicts (local artifact + paused push + optional Firestore `conflicts` subcollection append).
 
@@ -32,4 +32,4 @@ Planning workspaces created by Flux also ship `planning/AGENTS.md` (and `plannin
 2. **Same-base conflict:** Two users edit the same file from the same revision; one push wins, the other gets a conflict with recovery (take remote / resume / mark merged).
 3. **First-run:** (a) Empty Firestore + existing local docs → seed / migration path. (b) Populated Firestore + stale local → hydrate / `_flux_unsynced` backups as designed. (c) New teammate, empty local `planning/` → receives cloud docs only.
 4. **Local projects unchanged:** No Firestore traffic; planning docs behave as plain disk.
-5. **Scope:** Only user planning markdown under `planning/docs/**` participates in sync (legacy files directly under `planning/` are read/list compatible but not push roots); other files under `.flux/<project>/` are not uploaded as planning docs (push listing skips sync internals; non-`.md` is ignored by list providers).
+5. **Scope:** Only user planning markdown under `planning/docs/**` participates in sync (legacy files directly under `planning/` are read/list compatible but not push roots); other files under `.fluxx/<project>/` are not uploaded as planning docs (push listing skips sync internals; non-`.md` is ignored by list providers).

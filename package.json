@@ -1,6 +1,6 @@
 {
-  "name": "flux",
-  "productName": "Flux",
+  "name": "fluxx",
+  "productName": "Fluxx",
   "version": "0.1.1",
   "description": "Task-driven AI agent orchestration for developers",
   "main": ".vite/build/main.js",
@@ -19,7 +19,7 @@
   "keywords": [],
   "repository": {
     "type": "git",
-    "url": "https://github.com/sahilmahendrakar/flux-web.git"
+    "url": "https://github.com/sahilmahendrakar/fluxx-web.git"
   },
   "author": {
     "name": "Sahil Mahendrakar",

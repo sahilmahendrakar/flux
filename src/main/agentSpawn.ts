@@ -119,7 +119,7 @@ export function agentSpawnResumeSpec(
  * Planning PTY uses project-level agent (and optional model for Claude / Cursor).
  * Task sessions use {@link agentSpawnSpec} with the task row.
  *
- * All planning agents read `planning/CLAUDE.md` and `planning/AGENTS.md` for Flux CLI usage.
+ * All planning agents read `planning/CLAUDE.md` and `planning/AGENTS.md` for Fluxx CLI usage.
  *
  * @param agentModel — For `claude-code`, non-empty → `--model`; for `cursor`, passed to
  *   `--model` (default `auto` when blank). Ignored for `codex`.

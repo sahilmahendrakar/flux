@@ -1,4 +1,4 @@
-const TASK_CREATE_FLAGS = `Usage: flux tasks create [--json] --title <text> [options]
+const TASK_CREATE_FLAGS = `Usage: fluxx tasks create [--json] --title <text> [options]
 
 Required:
   --title <text>                 Task title
@@ -12,12 +12,12 @@ Optional:
   --source-branch <git-branch>   Feature / base branch (alias: --feature-branch, --branch)
   --create-source-branch-if-missing=true|false
   --repo-id <id>                 Multi-repo projects only (alias: --repo)
-  --assignee-email <email>       Cloud projects; resolve uid via flux members list
+  --assignee-email <email>       Cloud projects; resolve uid via fluxx members list
   --agent-model <model>
   --agent-yolo=true|false
   --json                         JSON on stdout`;
 
-const TASK_UPDATE_FLAGS = `Usage: flux tasks update [--json] --id <taskId> [options]
+const TASK_UPDATE_FLAGS = `Usage: fluxx tasks update [--json] --id <taskId> [options]
 
 Required:
   --id <taskId>
@@ -39,34 +39,34 @@ Optional:
   --auto-start-on-unblock=true|false
   --json`;
 
-const TASK_LIST_FLAGS = `Usage: flux tasks list [--json] [options]
+const TASK_LIST_FLAGS = `Usage: fluxx tasks list [--json] [options]
 
 Optional:
   --exclude-status <column>      Repeat: backlog, in-progress, needs-input, done
   --json`;
 
-const TASK_START_FLAGS = `Usage: flux tasks start [--json] --id <taskId>
+const TASK_START_FLAGS = `Usage: fluxx tasks start [--json] --id <taskId>
 
   --json`;
 
-const TASK_DELETE_FLAGS = `Usage: flux tasks delete [--json] --id <taskId> --confirm
+const TASK_DELETE_FLAGS = `Usage: fluxx tasks delete [--json] --id <taskId> --confirm
 
   --confirm                      Required; only after explicit user intent to delete
   --json`;
 
-const TOP_LEVEL = `Flux CLI — board automation for planning sessions
+const TOP_LEVEL = `Fluxx CLI — board automation for planning sessions
 
 Usage:
-  flux project info [--json]
-  flux tasks list|create|update|start|delete [--json] ...
-  flux members list [--json]
-  flux repo branches [--json] [--repo-id <id>] [--classify-branch <name>]
+  fluxx project info [--json]
+  fluxx tasks list|create|update|start|delete [--json] ...
+  fluxx members list [--json]
+  fluxx repo branches [--json] [--repo-id <id>] [--classify-branch <name>]
 
 Global:
   --json                         Print structured JSON on stdout
   -h, --help                     Show command help
 
-Run \`flux <command> --help\` for subcommand flags (e.g. flux tasks create --help).`;
+Run \`fluxx <command> --help\` for subcommand flags (e.g. fluxx tasks create --help).`;
 
 function helpForTasksAction(action: string | undefined): string | null {
   switch (action) {
@@ -81,7 +81,7 @@ function helpForTasksAction(action: string | undefined): string | null {
     case 'delete':
       return TASK_DELETE_FLAGS;
     case undefined:
-      return `Usage: flux tasks <list|create|update|start|delete> [options]
+      return `Usage: fluxx tasks <list|create|update|start|delete> [options]
 
 Subcommands:
   list     List tasks on the board
@@ -90,7 +90,7 @@ Subcommands:
   start    Move task to in-progress and start agent session
   delete   Permanently delete (--confirm required)
 
-Run \`flux tasks <subcommand> --help\` for flags.`;
+Run \`fluxx tasks <subcommand> --help\` for flags.`;
     default:
       return null;
   }
@@ -112,12 +112,12 @@ export function printFluxCliHelp(argv: string[]): boolean {
   if (!domain) {
     text = TOP_LEVEL;
   } else if (domain === 'project') {
-    text = 'Usage: flux project info [--json]\n\n  --json';
+    text = 'Usage: fluxx project info [--json]\n\n  --json';
   } else if (domain === 'members') {
-    text = 'Usage: flux members list [--json]\n\n  --json';
+    text = 'Usage: fluxx members list [--json]\n\n  --json';
   } else if (domain === 'repo') {
     text =
-      'Usage: flux repo branches [--json] [--repo-id <id>] [--classify-branch <name>]\n\n  --json';
+      'Usage: fluxx repo branches [--json] [--repo-id <id>] [--classify-branch <name>]\n\n  --json';
   } else if (domain === 'tasks') {
     const sub = helpForTasksAction(action);
     text = sub ?? `Unknown tasks subcommand. ${helpForTasksAction(undefined) ?? ''}`;

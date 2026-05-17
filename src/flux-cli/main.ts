@@ -39,7 +39,7 @@ export async function runFluxCli(argv: string[]): Promise<number> {
   const config = loadFluxCliBridgeConfig();
   if (!config) {
     printError(
-      'Flux CLI is not configured. Start a planning session in Flux, or set FLUX_AUTOMATION_URL.',
+      'Fluxx CLI is not configured. Start a planning session in Fluxx, or set FLUXX_AUTOMATION_URL.',
     );
     return EXIT_ERROR;
   }

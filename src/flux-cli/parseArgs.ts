@@ -308,6 +308,6 @@ export function parseFluxCliArgs(argv: string[]): FluxCliParseResult {
   return {
     ok: false,
     message:
-      'Unknown command. Try: flux project info, flux tasks list|create|update|start|delete, flux members list, flux repo branches',
+      'Unknown command. Try: fluxx project info, fluxx tasks list|create|update|start|delete, fluxx members list, fluxx repo branches',
   };
 }

@@ -235,7 +235,7 @@ interface Props {
   cloudUnblockAutostartClientUid?: string;
   /** When false, the GitHub PR control is hidden (no local/session worktree). */
   hasWorktree?: boolean;
-  /** Persist agent / model / YOLO for this task (same fields as task detail & `flux tasks update`). */
+  /** Persist agent / model / YOLO for this task (same fields as task detail & `fluxx tasks update`). */
   onTaskAgentSpawnPrefsChange: (taskId: string, patch: TaskAgentSpawnPatch) => void;
   /** True when a daemon session exists for this task (main-window session tab can be opened). */
   canOpenTaskWorkspaceTab: boolean;
@@ -290,7 +290,7 @@ export default function TaskCard({
   const branchChipLabel = effectiveTaskSourceBranchShort(task, branchCompareShort);
   const branchChipTitle =
     task.createSourceBranchIfMissing === true
-      ? `${branchChipLabel} — Flux will create this branch when the task starts`
+      ? `${branchChipLabel} — Fluxx will create this branch when the task starts`
       : `Source branch: ${branchChipLabel}`;
   const unblockToggleLockedByOtherAssignee = Boolean(
     cloudUnblockAutostartClientUid &&

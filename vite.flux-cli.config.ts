@@ -5,31 +5,36 @@ import { defineConfig, type Plugin } from 'vite';
 
 const repoRoot = path.dirname(fileURLToPath(import.meta.url));
 
-function copyFluxShim(): Plugin {
+function copyFluxxCliShims(): Plugin {
   return {
-    name: 'copy-flux-shim',
+    name: 'copy-fluxx-cli-shims',
     writeBundle(outputOptions) {
       const outDir = outputOptions.dir ?? path.join(repoRoot, '.vite/build');
-      const shimSrc = path.join(repoRoot, 'scripts', 'flux-shim');
-      const shimDst = path.join(outDir, 'flux');
-      if (!existsSync(shimSrc)) return;
-      copyFileSync(shimSrc, shimDst);
-      try {
-        chmodSync(shimDst, 0o755);
-      } catch {
-        // ignore chmod failures on Windows
+      for (const [srcName, dstName] of [
+        ['fluxx-shim', 'fluxx'],
+        ['flux-shim', 'flux'],
+      ] as const) {
+        const shimSrc = path.join(repoRoot, 'scripts', srcName);
+        const shimDst = path.join(outDir, dstName);
+        if (!existsSync(shimSrc)) return;
+        copyFileSync(shimSrc, shimDst);
+        try {
+          chmodSync(shimDst, 0o755);
+        } catch {
+          // ignore chmod failures on Windows
+        }
       }
     },
   };
 }
 
 export default defineConfig({
-  plugins: [copyFluxShim()],
+  plugins: [copyFluxxCliShims()],
   build: {
     lib: {
       entry: path.join(repoRoot, 'src/flux-cli/main.ts'),
       formats: ['cjs'],
-      fileName: () => 'flux-cli.js',
+      fileName: () => 'fluxx-cli.js',
     },
     outDir: path.join(repoRoot, '.vite/build'),
     emptyOutDir: false,

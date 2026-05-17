@@ -29,7 +29,7 @@ export async function invokeFluxAutomation(
     });
   } catch {
     throw new FluxCliConnectionError(
-      'Could not reach Flux. Is the Flux app running with this project open?',
+      'Could not reach Fluxx. Is the Fluxx app running with this project open?',
     );
   }
 
@@ -37,7 +37,7 @@ export async function invokeFluxAutomation(
   try {
     body = (await res.json()) as FluxAutomationInvokeResponse;
   } catch {
-    throw new FluxCliConnectionError('Flux returned a non-JSON response');
+    throw new FluxCliConnectionError('Fluxx returned a non-JSON response');
   }
 
   if (res.status === 401) {
@@ -50,7 +50,7 @@ export async function invokeFluxAutomation(
     return body;
   }
   if (!body || typeof body !== 'object' || !('ok' in body)) {
-    return { ok: false, error: `Unexpected Flux response (HTTP ${res.status})` };
+    return { ok: false, error: `Unexpected Fluxx response (HTTP ${res.status})` };
   }
   return body;
 }
