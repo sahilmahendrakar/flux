@@ -22,17 +22,10 @@ import {
 import Column from './Column';
 import NewTaskModal from './NewTaskModal';
 import { BoardFilterBar } from './BoardFilterBar';
-import { BoardViewToggle } from './BoardViewToggle';
-import {
-  readTaskBoardViewModeForProject,
-  writeTaskBoardViewModeForProject,
-  type TaskBoardViewMode,
-} from '../boardViewPrefs';
 import type { TaskAgentSpawnPatch } from './TaskCardAgentSpawnMenu';
 import type { TaskPatch } from '../renderer/tasks/TaskProvider';
 
 interface Props {
-  projectId: string;
   allTasks: Task[];
   onDragEnd: (result: DropResult) => void;
   onCreateTask: (
@@ -83,7 +76,6 @@ interface Props {
 }
 
 export default function Board({
-  projectId,
   allTasks,
   onDragEnd,
   onCreateTask,
@@ -112,19 +104,8 @@ export default function Board({
   onOpenTaskWorkspaceTab,
 }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<TaskBoardViewMode>(() =>
-    readTaskBoardViewModeForProject(projectId),
-  );
   const [boardFilter, setBoardFilter] = useState<BoardFilterState>(
     () => ({ ...DEFAULT_BOARD_FILTER }),
-  );
-
-  const onViewModeChange = useCallback(
-    (mode: TaskBoardViewMode) => {
-      setViewMode(mode);
-      writeTaskBoardViewModeForProject(projectId, mode);
-    },
-    [projectId],
   );
 
   const membersMap = useMemo(() => {
@@ -196,10 +177,7 @@ export default function Board({
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div
-        className="flex h-full min-h-0 w-full flex-col"
-        data-task-board-view={viewMode}
-      >
+      <div className="flex h-full min-h-0 w-full flex-col">
         <div className="flex shrink-0 flex-col gap-2 border-b border-gray-800 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4">
           <BoardFilterBar
             filter={boardFilter}
@@ -211,7 +189,6 @@ export default function Board({
             projectRepos={projectRepos}
           />
           <div className="flex shrink-0 items-center justify-end gap-2 self-end sm:self-center">
-            <BoardViewToggle value={viewMode} onChange={onViewModeChange} />
             <button
               type="button"
               onClick={onTogglePlanPanel}
