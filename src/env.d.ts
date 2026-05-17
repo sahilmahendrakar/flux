@@ -211,6 +211,9 @@ declare global {
       projects: {
         listLocal: () => Promise<LocalProject[]>;
         addLocal: () => Promise<LocalProject | { error: 'NOT_GIT_REPO' } | null>;
+        create: (
+          input: import('./projectCreate').ProjectCreateInput,
+        ) => Promise<import('./projectCreate').ProjectCreateResult>;
         activateLocal: (id: string | null) => Promise<LocalProject | null>;
         removeLocal: (id: string) => Promise<void>;
         removeFluxxOwnedLocalState: (key: ActiveProjectKey) => Promise<{
