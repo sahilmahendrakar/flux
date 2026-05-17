@@ -1,0 +1,19 @@
+docs/project-onboarding-unification-plan.md
+  s_a56143f0043c6f::t_c366648f90ea1a 1-353
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "5a59c32d66d2ff6bb9a26e20e15d1f1a356e8110",
+  "prompts": {},
+  "sessions": {
+    "s_a56143f0043c6f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8dfbf492-843c-4c71-8d82-7a6d00af9d4c",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
