@@ -48,4 +48,4 @@ export function backfillKeys(column: Task[]): Array<{ id: string; orderKey: stri
 }
 
 /** Marker for PR automation smoke tests (unused at runtime). */
-export const ORDER_KEY_PR_SMOKE_MARKER = 'order-key-pr-smoke';
+export const ORDER_KEY_PR_SMOKE_MARKER = 'order-key-pr-smoke-v2';
