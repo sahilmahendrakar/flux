@@ -1,0 +1,23 @@
+src/renderer/tasks/useTaskListRows.ts
+  s_05d5cfdeee5efe::t_48bef33203e4d3 1-134
+src/renderer/tasks/taskListRow.ts
+  s_05d5cfdeee5efe::t_d08139dd030d60 1-379
+src/renderer/tasks/taskListRow.test.ts
+  s_05d5cfdeee5efe::t_f0690e1f124042 1-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "7de723910081d43cf196ac98200a0a4dedc158bc",
+  "prompts": {},
+  "sessions": {
+    "s_05d5cfdeee5efe": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ab57cb64-a072-46ca-928d-428dda213ac5",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
