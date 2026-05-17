@@ -1,10 +1,10 @@
 # Fluxx repository — agent notes
 
-## MCP `fluxx__list_tasks`
+## CLI `fluxx tasks list`
 
-`fluxx__list_tasks` supports optional **`excludeStatuses`**: an array of board column ids (`backlog`, `in-progress`, `needs-input`, `done`). Tasks in those statuses are omitted from the tool result. Omit the field (or pass an empty array) to return the full board—the previous default. Example: `{ "excludeStatuses": ["done"] }` for active work only. Filtering happens in the Fluxx desktop app after tasks are loaded, for both local and cloud projects.
+`fluxx tasks list --json` supports optional repeated **`--exclude-status`**: board column ids (`backlog`, `in-progress`, `needs-input`, `done`). Tasks in those statuses are omitted from the result. Omit the flag to return the full board. Example: `fluxx tasks list --json --exclude-status done` for active work only. Filtering happens in the Fluxx desktop app after tasks are loaded, for both local and cloud projects.
 
-Planning workspaces created by Fluxx also ship `planning/AGENTS.md` (and `planning/CLAUDE.md`) with the same tool list; user planning markdown for the Docs UI and cloud sync lives under `planning/docs/**`. Keep assistant files aligned when editing guidance.
+Planning workspaces created by Fluxx also ship `planning/AGENTS.md` (and `planning/CLAUDE.md`) with the same command list; user planning markdown for the Docs UI and cloud sync lives under `planning/docs/**`. Keep assistant files aligned when editing guidance.
 
 ## Cloud planning-docs sync (maintainer model)
 
@@ -32,4 +32,4 @@ Planning workspaces created by Fluxx also ship `planning/AGENTS.md` (and `planni
 2. **Same-base conflict:** Two users edit the same file from the same revision; one push wins, the other gets a conflict with recovery (take remote / resume / mark merged).
 3. **First-run:** (a) Empty Firestore + existing local docs → seed / migration path. (b) Populated Firestore + stale local → hydrate / `_flux_unsynced` backups as designed. (c) New teammate, empty local `planning/` → receives cloud docs only.
 4. **Local projects unchanged:** No Firestore traffic; planning docs behave as plain disk.
-5. **Scope:** Only user planning markdown under `planning/docs/**` participates in sync (legacy files directly under `planning/` are read/list compatible but not push roots); other files under `.flux/<project>/` are not uploaded as planning docs (push listing skips sync internals; non-`.md` is ignored by list providers).
+5. **Scope:** Only user planning markdown under `planning/docs/**` participates in sync (legacy files directly under `planning/` are read/list compatible but not push roots); other files under `.fluxx/<project>/` are not uploaded as planning docs (push listing skips sync internals; non-`.md` is ignored by list providers).

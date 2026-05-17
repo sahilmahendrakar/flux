@@ -14,6 +14,7 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -128,6 +129,41 @@ function packagerIgnore(file: string): boolean {
   return true;
 }
 
+/** Stage `fluxx-cli.js` + `fluxx` shim (and legacy `flux` alias) for planning PTYs in packaged builds. */
+async function stageFluxCliResources(buildPath: string): Promise<void> {
+  const resourcesDir = path.resolve(buildPath, '..');
+  const cliDir = path.join(resourcesDir, 'fluxx-cli');
+  await fsp.mkdir(cliDir, { recursive: true });
+
+  const cliSrc = path.join(__dirname, '.vite', 'build', 'fluxx-cli.js');
+  const legacyCliSrc = path.join(__dirname, '.vite', 'build', 'flux-cli.js');
+  const bundleSrc = fs.existsSync(cliSrc) ? cliSrc : legacyCliSrc;
+  if (!fs.existsSync(bundleSrc)) {
+    throw new Error(
+      `[forge.config] expected fluxx-cli bundle at ${cliSrc}; Vite must build it before packageAfterCopy runs`,
+    );
+  }
+  await fsp.cp(bundleSrc, path.join(cliDir, 'fluxx-cli.js'));
+  await fsp.cp(bundleSrc, path.join(cliDir, 'flux-cli.js'));
+  const cliMapSrc = `${bundleSrc}.map`;
+  if (fs.existsSync(cliMapSrc)) {
+    await fsp.cp(cliMapSrc, path.join(cliDir, 'fluxx-cli.js.map'));
+    await fsp.cp(cliMapSrc, path.join(cliDir, 'flux-cli.js.map'));
+  }
+
+  for (const [shimName, dstName] of [
+    ['fluxx-shim', 'fluxx'],
+    ['flux-shim', 'flux'],
+  ] as const) {
+    const shimSrc = path.resolve(__dirname, 'scripts', shimName);
+    if (!fs.existsSync(shimSrc)) {
+      throw new Error(`[forge.config] expected ${dstName} shim at ${shimSrc}`);
+    }
+    const shimDst = path.join(cliDir, dstName);
+    await fsp.cp(shimSrc, shimDst);
+    await fsp.chmod(shimDst, 0o755);
+  }
+}
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
@@ -153,6 +189,15 @@ const config: ForgeConfig = {
   } as ForgePackagerOptions,
   rebuildConfig: {},
   hooks: {
+    packageAfterCopy: async (
+      _forgeConfig,
+      buildPath,
+      _electronVersion,
+      _platform,
+      _arch,
+    ) => {
+      await stageFluxCliResources(buildPath);
+    },
     postMake: async (_forgeConfig, makeResults) =>
       postMakeWriteLatestMacYml(makeResults),
   },
@@ -184,6 +229,11 @@ const config: ForgeConfig = {
           // `entry` is just an alias for `build.lib.entry` in the corresponding file of `config`.
           entry: 'src/main.ts',
           config: 'vite.main.config.ts',
+          target: 'main',
+        },
+        {
+          entry: 'src/flux-cli/main.ts',
+          config: 'vite.flux-cli.config.ts',
           target: 'main',
         },
         {

@@ -104,7 +104,7 @@ export function ProjectsListView({
   const handleRemoveLocalFlux = async (id: string, name: string) => {
     if (
       !window.confirm(
-        `Remove "${name}" from Fluxx?\n\nThis deletes Fluxx-owned data under ~/.fluxx for this project (tasks, planning docs, MCP config, and Fluxx-managed git worktrees), stops any running task or planning sessions for it, and clears saved tabs. Your original repository clone is not deleted.`,
+        `Remove "${name}" from Fluxx?\n\nThis deletes Fluxx-owned data under ~/.fluxx for this project (tasks, planning docs, CLI bridge config, and Fluxx-managed git worktrees), stops any running task or planning sessions for it, and clears saved tabs. Your original repository clone is not deleted.`,
       )
     ) {
       return;
