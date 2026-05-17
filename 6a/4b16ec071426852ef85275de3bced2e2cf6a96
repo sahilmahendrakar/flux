@@ -1,0 +1,98 @@
+src/main.ts
+  s_8eaf36396e03c6::t_bd3bbbd74825ef 2430
+  s_8eaf36396e03c6::t_05934f9e3b7335 4206-4207
+  s_8eaf36396e03c6::t_c03be12feabd06 4210
+  s_8eaf36396e03c6::t_634811d7f904ae 2081,2161,3414,3453
+  s_8eaf36396e03c6::t_8709df63980d29 750
+  s_8eaf36396e03c6::t_207f8c04c1d2fa 445
+  s_8eaf36396e03c6::t_cb77bd5e2d27a7 2686
+src/renderer/mcp/useMcpRendererBridge.ts
+  s_8eaf36396e03c6::t_5a675c53671fa4 106
+CLAUDE.md
+  s_8eaf36396e03c6::t_8c67a61bffc012 5,7
+  s_8eaf36396e03c6::t_1512940ec9efb5 1
+AGENT.md
+  s_8eaf36396e03c6::t_e7c0cb290a40ea 1
+  s_8eaf36396e03c6::t_a253d077c1677c 5,7
+src/components/Sidebar.tsx
+  s_8eaf36396e03c6::t_0cd99b9b7828a1 281
+src/main/AuthServer.ts
+  s_8eaf36396e03c6::t_47746a72ff413a 213
+  s_8eaf36396e03c6::t_4ba311ee6c5cab 208
+src/main/McpServer.ts
+  s_8eaf36396e03c6::t_81985902b5f022 311,346,759,828
+  s_8eaf36396e03c6::t_b1857320129c3f 226
+  s_8eaf36396e03c6::t_83321509cfd53d 896
+  s_8eaf36396e03c6::t_ca8615191b3b80 228
+  s_8eaf36396e03c6::t_be6e6d4ca01b85 381
+  s_8eaf36396e03c6::t_d7ff932d8f3eaa 224
+  s_8eaf36396e03c6::t_5b5a9395da7551 206
+  s_8eaf36396e03c6::t_f14fe890140ee1 538
+.env.example
+  s_8eaf36396e03c6::t_da1ba3bbc4c8ee 27,29
+src/App.tsx
+  s_8eaf36396e03c6::t_9e78d36a686d6d 132
+  s_8eaf36396e03c6::t_72c19ec7272849 3446
+  s_8eaf36396e03c6::t_f2dae10a05ca72 134
+README.md
+  s_8eaf36396e03c6::t_84250bc97f10b8 1,7,9,11,21,45,56,64,66,80,84,86
+src/components/ProjectSettingsView.tsx
+  s_8eaf36396e03c6::t_55a5be1f00a497 1390
+  s_8eaf36396e03c6::t_65aa90341aae88 1388
+  s_8eaf36396e03c6::t_c9c7c51d1d38e2 1137
+  s_8eaf36396e03c6::t_6918689ae14640 1510
+  s_8eaf36396e03c6::t_63de742c54cae2 1081
+  s_8eaf36396e03c6::t_b79d0443c9c82c 1076
+  s_8eaf36396e03c6::t_7abffa30abfc29 1484
+  s_8eaf36396e03c6::t_85688d7001b6b1 2255
+  s_8eaf36396e03c6::t_170fc93a75d299 1139
+  s_8eaf36396e03c6::t_ba6ea90f0779e2 2261
+src/hooks/useTrustAutorespondNotice.ts
+  s_8eaf36396e03c6::t_5c992f1103f952 26
+index.html
+  s_8eaf36396e03c6::t_121ee52ad892df 5
+package.json
+  s_8eaf36396e03c6::t_8bdba6746730ab 2-3
+src/components/TaskCard.tsx
+  s_8eaf36396e03c6::t_f719550262e0a1 293
+src/components/InviteTeammateModal.tsx
+  s_8eaf36396e03c6::t_f2656e52616bc4 60
+src/components/ProjectsListView.tsx
+  s_8eaf36396e03c6::t_3c0cdcdb7afca4 327
+  s_8eaf36396e03c6::t_f449756c4cbcf1 491
+  s_8eaf36396e03c6::t_1ae0112c6f77cd 610-612
+  s_8eaf36396e03c6::t_0339b745349506 140
+  s_8eaf36396e03c6::t_a22457931e54da 240
+  s_8eaf36396e03c6::t_214305d96c9512 588
+  s_8eaf36396e03c6::t_95b459215cb895 107
+  s_8eaf36396e03c6::t_6c005fdec79124 50
+  s_8eaf36396e03c6::t_b5719a79c5794f 130
+src/components/LoadingScreen.tsx
+  s_8eaf36396e03c6::t_3b44bf297bb0ab 12
+src/main/EmailService.ts
+  s_8eaf36396e03c6::t_5a5cdb7da81603 13
+  s_8eaf36396e03c6::t_2e5e8b2bb279c7 101
+  s_8eaf36396e03c6::t_f330b39f5cc76d 104
+  s_8eaf36396e03c6::t_f5437a44c78a71 42
+  s_8eaf36396e03c6::t_d36c691a0b5942 121,123
+  s_8eaf36396e03c6::t_d1a97a714ed7cd 96
+src/components/TaskSourceBranchPicker.tsx
+  s_8eaf36396e03c6::t_58b2c8965dfe43 55
+  s_8eaf36396e03c6::t_a360fa08703320 151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "6a4b16ec071426852ef85275de3bced2e2cf6a96",
+  "prompts": {},
+  "sessions": {
+    "s_8eaf36396e03c6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b67c3990-e5f6-4d36-a6c0-0b6932148d42",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
