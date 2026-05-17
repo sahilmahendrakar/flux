@@ -144,6 +144,25 @@ describe('validateGithubPrMatchesTaskRemote (multi-repo2 PR isolation)', () => {
         'This pull request is on GitHub at org/repo-b, but this task\'s clone uses origin org/repo-a.',
     });
   });
+
+  it('accepts PR on canonical repo when origin remote predates a GitHub rename', () => {
+    expect(
+      validateGithubPrMatchesTaskRemote(
+        'https://github.com/org/fluxx/pull/9',
+        'git@github.com:org/flux.git',
+        { canonicalRepo: { owner: 'org', repo: 'fluxx' } },
+      ),
+    ).toBeNull();
+  });
+
+  it('still rejects PR from a truly different repo when canonical is provided', () => {
+    const err = validateGithubPrMatchesTaskRemote(
+      'https://github.com/org/other/pull/1',
+      'git@github.com:org/flux.git',
+      { canonicalRepo: { owner: 'org', repo: 'fluxx' } },
+    );
+    expect(err?.code).toBe('PR_REPO_MISMATCH');
+  });
 });
 
 describe('prMetadataRefMismatchWarning', () => {

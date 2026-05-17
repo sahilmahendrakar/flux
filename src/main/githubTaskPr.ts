@@ -4,6 +4,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import type { RepoConfig, Task, TaskGithubPr, TaskPrErrorCode } from '../types';
 import {
+  type GithubOwnerRepo,
   parseGithubOwnerRepoFromPrUrl,
   parseGithubOwnerRepoFromRemote,
   parseGhPrViewJsonStdout,
@@ -535,16 +536,59 @@ export async function resolveGithubPrGitOperationPaths(params: {
   return { ok: true, ghCwd, gitRootPath, repo: repoCfg };
 }
 
+function githubOwnerRepoSlugMatches(
+  prSlug: GithubOwnerRepo,
+  cloneSlug: GithubOwnerRepo | null,
+): boolean {
+  return Boolean(
+    cloneSlug && prSlug.owner === cloneSlug.owner && prSlug.repo === cloneSlug.repo,
+  );
+}
+
+/**
+ * Resolves the repository `gh` associates with `cwd` (canonical name on GitHub).
+ * Used when `origin` still points at a pre-rename slug but PRs live on the new name.
+ */
+export async function readGhCanonicalOwnerRepo(ghCwd: string): Promise<GithubOwnerRepo | null> {
+  const r = await gh(['repo', 'view', '--json', 'nameWithOwner'], ghCwd);
+  if (!r.ok) return null;
+  try {
+    const parsed = JSON.parse(r.stdout) as { nameWithOwner?: string };
+    const slug = typeof parsed.nameWithOwner === 'string' ? parsed.nameWithOwner.trim() : '';
+    if (!slug) return null;
+    return parseGithubOwnerRepoFromRemote(`https://github.com/${slug}.git`);
+  } catch {
+    return null;
+  }
+}
+
 /** When both URLs parse as github.com owner/repo slugs, rejects PRs that are not from this clone's origin. */
-export function validateGithubPrMatchesTaskRemote(prUrl: string, originRemoteUrl: string): TaskPrError | null {
+export function validateGithubPrMatchesTaskRemote(
+  prUrl: string,
+  originRemoteUrl: string,
+  options?: { canonicalRepo?: GithubOwnerRepo | null },
+): TaskPrError | null {
   const prSlug = parseGithubOwnerRepoFromPrUrl(prUrl);
   const originSlug = parseGithubOwnerRepoFromRemote(originRemoteUrl);
-  if (!prSlug || !originSlug) return null;
-  if (prSlug.owner === originSlug.owner && prSlug.repo === originSlug.repo) return null;
+  const canonicalSlug = options?.canonicalRepo ?? null;
+  if (!prSlug) return null;
+  if (githubOwnerRepoSlugMatches(prSlug, originSlug) || githubOwnerRepoSlugMatches(prSlug, canonicalSlug)) {
+    return null;
+  }
+  if (!originSlug && !canonicalSlug) return null;
+
+  const cloneLabel = canonicalSlug
+    ? originSlug && canonicalSlug.repo !== originSlug.repo
+      ? `origin ${originSlug.owner}/${originSlug.repo} (GitHub: ${canonicalSlug.owner}/${canonicalSlug.repo})`
+      : `${canonicalSlug.owner}/${canonicalSlug.repo}`
+    : originSlug
+      ? `origin ${originSlug.owner}/${originSlug.repo}`
+      : 'this clone';
+
   return {
     ok: false,
     code: 'PR_REPO_MISMATCH',
-    message: `This pull request is on GitHub at ${prSlug.owner}/${prSlug.repo}, but this task's clone uses origin ${originSlug.owner}/${originSlug.repo}.`,
+    message: `This pull request is on GitHub at ${prSlug.owner}/${prSlug.repo}, but this task's clone uses ${cloneLabel}.`,
   };
 }
 

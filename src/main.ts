@@ -75,6 +75,7 @@ import {
   discoverGithubPrForTaskWorktree,
   ghPrViewJson,
   prMetadataRefMismatchWarning,
+  readGhCanonicalOwnerRepo,
   readOriginRemote,
   resolveGithubPrGitOperationPaths,
   validateGithubPrMatchesTaskRemote,
@@ -2547,7 +2548,10 @@ app.whenReady().then(async () => {
 
       const origin = await readOriginRemote(gitRootPath);
       if (!origin.ok) return origin;
-      const mismatch = validateGithubPrMatchesTaskRemote(viewed.githubPr.url, origin.url);
+      const canonicalRepo = await readGhCanonicalOwnerRepo(ghCwd);
+      const mismatch = validateGithubPrMatchesTaskRemote(viewed.githubPr.url, origin.url, {
+        canonicalRepo,
+      });
       if (mismatch) return mismatch;
 
       const metadataMismatchWarning = row?.githubPr
