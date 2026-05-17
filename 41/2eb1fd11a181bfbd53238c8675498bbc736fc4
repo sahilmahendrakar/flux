@@ -1,0 +1,21 @@
+src/flux-cli/client.ts
+  s_098ccaabdc7fb9::t_66e8b34952b3a1 32
+  s_098ccaabdc7fb9::t_c1c8dd3e6efed6 40
+  s_098ccaabdc7fb9::t_52b1961ce5ce38 53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "412eb1fd11a181bfbd53238c8675498bbc736fc4",
+  "prompts": {},
+  "sessions": {
+    "s_098ccaabdc7fb9": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8a0b381d-8ced-4aef-86a2-abcaa69f6f88",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
