@@ -1,3 +1,8 @@
+/** Bump when generated `planning/CLAUDE.md` / `AGENTS.md` should be refreshed on disk. */
+export const PLANNING_ASSISTANT_MARKDOWN_VERSION = 2;
+
+export const PLANNING_ASSISTANT_MARKDOWN_VERSION_MARKER = `<!-- flux-assistant-version:${PLANNING_ASSISTANT_MARKDOWN_VERSION} -->`;
+
 /** Shared body for `planning/CLAUDE.md` and `planning/AGENTS.md`. */
 export function planningAssistantMarkdown(
   projectName: string,
@@ -34,13 +39,15 @@ When user intent spans more than one repository and is ambiguous, **ask once** w
     ? `- \`flux repo branches --json\` — local + origin branch lists, default branch, optional \`--classify-branch <name>\`; add \`--repo-id\` to scope a non-primary repository`
     : `- \`flux repo branches --json\` — local + origin branch lists, default branch, optional \`--classify-branch <name>\` before batch-creating tasks`;
 
-  return `# Planning workspace — ${projectName}
+  return `${PLANNING_ASSISTANT_MARKDOWN_VERSION_MARKER}
+
+# Planning workspace — ${projectName}
 
 ${workspaceIntro}
 
 ## Flux CLI
 
-Planning sessions inject bridge env and prepend the packaged \`flux\` shim to \`PATH\` when Flux starts a session. Use the command as \`flux ...\`; do **not** create a \`FLUX_BIN\` variable, paste the absolute shim path, or run \`which flux\` except when troubleshooting a missing command. **Always pass \`--json\`** on board commands so you can parse stdout. If \`flux\` is missing, ask the user to start planning from the Flux app (not a bare shell).
+Planning sessions inject bridge env and prepend the packaged \`flux\` shim to \`PATH\` when Flux starts a session. Use the command as \`flux ...\`; do **not** create a \`FLUX_BIN\` variable, paste the absolute shim path, or run \`which flux\` except when troubleshooting a missing command. **Always pass \`--json\`** on board commands so you can parse stdout. Run \`flux tasks create --help\` or \`flux tasks update --help\` for the full flag list. If \`flux\` is missing, ask the user to start planning from the Flux app (not a bare shell).
 
 ## Your role
 
@@ -67,9 +74,19 @@ ${listBranchesLine}
 
 Board relationship: new tasks land in **Backlog**. \`flux tasks start\` is the usual way to mark work actively in flight. Use \`flux tasks update\` for other status changes (e.g. **Needs input**, **Review**, **Done**) or edits to title/description/agent.
 
-**Task branches:** When the user names a base branch (e.g. “do this on \`feature/auth\`”), pass \`--source-branch feature/auth\` on **each** subtask you create. Use \`--create-source-branch-if-missing=true\` only when they want a new branch created on first start. If they did not specify a branch, omit \`--source-branch\` so Flux uses the project default.
+## Multi-task features (required)
 
-**Task labels and dependencies:** Use repeated flags instead of JSON blobs: \`--label mcp-to-cli --label backend\`, \`--depends-on-task-id <taskId>\` for each prerequisite, \`--clear-labels\`, and \`--clear-dependencies\`. Use \`flux tasks list --json\` for ids. Reference only tasks in the current project.
+When you split one user-facing feature or initiative into **two or more** board tasks, treat them as a single feature batch. **Do this on every \`flux tasks create\` in the batch — not in a follow-up \`flux tasks update\`:**
+
+1. **Feature branch** — Choose one git branch (e.g. \`feature/list-view\`). Pass \`--source-branch <branch> --create-source-branch-if-missing=true\` on **each** task in the batch. If the user named a branch, use it; otherwise derive a short \`feature/<slug>\` from the feature name.
+2. **Labels** — Pass at least two repeated \`--label\` flags on **each** create: one area (e.g. \`frontend\`, \`backend\`, \`planning\`) and one kind (e.g. \`enhancement\`, \`bugfix\`). Add a feature slug label when helpful (e.g. \`list-view\`).
+3. **Dependencies** — The CLI supports \`--depends-on-task-id\` on **create and update** (aliases: \`--blocked-by-task-id\`). Create foundation tasks first; for later tasks in the batch, pass \`--depends-on-task-id <id>\` for each prerequisite using ids from \`flux tasks list --json\` or from earlier creates in the same turn. Typical order: toggle/shell → core component → sorting → polish. Do **not** tell the user dependencies are UI-only.
+
+**Single-task requests:** Still add sensible \`--label\` flags. Use \`--source-branch\` when the user names a branch or the work clearly belongs on a named feature branch.
+
+**Task branches (all creates):** \`--source-branch\` / \`--feature-branch\` set the git branch for agent sessions. \`--create-source-branch-if-missing=true\` creates the branch on first session start when it does not exist yet.
+
+**Task labels and dependencies:** Use repeated flags, not JSON: \`--label frontend --label enhancement\`, \`--depends-on-task-id <taskId>\` (repeat per blocker), \`--clear-labels\`, \`--clear-dependencies\` on update. Reference only tasks in the current project.
 
 **Team (cloud) projects:** CLI commands route through the running Flux app. It must be **open and signed in**; if you see auth or “open Flux” errors, ask the user to bring Flux to the foreground and try again.
 

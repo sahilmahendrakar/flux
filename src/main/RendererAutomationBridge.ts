@@ -24,7 +24,7 @@ interface PendingRequest {
 
 /**
  * Main-side request/response bridge to the renderer for cloud-project automation
- * (CLI, MCP, and other callers). The renderer holds Firebase auth and the active
+ * (CLI and other automation callers). The renderer holds Firebase auth and the active
  * TaskProvider, so Firestore reads/writes for cloud projects go through this RPC.
  * Local projects do not use the bridge.
  */

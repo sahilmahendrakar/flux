@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { FluxCliConnectionError, invokeFluxAutomation } from './client';
 import { loadFluxCliBridgeConfig } from './config';
+import { printFluxCliHelp } from './help';
 import { parseFluxCliArgs } from './parseArgs';
 import type { FluxAutomationHttpOp } from '../main/AutomationHttpServer';
 
@@ -25,6 +26,10 @@ function printError(message: string): void {
 }
 
 export async function runFluxCli(argv: string[]): Promise<number> {
+  if (printFluxCliHelp(argv)) {
+    return EXIT_OK;
+  }
+
   const parsed = parseFluxCliArgs(argv);
   if (!parsed.ok) {
     printError(parsed.message);

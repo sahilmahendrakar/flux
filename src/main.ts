@@ -16,8 +16,11 @@ import {
   resolveRepoForBranchDiscovery,
   validateTaskRepoIdPatchValue,
 } from './repoIdentity';
-import { McpServer } from './main/McpServer';
 import { AutomationHttpServer } from './main/AutomationHttpServer';
+import {
+  invokeFluxAutomationRequest,
+  type FluxAutomationHostDeps,
+} from './main/fluxAutomationHost';
 import { RendererAutomationBridge } from './main/RendererAutomationBridge';
 import {
   fluxAutomationPtyEnv,
@@ -413,8 +416,8 @@ function resolveWindowIconPath(): string | undefined {
 
 let mainWindow: BrowserWindow | null = null;
 
-let fluxMcpServer: McpServer | null = null;
 let fluxAutomationServer: AutomationHttpServer | null = null;
+let fluxAutomationHostDeps: FluxAutomationHostDeps | null = null;
 let fluxAutomationToken: string | null = null;
 let fluxAutomationRendererBridge: RendererAutomationBridge | null = null;
 
@@ -3451,34 +3454,42 @@ app.whenReady().then(async () => {
   automationRendererBridge.install();
   fluxAutomationRendererBridge = automationRendererBridge;
 
-  fluxMcpServer = new McpServer(
+  fluxAutomationHostDeps = {
     taskStore,
     projectStore,
     appStateStore,
     bindingStore,
-    automationRendererBridge,
-    () => mainWindow,
-    {
+    bridge: automationRendererBridge,
+    getMainWindow: () => mainWindow,
+    taskActions: {
       updateTask: (id, patch) =>
-        updateTaskWithTransitionHandling(id, patch, 'mcp:flux__update_task'),
-      startTask: (id) => startTaskAndSession(id, 'mcp:flux__start_task'),
+        updateTaskWithTransitionHandling(id, patch, 'cli:flux tasks update'),
+      startTask: (id) => startTaskAndSession(id, 'cli:flux tasks start'),
       startSessionForExistingTask: (task) =>
-        runStartSessionForTaskWithLogging(task, 'mcp:flux__start_task'),
+        runStartSessionForTaskWithLogging(task, 'cli:flux tasks start'),
       autoStartIfTransitionedToInProgress: (previous, updated) =>
         maybeAutoStartSessionOnInProgressTransition(
           previous,
           updated,
-          'mcp:flux__update_task',
+          'cli:flux tasks update',
         ),
     },
-  );
-  fluxMcpServer.start();
+  };
 
   fluxAutomationToken = newFluxAutomationToken();
   fluxAutomationServer = new AutomationHttpServer(
     fluxAutomationToken,
     () => appStateStore.get().activeProjectKey,
-    (body) => fluxMcpServer!.invokeAutomationRequest(body),
+    (body) => {
+      if (!fluxAutomationHostDeps) {
+        return Promise.resolve({
+          ok: false as const,
+          error: 'Automation host not ready',
+          code: 'NO_ACTIVE_PROJECT' as const,
+        });
+      }
+      return invokeFluxAutomationRequest(fluxAutomationHostDeps, body);
+    },
   );
   fluxAutomationServer.start();
 
@@ -4038,7 +4049,7 @@ app.on('before-quit', () => {
   fluxAutomationServer?.stop();
   fluxAutomationServer = null;
   fluxAutomationToken = null;
-  fluxMcpServer?.stop();
+  fluxAutomationHostDeps = null;
   planningDocsWatcher?.dispose();
   planningDocsWatcher = null;
   // Intentionally do NOT shut down the flux-daemon here; that's the whole

@@ -561,6 +561,8 @@ describe('ensurePlanningAssistantMarkdownFiles (multi-repo2 planning copy)', () 
     });
     expect((await fs.stat(path.join(dir, 'docs'))).isDirectory()).toBe(true);
     const claude = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
+    expect(claude).toContain('<!-- flux-assistant-version:2 -->');
+    expect(claude).toContain('## Multi-task features (required)');
     expect(claude).toContain('flux project info --json');
     expect(claude).toContain('repos[]');
     expect(claude).toContain('--repo-id');
@@ -584,6 +586,25 @@ describe('ensurePlanningAssistantMarkdownFiles (multi-repo2 planning copy)', () 
     expect(claude).not.toContain('repos[]');
     expect(claude).not.toContain('--repo-id');
     expect(claude).not.toContain('flux__');
+  });
+
+  it('upgrades generated CLI assistant files missing the current version marker', async () => {
+    const v1Cli = `# Planning workspace — Old
+
+## Flux CLI
+
+Planning sessions inject bridge env.
+`;
+    await fs.writeFile(path.join(dir, 'CLAUDE.md'), v1Cli, 'utf8');
+
+    await ensurePlanningAssistantMarkdownFiles(dir, 'Upgraded', '/tmp/repo', {
+      multiRepoGuide: false,
+    });
+
+    const claude = await fs.readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
+    expect(claude).toContain('<!-- flux-assistant-version:2 -->');
+    expect(claude).toContain('## Multi-task features (required)');
+    expect(claude).toContain('--depends-on-task-id');
   });
 
   it('migrates generated MCP-era assistant files to CLI guidance', async () => {

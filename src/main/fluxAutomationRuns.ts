@@ -1,7 +1,4 @@
-/**
- * Planning-agent automation invoked via HTTP (`AutomationHttpServer`) and CLI, MCP tools.
- * Keep behavior aligned with the `flux__*` MCP tool implementations in `McpServer.ts`.
- */
+/** Planning-agent automation invoked via HTTP (`AutomationHttpServer`) and the `flux` CLI. */
 import path from 'node:path';
 import type { AutomationBridgeResult, RendererAutomationBridge } from './RendererAutomationBridge';
 import type {
@@ -27,7 +24,7 @@ import {
   resolveLocalTaskRepoIdForCreate,
   resolveRepoForBranchDiscovery,
 } from '../repoIdentity';
-import { filterTasksByExcludeStatuses, FLUX_TASK_STATUS_VALUES } from './mcpListTasksFilter';
+import { filterTasksByExcludeStatuses, FLUX_TASK_STATUS_VALUES } from './automationListTasksFilter';
 import type { ProjectStore } from './ProjectStore';
 import type { TaskStore } from './TaskStore';
 import type { LocalBindingStore } from './LocalBindingStore';
@@ -370,7 +367,7 @@ export async function automationRunStartTask(
       return {
         ok: false,
         error:
-          'This task has no coding agent assigned. Use flux__update_task to set agent before starting.',
+          'This task has no coding agent assigned. Use `flux tasks update --agent` before starting.',
       };
     }
     const updated = await h.taskActions.startTask(input.id);
@@ -394,7 +391,7 @@ export async function automationRunStartTask(
     return {
       ok: false,
       error:
-        'This task has no coding agent assigned. Use flux__update_task to set agent before starting.',
+        'This task has no coding agent assigned. Use `flux tasks update --agent` before starting.',
     };
   }
   const updateResult = await h.bridge.request<AutomationBridgeTasksUpdateResult>('tasks.update', active.activeKey, {

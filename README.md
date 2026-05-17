@@ -85,7 +85,7 @@ When you start a planning session, Flux injects automation bridge env vars, writ
 
 Seeded `planning/CLAUDE.md` and `planning/AGENTS.md` document the CLI surface for all planning agents. Always pass `--json` on board commands. When the user names a git branch for work, pass `--source-branch` on each related `flux tasks create`. `flux tasks delete` requires `--confirm` after explicit user intent.
 
-Legacy `mcp.json` / `planning/.cursor/mcp.json` files are left untouched if already present; new planning sessions no longer create them.
+Planning automation uses the loopback HTTP bridge and packaged `flux` CLI only (no local MCP server on port 47432). Legacy `mcp.json` / `planning/.cursor/mcp.json` files, if present from older sessions, are not modified or required.
 
 ---
 

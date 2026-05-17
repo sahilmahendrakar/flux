@@ -40,7 +40,10 @@ import {
   DEFAULT_AUTO_START_WHEN_UNBLOCKED,
 } from '../cloudBindingPrefs';
 import { migrateLegacyPlanningMarkdownIntoUserDocsDir } from '../planningDocs/planningUserDocsLegacyMigration';
-import { planningAssistantMarkdown } from './planningCliGuidance';
+import {
+  PLANNING_ASSISTANT_MARKDOWN_VERSION_MARKER,
+  planningAssistantMarkdown,
+} from './planningCliGuidance';
 
 const DEFAULT_AGENT: Agent = 'claude-code';
 const DEFAULT_BASE_BRANCH = 'main';
@@ -303,6 +306,22 @@ function isLegacyMcpPlanningAssistantMarkdown(body: string): boolean {
   );
 }
 
+function isFluxGeneratedPlanningAssistantMarkdown(body: string): boolean {
+  return body.includes('# Planning workspace —') && body.includes('## Flux CLI');
+}
+
+function needsPlanningAssistantMarkdownUpgrade(body: string): boolean {
+  return !body.includes(PLANNING_ASSISTANT_MARKDOWN_VERSION_MARKER);
+}
+
+function shouldReplacePlanningAssistantMarkdown(body: string): boolean {
+  if (isLegacyMcpPlanningAssistantMarkdown(body)) return true;
+  if (isFluxGeneratedPlanningAssistantMarkdown(body) && needsPlanningAssistantMarkdownUpgrade(body)) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Creates `CLAUDE.md` and/or `AGENTS.md` when missing. Existing generated MCP-era
  * assistant instructions are migrated to CLI instructions; other user edits are left alone.
@@ -322,7 +341,7 @@ export async function ensurePlanningAssistantMarkdownFiles(
     const filePath = path.join(planningDir, fileName);
     try {
       const existing = await fs.readFile(filePath, 'utf8');
-      if (isLegacyMcpPlanningAssistantMarkdown(existing)) {
+      if (shouldReplacePlanningAssistantMarkdown(existing)) {
         await fs.writeFile(filePath, md, 'utf8');
       }
     } catch (err: unknown) {
