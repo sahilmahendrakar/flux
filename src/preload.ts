@@ -226,6 +226,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('projects:addLocal') as Promise<
         LocalProject | { error: 'NOT_GIT_REPO' } | null
       >,
+    create: (input: import('./projectCreate').ProjectCreateInput) =>
+      ipcRenderer.invoke('projects:create', input) as Promise<
+        import('./projectCreate').ProjectCreateResult
+      >,
     activateLocal: (id: string | null) =>
       ipcRenderer.invoke('projects:activateLocal', id) as Promise<LocalProject | null>,
     removeLocal: (id: string) =>

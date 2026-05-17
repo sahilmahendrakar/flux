@@ -6,6 +6,12 @@ import os from 'node:os';
 import started from 'electron-squirrel-startup';
 import { TaskStore } from './main/TaskStore';
 import { ProjectStore } from './main/ProjectStore';
+import { writeOnboardingPending } from './main/projectOnboarding';
+import {
+  validateLocalProjectCreateInput,
+  type ProjectCreateInput,
+  type ProjectCreateResult,
+} from './projectCreate';
 import {
   effectiveTaskRepoId,
   nextPersistedRepoIdAfterPatch,
@@ -650,15 +656,16 @@ app.whenReady().then(async () => {
       await projectStore.init(lastOpenedProjectDir);
       const project = projectStore.get();
       if (project && project.id === activeProjectKey.id) {
-        const { projectDir: materialisedDir } = await projectStore.ensureLayoutForRoot(
-          project.rootPath,
+        const { projectDir: materialisedDir } = await projectStore.ensureLayoutForLocalProject(
+          project,
+          lastOpenedProjectDir,
         );
         if (materialisedDir !== lastOpenedProjectDir) {
           await projectStore.init(materialisedDir);
         }
         await taskStore.reinit(materialisedDir);
         await migrateTaskRepoIdsForProject(taskStore, project);
-        worktreeService.setRootPath(project.rootPath);
+        worktreeService.setRootPath(project.repos[0]?.rootPath ?? project.rootPath);
         worktreeService.setProjectDir(materialisedDir);
         await appStateStore.set({
           lastOpenedProjectDir: materialisedDir,
@@ -687,15 +694,16 @@ app.whenReady().then(async () => {
       await projectStore.init(lastOpenedProjectDir);
       const project = projectStore.get();
       if (project) {
-        const { projectDir: materialisedDir } = await projectStore.ensureLayoutForRoot(
-          project.rootPath,
+        const { projectDir: materialisedDir } = await projectStore.ensureLayoutForLocalProject(
+          project,
+          lastOpenedProjectDir,
         );
         if (materialisedDir !== lastOpenedProjectDir) {
           await projectStore.init(materialisedDir);
         }
         await taskStore.reinit(materialisedDir);
         await migrateTaskRepoIdsForProject(taskStore, project);
-        worktreeService.setRootPath(project.rootPath);
+        worktreeService.setRootPath(project.repos[0]?.rootPath ?? project.rootPath);
         worktreeService.setProjectDir(materialisedDir);
         await appStateStore.set({
           activeProjectKey: { kind: 'local', id: project.id },
@@ -1710,6 +1718,43 @@ app.whenReady().then(async () => {
     return openLocalProjectFromRoot(picked.rootPath);
   });
   ipcMain.handle(
+    'projects:create',
+    async (_e, input: ProjectCreateInput): Promise<ProjectCreateResult> => {
+      const validated = await validateLocalProjectCreateInput(input, {
+        isGitRepo: async (rootPath) => {
+          try {
+            await fs.access(path.join(rootPath, '.git'));
+            return true;
+          } catch {
+            return false;
+          }
+        },
+      });
+      if (!validated.ok) {
+        return { ok: false, error: validated.error };
+      }
+      try {
+        const { project, projectDir } = await projectStore.createFromInput(validated.value);
+        await writeOnboardingPending(projectDir);
+        await projectStore.init(projectDir);
+        await taskStore.reinit(projectDir);
+        await taskStore.migrateMissingProjectIds(project.id);
+        await migrateTaskRepoIdsForProject(taskStore, project);
+        worktreeService.setRootPath(project.repos[0]?.rootPath ?? project.rootPath);
+        worktreeService.setProjectDir(projectDir);
+        await appStateStore.set({
+          lastOpenedProjectDir: projectDir,
+          activeProjectKey: { kind: 'local', id: project.id },
+        });
+        return { ok: true, project, projectDir };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error('[projects:create]', message);
+        return { ok: false, error: 'CREATE_FAILED', message };
+      }
+    },
+  );
+  ipcMain.handle(
     'projects:activateLocal',
     async (_e, id: string | null): Promise<LocalProject | null> => {
       if (id === null) {
@@ -1725,8 +1770,9 @@ app.whenReady().then(async () => {
       await projectStore.init(projectDir);
       const project = projectStore.get();
       if (!project) throw new Error(`Local project not found: ${id}`);
-      const { projectDir: materialisedDir } = await projectStore.ensureLayoutForRoot(
-        project.rootPath,
+      const { projectDir: materialisedDir } = await projectStore.ensureLayoutForLocalProject(
+        project,
+        projectDir,
       );
       if (materialisedDir !== projectDir) {
         await projectStore.init(materialisedDir);
@@ -1734,7 +1780,7 @@ app.whenReady().then(async () => {
       await taskStore.reinit(materialisedDir);
       await taskStore.migrateMissingProjectIds(project.id);
       await migrateTaskRepoIdsForProject(taskStore, project);
-      worktreeService.setRootPath(project.rootPath);
+      worktreeService.setRootPath(project.repos[0]?.rootPath ?? project.rootPath);
       worktreeService.setProjectDir(materialisedDir);
       await appStateStore.set({
         lastOpenedProjectDir: materialisedDir,
