@@ -3221,7 +3221,6 @@ export default function App() {
                       }}
                     >
                       <Board
-                        projectId={project.id}
                         allTasks={sortedTasks}
                         onDragEnd={handleDragEnd}
                         onCreateTask={handleCreateTask}
