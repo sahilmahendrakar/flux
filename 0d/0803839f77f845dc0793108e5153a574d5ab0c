@@ -1,0 +1,46 @@
+src/projectCreate.ts
+  s_8bbaafc7f377a6::t_b2d88f979c48a7 1,3-27,29,31-211,237-239,241-271
+  s_8bbaafc7f377a6::t_e2a81d51b9ccee 214-226,228-229,232-236
+  s_8bbaafc7f377a6::t_d731b436ff8d4f 28,30
+  s_8bbaafc7f377a6::t_5ce077be6b2308 2
+  s_8bbaafc7f377a6::t_b3b04038c43207 212-213,227,230-231,240
+src/main/projectOnboarding.ts
+  s_8bbaafc7f377a6::t_2bff0a4282231b 1-23
+src/main/ProjectStore.test.ts
+  s_8bbaafc7f377a6::t_b76b8de88dcada 515-529
+  s_8bbaafc7f377a6::t_fdc9f8985c6dcc 500-514,530-649
+src/preload.ts
+  s_8bbaafc7f377a6::t_3f53b109678d48 229-232
+src/env.d.ts
+  s_8bbaafc7f377a6::t_421fb77423979d 214-216
+src/projectCreate.test.ts
+  s_8bbaafc7f377a6::t_a92826ef8e8363 1-131
+src/main/ProjectStore.ts
+  s_8bbaafc7f377a6::t_37485fc4b2b64d 879-890,895-1003
+  s_8bbaafc7f377a6::t_33082f15a1b340 559,564,567,570-574
+  s_8bbaafc7f377a6::t_23265a239c7eec 43
+  s_8bbaafc7f377a6::t_e7947ea7d1b221 891-894
+  s_8bbaafc7f377a6::t_3343fd6cde2286 241-244,246-253,255-256,259
+src/main.ts
+  s_8bbaafc7f377a6::t_bb9462e37dcdca 697-699,706
+  s_8bbaafc7f377a6::t_fe111af2631bcb 9-14
+  s_8bbaafc7f377a6::t_b27354c0ce8ea1 659-661,668
+  s_8bbaafc7f377a6::t_c097f403d1755d 1721-1756
+  s_8bbaafc7f377a6::t_1ddf7de1619c8f 1773-1775,1783
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "0d0803839f77f845dc0793108e5153a574d5ab0c",
+  "prompts": {},
+  "sessions": {
+    "s_8bbaafc7f377a6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ddd903e4-255d-49ac-9f26-741ff29425bf",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
