@@ -1,0 +1,72 @@
+src/App.tsx
+  s_a9e9d7d67bbb55::t_8624d6c606ab0e 779-781,789-792,795-796,800-802,808-816
+src/cloudBindingPrefs.test.ts
+  s_a9e9d7d67bbb55::t_8db1041912cae1 7,10
+  s_a9e9d7d67bbb55::t_f2e3e464fc0ed2 41-57
+src/cloudProjectCreate.test.ts
+  s_a9e9d7d67bbb55::t_33d88f644cdea4 1-23
+src/components/CreateCloudProjectModal.tsx
+  s_a9e9d7d67bbb55::t_cd9b6e61b0d624 86,88,90,92,94,104,106-113,119,140,142-204,206-214,216-240
+  s_a9e9d7d67bbb55::t_eb52fac36b0dde 105
+  s_a9e9d7d67bbb55::t_c69f7ef470330b 205
+  s_a9e9d7d67bbb55::t_a13bd81937e8f6 141
+  s_a9e9d7d67bbb55::t_c2bdf503ef1588 2-3,7-11,14-15,18-19,22-52,61-70,241-242
+  s_a9e9d7d67bbb55::t_c961f2da3729d0 215
+src/main/LocalBindingStore.ts
+  s_a9e9d7d67bbb55::t_069c5bf66040ca 54-66
+  s_a9e9d7d67bbb55::t_bcb1b79c921b05 381-411
+src/components/ProjectsListView.tsx
+  s_a9e9d7d67bbb55::t_79ce9a277e8020 530-536
+  s_a9e9d7d67bbb55::t_1f4dde339b51f4 205-208,216-219,222-228,231-232,235-244,247-257,263-264,266-267,269-275,277-298
+  s_a9e9d7d67bbb55::t_ba9cfd2816dccf 265
+  s_a9e9d7d67bbb55::t_06000534a48189 12-15
+  s_a9e9d7d67bbb55::t_7f94a951f49494 549-557
+  s_a9e9d7d67bbb55::t_50e6daf8fa0cf7 74-92
+  s_a9e9d7d67bbb55::t_f95fe2636959e0 2,4-8
+  s_a9e9d7d67bbb55::t_d360fc1a87fa85 597-598
+  s_a9e9d7d67bbb55::t_1ca9fc52addd7e 9
+  s_a9e9d7d67bbb55::t_0fc72c9f5ad29f 58-60
+src/cloudProjectCreate.ts
+  s_a9e9d7d67bbb55::t_e8dae419b376bc 1-81
+src/cloudProjectActivation.test.ts
+  s_a9e9d7d67bbb55::t_5e649c0aaeeff8 1-48
+src/cloudFirestoreRepoParse.test.ts
+  s_a9e9d7d67bbb55::t_2c0d9fc645ed50 1-33
+src/preload.ts
+  s_a9e9d7d67bbb55::t_1268eb6f256b27 263-276
+src/cloudProjectActivation.ts
+  s_a9e9d7d67bbb55::t_16b2b8d0b02727 2-6,8,25-38,42-65
+  s_a9e9d7d67bbb55::t_ac1b699379a628 39-41
+  s_a9e9d7d67bbb55::t_fd48b32cd1079d 1,7,9-24
+src/env.d.ts
+  s_a9e9d7d67bbb55::t_5c82a5645c5922 235-243
+src/cloudBindingPrefs.ts
+  s_a9e9d7d67bbb55::t_a0741b4d5b9cee 185
+  s_a9e9d7d67bbb55::t_70b948825f51e5 171,176-179,181-184,193
+src/renderer/projects/cloudProjects.ts
+  s_a9e9d7d67bbb55::t_620de91783a6e4 112-121,125,139-141,145-146,149-160,167
+  s_a9e9d7d67bbb55::t_b4a2c507c44222 19-23,26
+src/main.ts
+  s_a9e9d7d67bbb55::t_4da84a056e9300 1053
+  s_a9e9d7d67bbb55::t_17a81915ce364a 734-737
+  s_a9e9d7d67bbb55::t_083e2ac3eee07d 33-34,40
+  s_a9e9d7d67bbb55::t_8592c962f1141f 1825-1835,1841,1843,1848-1849,1853,1859-1918
+src/cloudFirestoreRepoParse.ts
+  s_a9e9d7d67bbb55::t_6f209b0db066f7 1-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "ed9c71c741c654bec72dd1dfc3bc9cdc30e1fd2e",
+  "prompts": {},
+  "sessions": {
+    "s_a9e9d7d67bbb55": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "29a05374-7f8f-41f2-9ee3-97f0bb8bb1ad",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
