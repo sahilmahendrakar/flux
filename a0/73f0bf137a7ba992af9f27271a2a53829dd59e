@@ -1,0 +1,103 @@
+src/main/openWorkspacePath.ts
+  ai_agent 7,201,211,231,237,274
+src/main/taskEphemeralTeardown.ts
+  ai_agent 6,48,103,105,173
+src/main/fluxxTaskBranch.ts
+  s_577a8d037512b8::t_e02816c7fbc5cc 9-10,12,16-18
+src/main/taskSourceBranchGuard.ts
+  ai_agent 7-8,53-54,59,73,75,125,138,140
+src/githubPrMetadata.test.ts
+  ai_agent 57,67,107,113,122,128
+src/githubPrReviewWhenOpenAutomation.test.ts
+  ai_agent 77,84,94
+.env.example
+  s_577a8d037512b8::t_4f32a0351dc1d9 32-33
+src/App.tsx
+  ai_agent 674,710,1083,1085,1087-1088,1887-1888
+src/main/taskAgentSessionRecords.test.ts
+  s_577a8d037512b8::t_eb61d9d1ce2e55 15,22,27
+src/githubPrReviewWhenOpenAutomation.ts
+  ai_agent 2,20,29
+src/env.d.ts
+  ai_agent 216,286,298,306,320,327-328
+src/preload.ts
+  ai_agent 233-234,322,333,347,367,386-388,391
+src/main/WorktreeService.ts
+  ai_agent 12-16,79,101,105,110-111,122
+src/renderer/tasks/TaskProvider.ts
+  ai_agent 20
+src/taskAgentPullRequestPrompt.ts
+  ai_agent 7
+src/taskBranches.ts
+  ai_agent 3
+src/main/githubTaskPr.ts
+  ai_agent 13,166-167,554
+scripts/codemod-flux-to-fluxx-identifiers.mjs
+  s_577a8d037512b8::t_fbd9b409fc20e4 14-23
+  s_577a8d037512b8::t_fd374bf98ecd6c 1-5,9,11,13,24-59,61-70,74-87,89-90,92-104,107,109-113
+src/components/TaskDetailPanel.tsx
+  ai_agent 450,932,949
+src/components/ProjectsListView.tsx
+  ai_agent 115,128,148,160,256,270
+src/main/taskAgentSessionRecords.ts
+  s_577a8d037512b8::t_c060960e07f4f0 23-48
+  s_577a8d037512b8::t_8c01daff42fe1e 104-108
+  s_577a8d037512b8::t_1fbc07b92bdb3f 96-97,101-103
+  s_577a8d037512b8::t_d837eff192ef1e 195
+  s_577a8d037512b8::t_bbc9c256f0a45f 189
+src/taskRequestPullRequestFromAgentContext.test.ts
+  ai_agent 93,95,104,106
+src/main/openWorkspacePath.test.ts
+  ai_agent 18
+src/githubTaskPrPolicy.test.ts
+  ai_agent 36,48,56,71,78,81,93,109,112,168-169,171-172
+src/main/trustPromptAutorespondRoots.ts
+  ai_agent 3,14
+src/main/TaskStore.ts
+  s_577a8d037512b8::t_0e64314619c08e 100-105
+  s_577a8d037512b8::t_f9b6e510f8ea91 32-42
+  s_577a8d037512b8::t_677bcf53609938 152-165
+src/main/projectFluxxRemoval.ts
+  s_577a8d037512b8::t_52ead4b072611d 183
+  s_577a8d037512b8::t_de59ce07421edd 60
+src/planningDocs/resolvePlanningDocsDir.ts
+  ai_agent 10,22
+src/taskAgentPullRequestPrompt.test.ts
+  ai_agent 15,17,23,25,31,33,41,43,69,79,90,96
+src/main/ProjectStore.ts
+  ai_agent 19,304,827-828,932,935,954,962,968-969,1078,1081,1086,1121,1125,1132,1141,1145,1180,1184,1191,1198,1202,1220,1227,1234,1237,1245,1252,1260,1266
+src/main/WorktreeService.integration.test.ts
+  ai_agent 9,62,108,127,311
+src/main/projectDirLayout.ts
+  s_577a8d037512b8::t_1f43cf5bedb0eb 7-8,11-13
+src/types.ts
+  ai_agent 379,399,401,499,505,520
+src/taskBranch.ts
+  ai_agent 4,10,13-15
+src/renderer/tasks/cloudGithubPrRefreshReconcile.test.ts
+  ai_agent 76
+src/main.ts
+  ai_agent 29,35,174,281,498,503,622,1735,1737,1748,1758,1760,1900,2007,2068,2075,2077,2112,2148,2155,2157,2188,2199,2208,2218,2223,2244-2245,2497,2660,2666,2668,2672,3005,3149,3155,3160,3166,3169,3175,3177,3208,3405,3412,3444,3451,3483,3576
+src/renderer/tasks/FirestoreTaskProvider.ts
+  s_577a8d037512b8::t_e91f530637df02 437
+src/main/trustPromptAutorespondRoots.test.ts
+  ai_agent 4,12
+src/main/EmailService.ts
+  s_577a8d037512b8::t_0ef13fd970d119 14-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "a073f0bf137a7ba992af9f27271a2a53829dd59e",
+  "prompts": {},
+  "sessions": {
+    "s_577a8d037512b8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "63ba37e5-94b8-456e-a858-bcf610b6469b",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
