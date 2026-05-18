@@ -1,0 +1,30 @@
+src/components/LoadingScreen.tsx
+  s_5bbadf0204e895::t_ec9bffafc79f3e 3
+src/App.tsx
+  s_5bbadf0204e895::t_d4dec3b2e138dd 2968-2969
+index.html
+  s_5bbadf0204e895::t_362d2b572b874f 6-12,17-30,32,34-41
+  s_5bbadf0204e895::t_ec44707756a899 31,33,42-43
+  s_5bbadf0204e895::t_e246c4ff6d6980 15-16,44-45
+src/index.css
+  s_5bbadf0204e895::t_9b150a517b81f1 15-16,18
+src/renderer.tsx
+  s_5bbadf0204e895::t_cf76979feccfcc 16,18
+  s_5bbadf0204e895::t_a5f2706c8900f2 1,5-7,13-15,17,19-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "757c3c8b5fb06073b4b4ae9ae827d74d764ce175",
+  "prompts": {},
+  "sessions": {
+    "s_5bbadf0204e895": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3099a29b-f7c9-45ac-ab9f-8b7f8415b609",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
