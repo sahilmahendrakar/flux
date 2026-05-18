@@ -2965,9 +2965,8 @@ export default function App() {
     [selectedTask, cloudProjectId, runners.byTask, uid, projectMembers],
   );
 
-  // Only block the shell while hydrating a saved *local* active project (fast path).
-  // Saved cloud projects resolve in the background; auth may still be loading.
-  if (activationLoading) {
+  // Block the shell while hydrating a saved active project (local or cloud).
+  if (activationLoading || pendingCloudActive) {
     return (
       <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#09090b] text-white">
         {isMac ? (
