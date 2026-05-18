@@ -1,0 +1,31 @@
+src/components/ProjectsListView.tsx
+  s_bc4290b83e864f::t_bd68649759a0eb 126-133
+  s_bc4290b83e864f::t_f3bc6b631680af 428
+  s_bc4290b83e864f::t_ffa3186e7afbc2 1
+  s_bc4290b83e864f::t_fd6c8faf785dfa 480,485,488,492-536,563,567-572,574-637,639-655,657-687,689-693
+  s_bc4290b83e864f::t_5f2639757ff0b8 737-745,749-751,755-756,759
+  s_bc4290b83e864f::t_ec8a80a9338a40 64-77
+  s_bc4290b83e864f::t_534150cea9f6a9 21,24
+src/renderer/projects/buildProjectPickerRows.test.ts
+  s_bc4290b83e864f::t_3fea017eec79ea 1-123
+src/renderer/projects/buildProjectPickerRows.ts
+  s_bc4290b83e864f::t_623ef9815b05a4 1-91
+src/components/ProjectPickerSyncBadges.tsx
+  s_bc4290b83e864f::t_e2f01827a1abe1 1-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "04e53df59fc7cd75eb69f98c3a7a7e15021af261",
+  "prompts": {},
+  "sessions": {
+    "s_bc4290b83e864f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c1c208e6-69c9-42b5-9672-86bee97be4d2",
+        "model": "default"
+      },
+      "human_author": "Sahil Mahendrakar <sahil.mahendrakar@gmail.com>"
+    }
+  }
+}
